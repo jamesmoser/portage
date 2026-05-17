@@ -31,25 +31,23 @@ function toPD(nominalValue: number, personalInflation: number, yearsFromNow: num
 }
 
 function rrspContribNom(account: AppState['rrspA'], year: number, alive: boolean, isRrif: boolean, inflFactor: number): number {
-  if (!alive || isRrif || account.annualContribution <= 0) return 0
-  const endYear = getYear(account.contributionEndDate)
+  if (isRrif) return 0
+  return contribNom(account.annualContribution, account.contributionEndDate, account.contributionTiming, year, alive, inflFactor)
+}
+
+function contribNom(annualContribution: number, contributionEndDate: string, contributionTiming: 'lump' | 'spread', year: number, alive: boolean, inflFactor: number): number {
+  if (!alive || annualContribution <= 0) return 0
+  const endYear = getYear(contributionEndDate)
   if (year > endYear) return 0
-  const base = account.annualContribution * inflFactor
-  if (account.contributionTiming === 'lump') return base
+  const base = annualContribution * inflFactor
+  if (contributionTiming === 'lump') return base
   if (year < endYear) return base
-  const endMonth = new Date(account.contributionEndDate).getMonth() + 1  // 1–12
+  const endMonth = new Date(contributionEndDate).getMonth() + 1
   return base * endMonth / 12
 }
 
 function tfsaContribNom(account: AppState['tfsaA'], year: number, alive: boolean, inflFactor: number): number {
-  if (!alive || account.annualContribution <= 0) return 0
-  const endYear = getYear(account.contributionEndDate)
-  if (year > endYear) return 0
-  const base = account.annualContribution * inflFactor
-  if (account.contributionTiming === 'lump') return base
-  if (year < endYear) return base
-  const endMonth = new Date(account.contributionEndDate).getMonth() + 1
-  return base * endMonth / 12
+  return contribNom(account.annualContribution, account.contributionEndDate, account.contributionTiming, year, alive, inflFactor)
 }
 
 function cppFactor(startDate: string, birthDate: string): number {
@@ -373,8 +371,8 @@ export function runProjection(state: AppState): ProjectionResult {
     rrspB  = grow(Math.max(0, rrspB  + rrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
     tfsaA  = grow(tfsaA  + tfsaContribA, tfsaRetA)
     tfsaB  = grow(tfsaB  + tfsaContribB, tfsaRetB)
-    nonRegA = grow(nonRegA + (!retiredA && aAlive ? state.nonRegA.annualContribution * inflFactor : 0), nonRegRetA)
-    nonRegB = grow(nonRegB + (!retiredB && bAlive ? state.nonRegB.annualContribution * inflFactor : 0), nonRegRetB)
+    nonRegA = grow(nonRegA + contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aAlive, inflFactor), nonRegRetA)
+    nonRegB = grow(nonRegB + contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bAlive, inflFactor), nonRegRetB)
     hisa   = grow(hisa, state.riskFreeRatePct / 100)
 
     // ── Convert to present-day dollars ────────────────────────────────────────

@@ -103,6 +103,8 @@ export interface NonRegAccount {
   balance: number
   acb: number                              // adjusted cost base (book value)
   annualContribution: number
+  contributionEndDate: string              // date of last contribution
+  contributionTiming: 'lump' | 'spread'   // lump = full year applied Jan 1; spread = pro-rated to end date
   returnRateOverrideEnabled: boolean
   returnRateOverridePct: number
 

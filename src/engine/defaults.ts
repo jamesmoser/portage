@@ -209,11 +209,13 @@ export const DEFAULT_STATE: AppState = {
 
   nonRegA: {
     balance: 0, acb: 0, annualContribution: 0,
+    contributionEndDate: retireA, contributionTiming: 'lump',
     returnRateOverrideEnabled: false, returnRateOverridePct: 0,
     eligibleDivYieldPct: 0, foreignIncomeYieldPct: 0, interestYieldPct: 0,
   },
   nonRegB: {
     balance: 0, acb: 0, annualContribution: 0,
+    contributionEndDate: retireB, contributionTiming: 'lump',
     returnRateOverrideEnabled: false, returnRateOverridePct: 0,
     eligibleDivYieldPct: 0, foreignIncomeYieldPct: 0, interestYieldPct: 0,
   },
