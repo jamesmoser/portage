@@ -25,8 +25,34 @@ function TFSASection({ label, account, birthDate, planningEndAge, retirementDate
   personColor?: string
 }) {
   const deathDate = dateAtAge(birthDate, planningEndAge)
+
+  const infoModal = (
+    <div className="space-y-3 text-sm">
+      <div>
+        <p className="font-semibold mb-1">Tax-Free Savings Account</p>
+        <p>All growth inside a TFSA is tax-free, and withdrawals are never added to taxable income. This means TFSA withdrawals have no impact on income-tested benefits such as OAS, GIS, or the Age Amount — making them the most tax-efficient source of retirement income.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">Contribution Room</p>
+        <p>Room accumulates every calendar year for any Canadian resident age 18+, regardless of employment or retirement status. The 2024 annual limit is $7,000, indexed to CPI in $500 increments. Any amount <strong>withdrawn in a year is restored as new contribution room on January 1 of the following year</strong> — so strategic withdrawals in one year can be re-contributed the next.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">RRSP Meltdown Strategy</p>
+        <p>A common high-net-worth approach is to draw down the RRSP/RRIF early in retirement (while tax brackets are manageable) and redirect the after-tax proceeds into the TFSA each year. This shifts assets from a fully-taxable account into a permanently tax-free one, reducing future RRIF minimums and their impact on OAS clawback. To model this: set the annual TFSA contribution to the expected after-tax RRSP proceeds and use "Date of Death" as the end date.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">Lump Sum vs Spread</p>
+        <p>Lump sum applies the full annual contribution on Jan 1. Spread pro-rates the contribution evenly through the year. The final partial year is adjusted to the contribution end date month in both cases.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">Death and Survivor Transfer</p>
+        <p>A TFSA can be transferred to a surviving spouse as an <strong>exempt contribution</strong> — it does not consume the survivor's existing contribution room. The model applies this rollover automatically in the year following the first death.</p>
+      </div>
+    </div>
+  )
+
   return (
-    <SectionCard title={label} width="half" personColor={personColor} onReset={onReset}>
+    <SectionCard title={label} width="half" personColor={personColor} onReset={onReset} info={infoModal}>
       <div className="grid grid-cols-2 gap-3">
         <NumberInput label="Current Balance" value={account.balance}
           onChange={v => onChange({ ...account, balance: v })}
