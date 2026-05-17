@@ -2,14 +2,24 @@ import { exactAgeAt } from '../engine/dates'
 
 export type XAxisMode = 'year' | 'ageA' | 'ageB'
 
-export function buildXAxis(years: number[], mode: XAxisMode, aBirth: string, bBirth: string) {
+export function buildXAxis(
+  years: number[], mode: XAxisMode,
+  aBirth: string, bBirth: string,
+  aEndAge: number, bEndAge: number,
+) {
   return {
     tickmode: 'array' as const,
     tickvals: years,
     ticktext: years.map(y => {
       const d = `${y}-12-31`
-      if (mode === 'ageA') return String(Math.floor(exactAgeAt(aBirth, d)))
-      if (mode === 'ageB') return String(Math.floor(exactAgeAt(bBirth, d)))
+      if (mode === 'ageA') {
+        const age = Math.floor(exactAgeAt(aBirth, d))
+        return age > aEndAge ? `(${age})` : String(age)
+      }
+      if (mode === 'ageB') {
+        const age = Math.floor(exactAgeAt(bBirth, d))
+        return age > bEndAge ? `(${age})` : String(age)
+      }
       return String(y)
     }),
   }

@@ -237,7 +237,7 @@ export function DBPensionTab() {
   const allTraces = [empTraceA, empTraceB, ...pensionTracesA, ...pensionTracesB]
   const hasData = empTraceA.y.some((v: number) => v > 0) || empTraceB.y.some((v: number) => v > 0) || pensionTracesA.length > 0 || pensionTracesB.length > 0
 
-  const dbXAxis = buildXAxis(allYears, xAxisMode, personA.birthDate, personB.birthDate)
+  const dbXAxis = buildXAxis(allYears, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
 
   return (
     <CardGrid>

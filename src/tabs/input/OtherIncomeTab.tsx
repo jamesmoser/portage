@@ -147,7 +147,7 @@ export function OtherIncomeTab() {
           layout={{
             barmode: 'stack',
             yaxis: { tickformat: ',.0f', title: { text: 'Annual Income ($)', font: { size: 11 } }, range: [0, maxOther > 0 ? maxOther * 1.05 : 50000] },
-            xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate) },
+            xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
           }}
           style={{ height: 280 }}
         />

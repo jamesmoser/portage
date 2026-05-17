@@ -83,9 +83,12 @@ export function NonRegTab() {
   const { dataPoints } = useMemo(() => runProjection(state), [state])
 
   const years = dataPoints.map(d => d.year)
+  const nonRegAVals = dataPoints.map(d => d.nonRegA)
+  const nonRegBVals = dataPoints.map(d => d.nonRegB)
+  const maxNonReg = Math.max(0, ...nonRegAVals.map((a, i) => a + nonRegBVals[i]))
   const chartData: Data[] = [
-    { x: years, y: dataPoints.map(d => d.nonRegA), name: `${aName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
-    { x: years, y: dataPoints.map(d => d.nonRegB), name: `${bName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegB } },
+    { x: years, y: nonRegAVals, name: `${aName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
+    { x: years, y: nonRegBVals, name: `${bName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegB } },
   ]
 
   return (
@@ -102,8 +105,8 @@ export function NonRegTab() {
               data={chartData}
               layout={{
                 barmode: 'stack',
-                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } } },
-                xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate) },
+                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxNonReg > 0 ? maxNonReg * 1.05 : 10000] },
+                xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
               }}
               style={{ height: 320 }}
             />

@@ -30,9 +30,12 @@ export function TFSATab() {
   const { dataPoints } = useMemo(() => runProjection(state), [state])
 
   const years = dataPoints.map(d => d.year)
+  const tfsaAVals = dataPoints.map(d => d.tfsaA)
+  const tfsaBVals = dataPoints.map(d => d.tfsaB)
+  const maxTfsa = Math.max(0, ...tfsaAVals.map((a, i) => a + tfsaBVals[i]))
   const chartData: Data[] = [
-    { x: years, y: dataPoints.map(d => d.tfsaA), name: `${aName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
-    { x: years, y: dataPoints.map(d => d.tfsaB), name: `${bName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaB } },
+    { x: years, y: tfsaAVals, name: `${aName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
+    { x: years, y: tfsaBVals, name: `${bName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaB } },
   ]
 
   return (
@@ -98,8 +101,8 @@ export function TFSATab() {
               data={chartData}
               layout={{
                 barmode: 'stack',
-                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } } },
-                xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate) },
+                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxTfsa > 0 ? maxTfsa * 1.05 : 10000] },
+                xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
               }}
               style={{ height: 320 }}
             />

@@ -73,13 +73,17 @@ export interface EmploymentIncome {
 export interface RRSPAccount {
   balance: number
   annualContribution: number
-  contributionRoomRemaining: number
+  contributionEndDate: string           // date of last contribution (often = retirement date)
+  contributionTiming: 'lump' | 'spread' // lump = full year applied Jan 1; spread = pro-rated to end date
   spousalBalance: number
-  spousalLastContributionYear: number  // for 3-year attribution rule
+  spousalAnnualContribution: number
+  spousalContributionTiming: 'lump' | 'spread'
+  spousalLastContributionDate: string   // for 3-year attribution rule
   rrifConversionDate: string           // YYYY-MM-DD, max Dec 31 of year turning 71
   useSpouseAgeForMinimums: boolean     // use younger spouse's age to reduce RRIF minimums
   additionalWithdrawalAboveMinimum: number  // annual $ above RRIF minimum
-  returnRateOverridePct: number        // 0 = use blended default from ReturnRates
+  returnRateOverrideEnabled: boolean
+  returnRateOverridePct: number
 }
 
 // ─── TFSA ─────────────────────────────────────────────────────────────────────

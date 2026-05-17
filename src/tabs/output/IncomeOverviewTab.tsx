@@ -28,7 +28,7 @@ export function IncomeOverviewTab() {
   const aName = personA.name || 'A'
   const bName = personB.name || 'B'
   const years = dataPoints.map(d => d.year)
-  const xAxis = buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate)
+  const xAxis = buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
 
   // ── Income stacked bar ────────────────────────────────────────────────────
   const incomeData: Data[] = [

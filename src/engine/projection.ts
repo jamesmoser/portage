@@ -21,9 +21,6 @@ function nominalReturnForAge(age: number, rates: AppState['returnRates']): numbe
   return rates.from70plus / 100
 }
 
-function accountReturn(overridePct: number, defaultRate: number): number {
-  return overridePct > 0 ? overridePct / 100 : defaultRate
-}
 
 function grow(balance: number, rate: number): number {
   return balance * (1 + rate)
@@ -31,6 +28,17 @@ function grow(balance: number, rate: number): number {
 
 function toPD(nominalValue: number, personalInflation: number, yearsFromNow: number): number {
   return nominalValue / Math.pow(1 + personalInflation, yearsFromNow)
+}
+
+function rrspContribNom(account: AppState['rrspA'], year: number, alive: boolean, isRrif: boolean, inflFactor: number): number {
+  if (!alive || isRrif || account.annualContribution <= 0) return 0
+  const endYear = getYear(account.contributionEndDate)
+  if (year > endYear) return 0
+  const base = account.annualContribution * inflFactor
+  if (account.contributionTiming === 'lump') return base
+  if (year < endYear) return base
+  const endMonth = new Date(account.contributionEndDate).getMonth() + 1  // 1–12
+  return base * endMonth / 12
 }
 
 function cppFactor(startDate: string, birthDate: string): number {
@@ -103,6 +111,25 @@ export function runProjection(state: AppState): ProjectionResult {
     const aAlive   = year <= endYearA
     const bAlive   = year <= endYearB
 
+    // ── Asset rollover to surviving spouse at death ───────────────────────────
+    // All transfers use the spousal rollover election (no immediate tax):
+    //   RRSP/RRIF — successor annuitant: full balance, tax-free
+    //   TFSA      — exempt contribution: full balance, no room consumed
+    //   Non-reg   — spousal rollover at ACB: balance + embedded gain deferred
+    // Runs before RRIF minimums so combined balance drives first-year minimum.
+    if (!aAlive && bAlive) {
+      if (rrspA   > 0) { rrspB    += rrspA;    rrspA    = 0 }
+      if (tfsaA   > 0) { tfsaB    += tfsaA;    tfsaA    = 0 }
+      if (nonRegA > 0) { nonRegB  += nonRegA;  nonRegA  = 0
+                         nonRegAcbB += nonRegAcbA; nonRegAcbA = 0 }
+    }
+    if (!bAlive && aAlive) {
+      if (rrspB   > 0) { rrspA    += rrspB;    rrspB    = 0 }
+      if (tfsaB   > 0) { tfsaA    += tfsaB;    tfsaB    = 0 }
+      if (nonRegB > 0) { nonRegA  += nonRegB;  nonRegB  = 0
+                         nonRegAcbA += nonRegAcbB; nonRegAcbB = 0 }
+    }
+
     // ── Employment income ────────────────────────────────────────────────────
     const empGrowthA = Math.pow(1 + state.employmentA.growthRatePct / 100, yearsFromNow)
     const empGrowthB = Math.pow(1 + state.employmentB.growthRatePct / 100, yearsFromNow)
@@ -148,10 +175,14 @@ export function runProjection(state: AppState): ProjectionResult {
     }
 
     // ── CPP / OAS ────────────────────────────────────────────────────────────
-    const cppA_nom = aAlive && onOrAfter(dateStr, state.cppA.startDate)
-      ? state.cppA.estimatedMonthlyAt65 * 12 * cppFactorA * cpiFactorForYear : 0
-    const cppB_nom = bAlive && onOrAfter(dateStr, state.cppB.startDate)
-      ? state.cppB.estimatedMonthlyAt65 * 12 * cppFactorB * cpiFactorForYear : 0
+    const cppA_nom = (aAlive && onOrAfter(dateStr, state.cppA.startDate)
+        ? state.cppA.estimatedMonthlyAt65 * 12 * cppFactorA * cpiFactorForYear : 0)
+      + (!bAlive && aAlive && onOrAfter(dateStr, state.cppB.startDate)
+        ? state.cppB.estimatedMonthlyAt65 * 12 * cppFactorB * 0.60 * cpiFactorForYear : 0)
+    const cppB_nom = (bAlive && onOrAfter(dateStr, state.cppB.startDate)
+        ? state.cppB.estimatedMonthlyAt65 * 12 * cppFactorB * cpiFactorForYear : 0)
+      + (!aAlive && bAlive && onOrAfter(dateStr, state.cppA.startDate)
+        ? state.cppA.estimatedMonthlyAt65 * 12 * cppFactorA * 0.60 * cpiFactorForYear : 0)
     const oasStartedA = aAlive && onOrAfter(dateStr, state.oasA.startDate)
     const oasStartedB = bAlive && onOrAfter(dateStr, state.oasB.startDate)
     const oasA_nom = oasStartedA
@@ -317,8 +348,8 @@ export function runProjection(state: AppState): ProjectionResult {
     }
 
     // ── Grow accounts for next year ───────────────────────────────────────────
-    const rrspRetA  = accountReturn(state.rrspA.returnRateOverridePct, nomReturn)
-    const rrspRetB  = accountReturn(state.rrspB.returnRateOverridePct, nomReturn)
+    const rrspRetA  = state.rrspA.returnRateOverrideEnabled ? state.rrspA.returnRateOverridePct / 100 : nomReturn
+    const rrspRetB  = state.rrspB.returnRateOverrideEnabled ? state.rrspB.returnRateOverridePct / 100 : nomReturn
     const tfsaRetA  = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
     const tfsaRetB  = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
 
@@ -327,8 +358,10 @@ export function runProjection(state: AppState): ProjectionResult {
     const tfsaContribB = bAlive && (state.tfsaB.contributionStopAtRetirement ? !retiredB : year <= state.tfsaB.contributionEndYear)
       ? state.tfsaB.annualContribution * inflFactor : 0
 
-    rrspA  = grow(Math.max(0, rrspA  - (isRrifA ? rrifA_nom - rrifMinA : 0)), rrspRetA)
-    rrspB  = grow(Math.max(0, rrspB  - (isRrifB ? rrifB_nom - rrifMinB : 0)), rrspRetB)
+    const rrspContribA = rrspContribNom(state.rrspA, year, aAlive, isRrifA, inflFactor)
+    const rrspContribB = rrspContribNom(state.rrspB, year, bAlive, isRrifB, inflFactor)
+    rrspA  = grow(Math.max(0, rrspA  + rrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
+    rrspB  = grow(Math.max(0, rrspB  + rrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
     tfsaA  = grow(tfsaA  + tfsaContribA, tfsaRetA)
     tfsaB  = grow(tfsaB  + tfsaContribB, tfsaRetB)
     nonRegA = grow(nonRegA + (!retiredA && aAlive ? state.nonRegA.annualContribution * inflFactor : 0), nonRegRetA)

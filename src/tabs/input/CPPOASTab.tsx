@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { CardGrid } from '../../components/CardGrid'
 import { SectionCard } from '../../components/SectionCard'
@@ -8,7 +8,8 @@ import { ToggleInput } from '../../components/ToggleInput'
 import { SelectInput } from '../../components/SelectInput'
 import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
-import { exactAgeAt, getYear, dateAtAge } from '../../engine/dates'
+import { exactAgeAt, dateAtAge } from '../../engine/dates'
+import { runProjection } from '../../engine/projection'
 import { DEFAULT_STATE, CPP_COMBINED_MAX_MONTHLY, OAS_MAX_MONTHLY } from '../../engine/defaults'
 import { CHART_COLORS } from '../PaletteTab'
 import { InfoPanel } from '../../components/InfoPanel'
@@ -27,25 +28,9 @@ function oasAdjFactor(startDate: string, birthDate: string): number {
   return Math.min(1 + 0.006 * (age - 65) * 12, 1.36)
 }
 
-function buildBenefitValues(
-  allYears: number[], currentYear: number,
-  monthlyAt65: number, adjFactor: number,
-  startDate: string, birthDate: string, planEndAge: number,
-  cpi: number, pi: number,
-): number[] {
-  const startYear = getYear(startDate)
-  const endYear   = getYear(dateAtAge(birthDate, planEndAge))
-  const annual    = monthlyAt65 * 12 * adjFactor
-  return allYears.map(y => {
-    if (y < startYear || y > endYear) return 0
-    const nominal = annual * Math.pow(1 + cpi, Math.max(0, y - startYear))
-    return nominal / Math.pow(1 + pi, Math.max(0, y - currentYear))
-  })
-}
-
-
 export function CPPOASTab() {
-  const { cppA, cppB, oasA, oasB, personA, personB, cpiRatePct, personalInflationRatePct, update } = useStore()
+  const state = useStore()
+  const { cppA, cppB, oasA, oasB, personA, personB, update } = state
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
   const aName = personA.name || 'A'
   const bName = personB.name || 'B'
@@ -60,16 +45,8 @@ export function CPPOASTab() {
   const oasAgeA = exactAgeAt(personA.birthDate, oasA.startDate)
   const oasAgeB = exactAgeAt(personB.birthDate, oasB.startDate)
 
-  const currentYear = new Date().getFullYear()
-  const cpi = cpiRatePct / 100
-  const pi  = personalInflationRatePct / 100
-  const allYears = Array.from(
-    { length: Math.max(
-        getYear(dateAtAge(personA.birthDate, personA.planningEndAge)),
-        getYear(dateAtAge(personB.birthDate, personB.planningEndAge)),
-      ) - currentYear + 1 },
-    (_, i) => currentYear + i,
-  )
+  const { dataPoints } = useMemo(() => runProjection(state), [state])
+  const projYears = dataPoints.map(d => d.year)
 
   const annualA = cppA.estimatedMonthlyAt65 * 12 * cppFactA
   const annualB = cppB.estimatedMonthlyAt65 * 12 * cppFactB
@@ -127,10 +104,10 @@ export function CPPOASTab() {
   )
 
   const govChartData: Data[] = [
-    { x: allYears, y: buildBenefitValues(allYears, currentYear, cppA.estimatedMonthlyAt65, cppFactA, cppA.startDate, personA.birthDate, personA.planningEndAge, cpi, pi), type: 'bar', name: `${aName} CPP`, marker: { color: CHART_COLORS.cppA } },
-    { x: allYears, y: buildBenefitValues(allYears, currentYear, cppB.estimatedMonthlyAt65, cppFactB, cppB.startDate, personB.birthDate, personB.planningEndAge, cpi, pi), type: 'bar', name: `${bName} CPP`, marker: { color: CHART_COLORS.cppB } },
-    { x: allYears, y: buildBenefitValues(allYears, currentYear, oasA.estimatedMonthlyAt65, oasFactA, oasA.startDate, personA.birthDate, personA.planningEndAge, cpi, pi), type: 'bar', name: `${aName} OAS`, marker: { color: CHART_COLORS.oasA } },
-    { x: allYears, y: buildBenefitValues(allYears, currentYear, oasB.estimatedMonthlyAt65, oasFactB, oasB.startDate, personB.birthDate, personB.planningEndAge, cpi, pi), type: 'bar', name: `${bName} OAS`, marker: { color: CHART_COLORS.oasB } },
+    { x: projYears, y: dataPoints.map(d => d.cppA), type: 'bar', name: `${aName} CPP`, marker: { color: CHART_COLORS.cppA } },
+    { x: projYears, y: dataPoints.map(d => d.cppB), type: 'bar', name: `${bName} CPP`, marker: { color: CHART_COLORS.cppB } },
+    { x: projYears, y: dataPoints.map(d => d.oasA), type: 'bar', name: `${aName} OAS`, marker: { color: CHART_COLORS.oasA } },
+    { x: projYears, y: dataPoints.map(d => d.oasB), type: 'bar', name: `${bName} OAS`, marker: { color: CHART_COLORS.oasB } },
   ]
 
   const cppInfoModal = (
@@ -495,7 +472,7 @@ export function CPPOASTab() {
           layout={{
             barmode: 'stack',
             yaxis: { tickformat: ',.0f', title: { text: 'Annual Benefit ($)', font: { size: 11 } } },
-            xaxis: { ...buildXAxis(allYears, xAxisMode, personA.birthDate, personB.birthDate) },
+            xaxis: { ...buildXAxis(projYears, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
           }}
           style={{ height: 280 }}
         />

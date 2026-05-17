@@ -75,7 +75,7 @@ export function SpendingTab() {
   const { dataPoints } = useMemo(() => runProjection(state), [state])
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
   const years = dataPoints.map(d => d.year)
-  const xAxis = buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate)
+  const xAxis = buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
   const chartData: Data[] = [
     {
       x: years, y: dataPoints.map(d => d.householdSpending),
