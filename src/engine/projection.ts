@@ -92,7 +92,7 @@ export function runProjection(state: AppState): ProjectionResult {
   let nonRegB   = state.nonRegB.balance
   let nonRegAcbA = state.nonRegA.acb
   let nonRegAcbB = state.nonRegB.acb
-  let hisa      = state.cash.hisaBalance + state.cash.chequingBalance
+  let hisa      = state.cash.hisaBalance
 
   const cppFactorA = cppFactor(state.cppA.startDate, state.personA.birthDate)
   const cppFactorB = cppFactor(state.cppB.startDate, state.personB.birthDate)
@@ -355,6 +355,9 @@ export function runProjection(state: AppState): ProjectionResult {
     if (gap_nom > 0.01) {
       warnings.push(`Year ${year}: spending shortfall of $${Math.round(toPD(gap_nom, pi, yearsFromNow)).toLocaleString()} (PD)`)
     }
+    if (state.cash.hisaMinBalance > 0 && toPD(hisa, pi, yearsFromNow) < state.cash.hisaMinBalance) {
+      warnings.push(`Year ${year}: HISA balance ($${Math.round(toPD(hisa, pi, yearsFromNow)).toLocaleString()}) is below the minimum balance target ($${Math.round(state.cash.hisaMinBalance).toLocaleString()})`)
+    }
 
     // ── Grow accounts for next year ───────────────────────────────────────────
     const rrspRetA  = state.rrspA.returnRateOverrideEnabled ? state.rrspA.returnRateOverridePct / 100 : nomReturn
@@ -373,7 +376,7 @@ export function runProjection(state: AppState): ProjectionResult {
     tfsaB  = grow(tfsaB  + tfsaContribB, tfsaRetB)
     nonRegA = grow(nonRegA + contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aAlive, inflFactor), nonRegRetA)
     nonRegB = grow(nonRegB + contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bAlive, inflFactor), nonRegRetB)
-    hisa   = grow(hisa, state.riskFreeRatePct / 100)
+    hisa   = grow(hisa, state.cash.hisaRatePct / 100)
 
     // ── Convert to present-day dollars ────────────────────────────────────────
     const pd = (n: number) => toPD(n, pi, yearsFromNow)

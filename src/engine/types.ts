@@ -120,9 +120,8 @@ export interface NonRegAccount {
 
 export interface CashAccounts {
   hisaBalance: number
-  hisaRatePct: number          // annual interest rate
-  chequingBalance: number
-  targetCashBuffer: number     // minimum desired cash before drawing from investments
+  hisaRatePct: number       // nominal annual interest rate
+  hisaMinBalance: number    // warning threshold — plan flags years HISA falls below this (today's $)
 }
 
 // ─── Other Income ─────────────────────────────────────────────────────────────

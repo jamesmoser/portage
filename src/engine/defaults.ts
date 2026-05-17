@@ -223,8 +223,7 @@ export const DEFAULT_STATE: AppState = {
   cash: {
     hisaBalance: 0,
     hisaRatePct: 4.5,
-    chequingBalance: 0,
-    targetCashBuffer: 0,
+    hisaMinBalance: 0,
   },
 
   otherIncome: {
