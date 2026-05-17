@@ -19,7 +19,7 @@ const TABS = [
 ]
 
 export default function App() {
-  const { saveManual, exportJSON, importJSON, lastSaved } = useStore()
+  const { exportJSON, importJSON, resetToDefaults, lastSaved } = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -63,13 +63,7 @@ export default function App() {
             <span className="block w-[18px] h-0.5 bg-white rounded-full" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-50">
-              <button
-                className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                onClick={() => { saveManual(); setMenuOpen(false) }}
-              >
-                Save
-              </button>
+            <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-50">
               <button
                 className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                 onClick={() => { exportJSON(); setMenuOpen(false) }}
@@ -91,11 +85,18 @@ export default function App() {
                   }}
                 />
               </label>
+              <div className="border-t border-slate-100 my-1" />
+              <button
+                className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                onClick={() => { if (confirm('Reset all data to defaults? This cannot be undone.')) { resetToDefaults(); setMenuOpen(false) } }}
+              >
+                Reset to Defaults
+              </button>
               {lastSaved && (
                 <>
                   <div className="border-t border-slate-100 my-1" />
                   <p className="px-4 py-1.5 text-[10px] text-slate-400">
-                    Saved {lastSaved.toLocaleTimeString()}
+                    Auto-saved {lastSaved.toLocaleTimeString()}
                   </p>
                 </>
               )}

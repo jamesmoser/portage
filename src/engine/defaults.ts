@@ -98,7 +98,6 @@ export const DEFAULT_STATE: AppState = {
     from65to70: 5.0,
     from70plus: 4.0,
   },
-  riskFreeRatePct: 4.5,
 
   dbPensionA: {
     enabled: false,

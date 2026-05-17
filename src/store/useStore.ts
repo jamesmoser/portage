@@ -95,7 +95,7 @@ export const useStore = create<Store>()(
 
     exportJSON: () => {
       const state = get() as AppState
-      const json = JSON.stringify(state, null, 2)
+      const json = JSON.stringify(state, replacer, 2)
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -107,7 +107,7 @@ export const useStore = create<Store>()(
 
     importJSON: async (file: File) => {
       const text = await file.text()
-      const parsed = JSON.parse(text) as Partial<AppState>
+      const parsed = JSON.parse(text, reviver) as Partial<AppState>
       const merged = deepMerge(DEFAULT_STATE, parsed) as AppState
       set(() => ({ ...merged }))
       saveToStorage(merged)

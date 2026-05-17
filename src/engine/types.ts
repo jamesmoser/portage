@@ -246,7 +246,6 @@ export interface AppState {
   personalInflationRatePct: number
   cpiRatePct: number
   returnRates: ReturnRates
-  riskFreeRatePct: number         // HISA/cash return
 
   dbPensionA: DBPension
   dbPensionB: DBPension
