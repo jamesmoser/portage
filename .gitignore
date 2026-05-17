@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Vite cache
+.vite/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exported plan files (downloaded to ~/Downloads, but ignore if accidentally placed here)
+*.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -1,0 +1,99 @@
+/* ── Fonts ───────────────────────────────────────────────────────────────────
+   To swap fonts: change these two imports + update tailwind.config.js fonts{}
+   ─────────────────────────────────────────────────────────────────────────── */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background-color: #f2f3f5;
+    @apply font-sans text-slate-900 min-h-screen;
+  }
+}
+
+@layer components {
+
+  /* ── Cards ───────────────────────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-md
+           transition-shadow duration-150;
+  }
+  .card:hover {
+    @apply shadow-lg;
+  }
+  .card-header {
+    @apply px-5 pt-4 pb-3 flex items-start justify-between;
+  }
+  .card-title {
+    @apply text-sm font-semibold text-slate-800 leading-tight;
+  }
+  .card-note {
+    @apply text-xs text-slate-400 mt-0.5;
+  }
+  .card-body {
+    @apply px-5 pb-5;
+  }
+  .card-divider {
+    @apply border-t border-slate-100 mx-5 my-3;
+  }
+
+  /* ── Form fields ─────────────────────────────────────────────────────── */
+  .label-text {
+    @apply block text-sm font-medium text-slate-500 mb-1 leading-none;
+  }
+  .input-field {
+    @apply block w-full h-9 rounded border border-slate-200 bg-white
+           px-3 text-sm text-slate-900 placeholder:text-slate-400
+           focus:border-[#7B1515] focus:outline-none focus:ring-2 focus:ring-[#7B1515]/20
+           transition-colors duration-100;
+  }
+  input[type="number"].input-field {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  select.input-field {
+    @apply cursor-pointer;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 text-white
+           text-sm font-semibold rounded shadow
+           active:shadow-none active:translate-y-px
+           focus:outline-none focus:ring-2 focus:ring-[#7B1515]/40
+           transition-all duration-100 whitespace-nowrap;
+    background-color: #7B1515;
+  }
+  .btn-primary:hover { background-color: #6B1010; }
+  .btn-primary:active { background-color: #5a0d0d; }
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700
+           text-sm font-semibold rounded border border-slate-200 shadow
+           hover:bg-slate-50 active:bg-slate-100 active:shadow-none active:translate-y-px
+           focus:outline-none focus:ring-2 focus:ring-slate-400/40
+           transition-all duration-100 whitespace-nowrap;
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 text-white
+           text-sm font-semibold rounded shadow
+           active:shadow-none active:translate-y-px
+           focus:outline-none focus:ring-2 focus:ring-[#7B1515]/40
+           transition-all duration-100 whitespace-nowrap;
+    background-color: #7B1515;
+  }
+  .btn-danger:hover { background-color: #6B1010; }
+  .btn-danger:active { background-color: #5a0d0d; }
+
+  /* ── Legacy shims (kept for backward compat with any missed usages) ─── */
+  .section-card  { @apply card; }
+  .section-title { @apply card-title; }
+}
