@@ -29,12 +29,12 @@ export function AssumptionsTab() {
         <div className="space-y-3">
           <NumberInput label="Personal / Real Inflation Rate" value={personalInflationRatePct}
             onChange={v => update('personalInflationRatePct', v)}
-            suffix="% / year" min={0} max={20} step={0.1} decimals={1}
+            suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm"
             tooltip="Your assumed true cost-of-living increase. Used to deflate all future values to today's dollars." />
           <NumberInput label="CPI Rate (Statistics Canada)" value={cpiRatePct}
             onChange={v => update('cpiRatePct', v)}
-            suffix="% / year" min={0} max={20} step={0.1} decimals={1}
-            tooltip="Used to index DB pension, CPP, OAS, and tax brackets forward." />
+            suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm"
+            tooltip="Used to index defined benefit pension, CPP, OAS, and tax brackets forward." />
         </div>
 
         <div className="mt-4">
@@ -85,7 +85,7 @@ export function AssumptionsTab() {
                             label=""
                             value={returnRates[row.key]}
                             onChange={v => update('returnRates', { ...returnRates, [row.key]: v })}
-                            min={0} max={30} step={0.1} decimals={1}
+                            min={0} max={30} step={0.1} decimals={1} size="full"
                           />
                         </td>
                       </tr>

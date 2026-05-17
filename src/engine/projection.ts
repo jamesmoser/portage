@@ -114,8 +114,10 @@ export function runProjection(state: AppState): ProjectionResult {
     let dbBase_nom = 0, dbBridge_nom = 0
     if (dbAActive) {
       const yop = yearsFromNow - Math.max(0, getYear(state.dbPensionA.startDate) - currentYear)
-      const ir  = state.dbPensionA.cpiIndexed
-        ? (state.dbPensionA.cpiIndexingCap > 0 ? Math.min(cpi, state.dbPensionA.cpiIndexingCap / 100) : cpi)
+      const dbARate   = (state.dbPensionA.indexingRatePct != null ? state.dbPensionA.indexingRatePct : cpi * 100) / 100
+      const dbACapOn  = state.dbPensionA.cpiIndexingCapEnabled ?? (state.dbPensionA.cpiIndexingCap > 0)
+      const ir        = state.dbPensionA.cpiIndexed
+        ? (dbACapOn && state.dbPensionA.cpiIndexingCap > 0 ? Math.min(dbARate, state.dbPensionA.cpiIndexingCap / 100) : dbARate)
         : 0
       const cppIntRed = state.dbPensionA.cppIntegration && personAAgeInt >= 65
         ? state.dbPensionA.cppIntegrationAmount * Math.pow(1 + ir, Math.max(0, year - getYear(state.personA.retirementDate)))
@@ -131,8 +133,10 @@ export function runProjection(state: AppState): ProjectionResult {
     let dbBaseB_nom = 0, dbBridgeB_nom = 0
     if (dbBActive) {
       const yop = yearsFromNow - Math.max(0, getYear(state.dbPensionB.startDate) - currentYear)
-      const ir  = state.dbPensionB.cpiIndexed
-        ? (state.dbPensionB.cpiIndexingCap > 0 ? Math.min(cpi, state.dbPensionB.cpiIndexingCap / 100) : cpi)
+      const dbBRate   = (state.dbPensionB.indexingRatePct != null ? state.dbPensionB.indexingRatePct : cpi * 100) / 100
+      const dbBCapOn  = state.dbPensionB.cpiIndexingCapEnabled ?? (state.dbPensionB.cpiIndexingCap > 0)
+      const ir        = state.dbPensionB.cpiIndexed
+        ? (dbBCapOn && state.dbPensionB.cpiIndexingCap > 0 ? Math.min(dbBRate, state.dbPensionB.cpiIndexingCap / 100) : dbBRate)
         : 0
       const cppIntRed = state.dbPensionB.cppIntegration && personBAgeInt >= 65
         ? state.dbPensionB.cppIntegrationAmount * Math.pow(1 + ir, Math.max(0, year - getYear(state.personB.retirementDate)))
@@ -148,10 +152,16 @@ export function runProjection(state: AppState): ProjectionResult {
       ? state.cppA.estimatedMonthlyAt65 * 12 * cppFactorA * cpiFactorForYear : 0
     const cppB_nom = bAlive && onOrAfter(dateStr, state.cppB.startDate)
       ? state.cppB.estimatedMonthlyAt65 * 12 * cppFactorB * cpiFactorForYear : 0
-    const oasA_nom = aAlive && onOrAfter(dateStr, state.oasA.startDate)
-      ? state.oasA.estimatedMonthlyAt65 * 12 * oasFactorA * cpiFactorForYear : 0
-    const oasB_nom = bAlive && onOrAfter(dateStr, state.oasB.startDate)
-      ? state.oasB.estimatedMonthlyAt65 * 12 * oasFactorB * cpiFactorForYear : 0
+    const oasStartedA = aAlive && onOrAfter(dateStr, state.oasA.startDate)
+    const oasStartedB = bAlive && onOrAfter(dateStr, state.oasB.startDate)
+    const oasA_nom = oasStartedA
+      ? state.oasA.estimatedMonthlyAt65 * 12 * oasFactorA * cpiFactorForYear
+        + (state.oasA.gisEligible ? (state.oasA.gisMonthlyAmount ?? 0) * 12 * cpiFactorForYear : 0)
+      : 0
+    const oasB_nom = oasStartedB
+      ? state.oasB.estimatedMonthlyAt65 * 12 * oasFactorB * cpiFactorForYear
+        + (state.oasB.gisEligible ? (state.oasB.gisMonthlyAmount ?? 0) * 12 * cpiFactorForYear : 0)
+      : 0
 
     // ── RRIF minimums ────────────────────────────────────────────────────────
     const isRrifA = aAlive && onOrAfter(dateStr, state.rrspA.rrifConversionDate)

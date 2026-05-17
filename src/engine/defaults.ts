@@ -6,6 +6,17 @@ import { todayStr, dateAtAge } from './dates'
 
 const today = todayStr()
 
+// ─── CPP maximum monthly benefit (2024, today's dollars) ────────────────────
+// Base CPP max at age 65 with full contributions (39 effective years at YMPE).
+// CPP2 max assumes 39 years of contributions at/above YAMPE; note CPP2 only
+// started January 2024, so this overstates CPP2 for near-term retirees.
+export const CPP_BASE_MAX_MONTHLY = 1364    // $1,364.60 — base CPP, 2024
+export const CPP2_MAX_MONTHLY     = 130     // ~$130/month — CPP2 fully phased in
+export const CPP_COMBINED_MAX_MONTHLY = CPP_BASE_MAX_MONTHLY + CPP2_MAX_MONTHLY  // $1,494
+
+export const OAS_MAX_MONTHLY = 713          // ~$713/month — full OAS at 65, 2024
+export const GIS_MAX_MONTHLY = 641          // ~$641/month — max GIS for coupled recipient, 2024
+
 export const DEFAULT_TAX_SETTINGS: TaxSettings = {
   taxYear: 2024,
 
@@ -95,6 +106,8 @@ export const DEFAULT_STATE: AppState = {
     startDate: retireA,
     annualAmount: 0,
     cpiIndexed: false,
+    indexingRatePct: 0,
+    cpiIndexingCapEnabled: false,
     cpiIndexingCap: 0,
     bridgeBenefitAmount: 0,
     bridgeBenefitEndDate: dateAtAge(birthA, 65),
@@ -110,6 +123,8 @@ export const DEFAULT_STATE: AppState = {
     startDate: retireB,
     annualAmount: 0,
     cpiIndexed: false,
+    indexingRatePct: 0,
+    cpiIndexingCapEnabled: false,
     cpiIndexingCap: 0,
     bridgeBenefitAmount: 0,
     bridgeBenefitEndDate: dateAtAge(birthB, 65),
@@ -123,20 +138,36 @@ export const DEFAULT_STATE: AppState = {
   cppA: {
     estimatedMonthlyAt65: 0,
     startDate: dateAtAge(birthA, 65),
+    inputMode: 'direct',
+    maxMonthlyBenefit: CPP_COMBINED_MAX_MONTHLY,
+    pctOfMax: 0,
+    yearsAtMax: 0,
   },
   cppB: {
     estimatedMonthlyAt65: 0,
     startDate: dateAtAge(birthB, 65),
+    inputMode: 'direct',
+    maxMonthlyBenefit: CPP_COMBINED_MAX_MONTHLY,
+    pctOfMax: 0,
+    yearsAtMax: 0,
   },
   oasA: {
-    estimatedMonthlyAt65: 713,   // approximate 2024 max OAS
+    estimatedMonthlyAt65: OAS_MAX_MONTHLY,
     startDate: dateAtAge(birthA, 65),
+    inputMode: 'direct',
+    maxMonthlyBenefit: OAS_MAX_MONTHLY,
+    yearsOfResidency: 40,
     gisEligible: false,
+    gisMonthlyAmount: GIS_MAX_MONTHLY,
   },
   oasB: {
-    estimatedMonthlyAt65: 713,
+    estimatedMonthlyAt65: OAS_MAX_MONTHLY,
     startDate: dateAtAge(birthB, 65),
+    inputMode: 'direct',
+    maxMonthlyBenefit: OAS_MAX_MONTHLY,
+    yearsOfResidency: 40,
     gisEligible: false,
+    gisMonthlyAmount: GIS_MAX_MONTHLY,
   },
 
   employmentA: { annualAmount: 0, growthRatePct: 0 },

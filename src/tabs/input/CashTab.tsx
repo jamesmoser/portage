@@ -16,7 +16,7 @@ export function CashTab() {
             prefix="$" min={0} step={1000} decimals={0} />
           <NumberInput label="Interest Rate (nominal)" value={cash.hisaRatePct}
             onChange={v => update('cash', { ...cash, hisaRatePct: v })}
-            suffix="% / year" min={0} max={15} step={0.1} decimals={1}
+            suffix="% / year" min={0} max={15} step={0.1} decimals={1} size="sm"
             tooltip="HISA interest is fully taxable at your marginal rate." />
         </div>
         <div className="mt-4">

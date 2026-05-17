@@ -7,6 +7,7 @@ import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { todayStr } from '../../engine/dates'
 import type { OtherIncomeItem } from '../../engine/types'
+import { DEFAULT_STATE } from '../../engine/defaults'
 
 export function OtherIncomeTab() {
   const { otherIncome, personA, personB, update } = useStore()
@@ -40,7 +41,8 @@ export function OtherIncomeTab() {
 
   return (
     <CardGrid>
-      <SectionCard title="Rental Income" width="half">
+      <SectionCard title="Rental Income" width="half"
+        onReset={() => updateOther({ rentalGrossAnnual: 0, rentalExpensesAnnual: 0 })}>
         <div className="grid grid-cols-1 gap-3">
           <NumberInput
             label="Gross Annual Rental Income (today's $)"
@@ -63,7 +65,8 @@ export function OtherIncomeTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Business Income" width="half">
+      <SectionCard title="Business Income" width="half"
+        onReset={() => updateOther({ businessIncome: 0, businessIncomeEndDate: personA.retirementDate })}>
         <div className="grid grid-cols-1 gap-3">
           <NumberInput
             label="Annual Business / Self-Employment Income (today's $)"
@@ -80,7 +83,8 @@ export function OtherIncomeTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title={`Part-Time Work — ${personA.name || 'Person A'}`} width="half" personColor={personA.color}>
+      <SectionCard title={`Part-Time Work — ${personA.name || 'Person A'}`} width="half" personColor={personA.color}
+        onReset={() => updateOther({ partTimeA: { amount: 0, startDate: today, endDate: personA.retirementDate, growthRatePct: 0 } })}>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
             label="Annual Amount (today's $)"
@@ -92,7 +96,7 @@ export function OtherIncomeTab() {
             label="Annual Growth Rate"
             value={o.partTimeA.growthRatePct}
             onChange={v => updateOther({ partTimeA: { ...o.partTimeA, growthRatePct: v } })}
-            suffix="% / year" min={0} max={20} step={0.1} decimals={1}
+            suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm"
           />
           <DateInput
             label="Start Date"
@@ -107,7 +111,8 @@ export function OtherIncomeTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title={`Part-Time Work — ${personB.name || 'Person B'}`} width="half" personColor={personB.color}>
+      <SectionCard title={`Part-Time Work — ${personB.name || 'Person B'}`} width="half" personColor={personB.color}
+        onReset={() => updateOther({ partTimeB: { amount: 0, startDate: today, endDate: personB.retirementDate, growthRatePct: 0 } })}>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
             label="Annual Amount (today's $)"
@@ -119,7 +124,7 @@ export function OtherIncomeTab() {
             label="Annual Growth Rate"
             value={o.partTimeB.growthRatePct}
             onChange={v => updateOther({ partTimeB: { ...o.partTimeB, growthRatePct: v } })}
-            suffix="% / year" min={0} max={20} step={0.1} decimals={1}
+            suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm"
           />
           <DateInput
             label="Start Date"
@@ -134,7 +139,8 @@ export function OtherIncomeTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Inheritance" width="half">
+      <SectionCard title="Inheritance" width="half"
+        onReset={() => updateOther({ inheritanceAmount: 0, inheritanceDate: today })}>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
             label="Expected Amount (today's $)"
@@ -151,7 +157,8 @@ export function OtherIncomeTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Life Insurance Death Benefits" width="half">
+      <SectionCard title="Life Insurance Death Benefits" width="half"
+        onReset={() => updateOther({ lifeInsuranceA: 0, lifeInsuranceB: 0 })}>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
             label={`${personA.name || 'Person A'} — Death Benefit`}
@@ -200,7 +207,7 @@ export function OtherIncomeTab() {
                 label="Growth Rate"
                 value={item.growthRatePct}
                 onChange={v => updateItem(item.id, { growthRatePct: v })}
-                suffix="% / year" min={0} max={20} step={0.1} decimals={1}
+                suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm"
               />
               <DateInput
                 label="Start Date"
@@ -220,7 +227,7 @@ export function OtherIncomeTab() {
                 />
               </div>
               <div className="flex items-end">
-                <button className="btn-danger" onClick={() => removeItem(item.id)}>Remove</button>
+                <button className="btn-danger" onClick={() => removeItem(item.id)} aria-label="Remove">X</button>
               </div>
             </div>
           </div>

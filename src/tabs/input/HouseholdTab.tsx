@@ -64,7 +64,7 @@ function PersonCard({
           tooltip="First full day of retirement" />
         <NumberInput label="Age at Death" value={person.planningEndAge}
           onChange={v => onChange({ ...person, planningEndAge: v })}
-          suffix="years" min={60} max={110}
+          suffix="years" min={60} max={110} size="sm"
           tooltip="Use a conservative (longer) estimate to stress-test longevity risk" />
       </div>
 

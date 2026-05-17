@@ -9,7 +9,7 @@ export function IncomeTab() {
     <div className="space-y-2">
       <SectionDivider title="Employment" />
       <EmploymentTab />
-      <SectionDivider title="DB Pension" />
+      <SectionDivider title="Defined Benefit Pension" />
       <DBPensionTab />
       <SectionDivider title="CPP & OAS" />
       <CPPOASTab />

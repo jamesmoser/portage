@@ -34,12 +34,12 @@ function BracketTable({ title, brackets, onChange }: {
                 {b.upTo === Infinity || b.upTo == null
                   ? <span className="px-1 text-slate-400 italic">No limit</span>
                   : <NumberInput label="" value={b.upTo} onChange={v => updateBracket(i, 'upTo', v)}
-                      min={0} step={1000} decimals={0} />
+                      min={0} step={1000} decimals={0} size="full" />
                 }
               </td>
               <td className="px-2 py-1.5 w-1/2">
                 <NumberInput label="" value={b.rate * 100} onChange={v => updateBracket(i, 'rate', v / 100)}
-                  min={0} max={60} step={0.01} decimals={2} />
+                  min={0} max={60} step={0.01} decimals={2} size="full" />
               </td>
             </tr>
           ))}
@@ -76,8 +76,8 @@ export function TaxSettingsTab() {
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50 border-b border-slate-200"><th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Personal Credits</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Basic Personal Amount ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.federalBPA} onChange={v => update2('federalBPA', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Pension Income Amount ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.federalPensionIncomeAmount} onChange={v => update2('federalPensionIncomeAmount', v)} min={0} step={100} decimals={0} /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Basic Personal Amount ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.federalBPA} onChange={v => update2('federalBPA', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Pension Income Amount ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.federalPensionIncomeAmount} onChange={v => update2('federalPensionIncomeAmount', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
               </tbody>
             </table>
           </div>
@@ -85,9 +85,9 @@ export function TaxSettingsTab() {
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50 border-b border-slate-200"><th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Age Amount</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Age Amount, 65+ ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.federalAgeAmount} onChange={v => update2('federalAgeAmount', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Phase-Out Starts ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.federalAgeAmountThreshold} onChange={v => update2('federalAgeAmountThreshold', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Reduction Rate (%)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.federalAgeAmountReductionRate * 100} onChange={v => update2('federalAgeAmountReductionRate', v / 100)} min={0} max={50} step={0.01} decimals={2} /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Age Amount, 65+ ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.federalAgeAmount} onChange={v => update2('federalAgeAmount', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Phase-Out Starts ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.federalAgeAmountThreshold} onChange={v => update2('federalAgeAmountThreshold', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Reduction Rate (%)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.federalAgeAmountReductionRate * 100} onChange={v => update2('federalAgeAmountReductionRate', v / 100)} min={0} max={50} step={0.01} decimals={2} size="full" /></td></tr>
               </tbody>
             </table>
           </div>
@@ -95,7 +95,7 @@ export function TaxSettingsTab() {
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50 border-b border-slate-200"><th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">OAS Clawback</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Threshold ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.oasClawbackThreshold} onChange={v => update2('oasClawbackThreshold', v)} min={0} step={100} decimals={0} /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Threshold ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.oasClawbackThreshold} onChange={v => update2('oasClawbackThreshold', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
               </tbody>
             </table>
           </div>
@@ -109,8 +109,8 @@ export function TaxSettingsTab() {
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50 border-b border-slate-200"><th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Personal Credits</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Basic Personal Amount ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.ontarioBPA} onChange={v => update2('ontarioBPA', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Pension Income Amount ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioPensionIncomeAmount} onChange={v => update2('ontarioPensionIncomeAmount', v)} min={0} step={100} decimals={0} /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Basic Personal Amount ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.ontarioBPA} onChange={v => update2('ontarioBPA', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Pension Income Amount ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioPensionIncomeAmount} onChange={v => update2('ontarioPensionIncomeAmount', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
               </tbody>
             </table>
           </div>
@@ -118,8 +118,8 @@ export function TaxSettingsTab() {
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50 border-b border-slate-200"><th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Age Amount</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Age Amount, 65+ ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.ontarioAgeAmount} onChange={v => update2('ontarioAgeAmount', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Phase-Out Starts ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioAgeAmountThreshold} onChange={v => update2('ontarioAgeAmountThreshold', v)} min={0} step={100} decimals={0} /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Age Amount, 65+ ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.ontarioAgeAmount} onChange={v => update2('ontarioAgeAmount', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Phase-Out Starts ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioAgeAmountThreshold} onChange={v => update2('ontarioAgeAmountThreshold', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
               </tbody>
             </table>
           </div>
@@ -127,10 +127,10 @@ export function TaxSettingsTab() {
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50 border-b border-slate-200"><th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Surtax</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Tier 1 Threshold ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.ontarioSurtax1Threshold} onChange={v => update2('ontarioSurtax1Threshold', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Tier 1 Rate (%)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioSurtax1Rate * 100} onChange={v => update2('ontarioSurtax1Rate', v / 100)} min={0} max={100} step={0.01} decimals={2} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Tier 2 Threshold ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioSurtax2Threshold} onChange={v => update2('ontarioSurtax2Threshold', v)} min={0} step={100} decimals={0} /></td></tr>
-                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Tier 2 Rate (%)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioSurtax2Rate * 100} onChange={v => update2('ontarioSurtax2Rate', v / 100)} min={0} max={100} step={0.01} decimals={2} /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600 w-1/2">Tier 1 Threshold ($)</td><td className="px-2 py-1.5 w-1/2"><NumberInput label="" value={s.ontarioSurtax1Threshold} onChange={v => update2('ontarioSurtax1Threshold', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Tier 1 Rate (%)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioSurtax1Rate * 100} onChange={v => update2('ontarioSurtax1Rate', v / 100)} min={0} max={100} step={0.01} decimals={2} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Tier 2 Threshold ($)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioSurtax2Threshold} onChange={v => update2('ontarioSurtax2Threshold', v)} min={0} step={100} decimals={0} size="full" /></td></tr>
+                <tr className="hover:bg-slate-50/50"><td className="px-3 py-2 text-slate-600">Tier 2 Rate (%)</td><td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioSurtax2Rate * 100} onChange={v => update2('ontarioSurtax2Rate', v / 100)} min={0} max={100} step={0.01} decimals={2} size="full" /></td></tr>
               </tbody>
             </table>
           </div>
@@ -153,15 +153,15 @@ export function TaxSettingsTab() {
               <tbody className="divide-y divide-slate-100">
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">Gross-Up (%)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalEligibleDivGrossUp * 100} onChange={v => update2('federalEligibleDivGrossUp', v / 100)} min={0} max={100} step={0.01} decimals={2} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalEligibleDivGrossUp * 100} onChange={v => update2('federalEligibleDivGrossUp', v / 100)} min={0} max={100} step={0.01} decimals={2} size="full" /></td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">Federal Credit (% of grossed-up)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalEligibleDivCredit * 100} onChange={v => update2('federalEligibleDivCredit', v / 100)} min={0} max={50} step={0.01} decimals={2} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalEligibleDivCredit * 100} onChange={v => update2('federalEligibleDivCredit', v / 100)} min={0} max={50} step={0.01} decimals={2} size="full" /></td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">Ontario Credit (% of grossed-up)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioEligibleDivCredit * 100} onChange={v => update2('ontarioEligibleDivCredit', v / 100)} min={0} max={50} step={0.01} decimals={2} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.ontarioEligibleDivCredit * 100} onChange={v => update2('ontarioEligibleDivCredit', v / 100)} min={0} max={50} step={0.01} decimals={2} size="full" /></td>
                 </tr>
               </tbody>
             </table>
@@ -178,11 +178,11 @@ export function TaxSettingsTab() {
               <tbody className="divide-y divide-slate-100">
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">Gross-Up (%)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalNonEligibleDivGrossUp * 100} onChange={v => update2('federalNonEligibleDivGrossUp', v / 100)} min={0} max={100} step={0.01} decimals={2} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalNonEligibleDivGrossUp * 100} onChange={v => update2('federalNonEligibleDivGrossUp', v / 100)} min={0} max={100} step={0.01} decimals={2} size="full" /></td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">Federal Credit (% of grossed-up)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalNonEligibleDivCredit * 100} onChange={v => update2('federalNonEligibleDivCredit', v / 100)} min={0} max={50} step={0.01} decimals={2} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.federalNonEligibleDivCredit * 100} onChange={v => update2('federalNonEligibleDivCredit', v / 100)} min={0} max={50} step={0.01} decimals={2} size="full" /></td>
                 </tr>
               </tbody>
             </table>
@@ -203,11 +203,11 @@ export function TaxSettingsTab() {
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">High Rate (%)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.capitalGainsHighRate * 100} onChange={v => update2('capitalGainsHighRate', v / 100)} min={0} max={100} step={0.01} decimals={2} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.capitalGainsHighRate * 100} onChange={v => update2('capitalGainsHighRate', v / 100)} min={0} max={100} step={0.01} decimals={2} size="full" /></td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="px-3 py-2 text-slate-600">High Rate Threshold ($)</td>
-                  <td className="px-2 py-1.5"><NumberInput label="" value={s.capitalGainsHighThreshold} onChange={v => update2('capitalGainsHighThreshold', v)} min={0} step={10000} decimals={0} /></td>
+                  <td className="px-2 py-1.5"><NumberInput label="" value={s.capitalGainsHighThreshold} onChange={v => update2('capitalGainsHighThreshold', v)} min={0} step={10000} decimals={0} size="full" /></td>
                 </tr>
               </tbody>
             </table>

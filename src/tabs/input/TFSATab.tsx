@@ -7,6 +7,7 @@ import { ToggleInput } from '../../components/ToggleInput'
 import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { runProjection } from '../../engine/projection'
+import { CHART_COLORS } from '../PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
@@ -30,8 +31,8 @@ export function TFSATab() {
 
   const years = dataPoints.map(d => d.year)
   const chartData: Data[] = [
-    { x: years, y: dataPoints.map(d => d.tfsaA), name: `${aName} TFSA`, type: 'bar', marker: { color: personA.color } },
-    { x: years, y: dataPoints.map(d => d.tfsaB), name: `${bName} TFSA`, type: 'bar', marker: { color: personB.color } },
+    { x: years, y: dataPoints.map(d => d.tfsaA), name: `${aName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
+    { x: years, y: dataPoints.map(d => d.tfsaB), name: `${bName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaB } },
   ]
 
   return (
@@ -50,7 +51,7 @@ export function TFSATab() {
           {!tfsaA.contributionStopAtRetirement && (
             <NumberInput label="Final Contribution Year" value={tfsaA.contributionEndYear}
               onChange={v => update('tfsaA', { ...tfsaA, contributionEndYear: v })}
-              min={2000} max={2100} step={1} decimals={0} />
+              min={2000} max={2100} step={1} decimals={0} size="sm" />
           )}
           <ToggleInput label="Override Return Rate"
             value={tfsaA.returnRateOverrideEnabled}
@@ -58,7 +59,7 @@ export function TFSATab() {
           {tfsaA.returnRateOverrideEnabled && (
             <NumberInput label="Return Rate" value={tfsaA.returnRateOverridePct}
               onChange={v => update('tfsaA', { ...tfsaA, returnRateOverridePct: v })}
-              suffix="%" min={0} max={30} step={0.1} decimals={1} />
+              suffix="%" min={0} max={30} step={0.1} decimals={1} size="sm" />
           )}
         </div>
       </SectionCard>
@@ -77,7 +78,7 @@ export function TFSATab() {
           {!tfsaB.contributionStopAtRetirement && (
             <NumberInput label="Final Contribution Year" value={tfsaB.contributionEndYear}
               onChange={v => update('tfsaB', { ...tfsaB, contributionEndYear: v })}
-              min={2000} max={2100} step={1} decimals={0} />
+              min={2000} max={2100} step={1} decimals={0} size="sm" />
           )}
           <ToggleInput label="Override Return Rate"
             value={tfsaB.returnRateOverrideEnabled}
@@ -85,7 +86,7 @@ export function TFSATab() {
           {tfsaB.returnRateOverrideEnabled && (
             <NumberInput label="Return Rate" value={tfsaB.returnRateOverridePct}
               onChange={v => update('tfsaB', { ...tfsaB, returnRateOverridePct: v })}
-              suffix="%" min={0} max={30} step={0.1} decimals={1} />
+              suffix="%" min={0} max={30} step={0.1} decimals={1} size="sm" />
           )}
         </div>
       </SectionCard>

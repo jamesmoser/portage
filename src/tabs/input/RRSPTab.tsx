@@ -29,7 +29,7 @@ function RRSPSection({ label, account, otherPersonName, onChange, personColor }:
           tooltip="From your CRA My Account Notice of Assessment" />
         <NumberInput label="Return Rate Override (0 = blended)" value={account.returnRateOverridePct}
           onChange={v => onChange({ ...account, returnRateOverridePct: v })}
-          suffix="%" min={0} max={30} step={0.1} decimals={1} />
+          suffix="%" min={0} max={30} step={0.1} decimals={1} size="sm" />
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-100">
@@ -41,7 +41,7 @@ function RRSPSection({ label, account, otherPersonName, onChange, personColor }:
             tooltip="In your spouse's name but using your contribution room." />
           <NumberInput label="Last Contribution Year" value={account.spousalLastContributionYear}
             onChange={v => onChange({ ...account, spousalLastContributionYear: v })}
-            min={2000} max={2050} step={1} decimals={0}
+            min={2000} max={2050} step={1} decimals={0} size="sm"
             tooltip="Withdrawals within 3 calendar years of last contribution are attributed back to contributor" />
         </div>
       </div>

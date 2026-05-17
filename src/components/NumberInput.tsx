@@ -13,12 +13,13 @@ interface Props {
   tooltip?: string
   disabled?: boolean
   className?: string
+  size?: 'sm' | 'md' | 'full'
 }
 
 export function NumberInput({
   label, value: valueProp, onChange,
   prefix, suffix, min, max, step = 1, decimals = 0,
-  tooltip, disabled = false, className = '',
+  tooltip, disabled = false, className = '', size = 'md',
 }: Props) {
   const value = valueProp ?? 0
   const [localValue, setLocalValue] = React.useState<string>(
@@ -55,13 +56,15 @@ export function NumberInput({
   const unit = prefix ? `(${prefix})` : suffix ? `(${suffix})` : ''
   const fullLabel = unit ? `${label} ${unit}` : label
 
+  const sizeClass = size === 'full' ? '' : 'max-w-[186px]'
+
   return (
     <div className={className} title={tooltip}>
       <label className="label-text">{fullLabel}</label>
       <input
         type="text"
         inputMode={decimals > 0 ? 'decimal' : 'numeric'}
-        className="input-field"
+        className={`input-field ${sizeClass}`}
         value={focused ? localValue : formatDisplay(value)}
         onChange={handleChange}
         onFocus={() => { setFocused(true); setLocalValue(value === 0 ? '' : value.toFixed(decimals)) }}

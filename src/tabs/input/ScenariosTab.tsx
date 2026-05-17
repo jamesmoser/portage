@@ -82,21 +82,21 @@ export function ScenariosTab() {
                 label="Return Rate Offset"
                 value={s.returnRateOffsetPct}
                 onChange={v => updateScenario(s.id, { returnRateOffsetPct: v })}
-                suffix="%" min={-10} max={10} step={0.1} decimals={1}
+                suffix="%" min={-10} max={10} step={0.1} decimals={1} size="sm"
                 tooltip="+2% = bull market; -2% = bear market"
               />
               <NumberInput
                 label="Inflation Offset"
                 value={s.personalInflationOffsetPct}
                 onChange={v => updateScenario(s.id, { personalInflationOffsetPct: v })}
-                suffix="%" min={-5} max={10} step={0.1} decimals={1}
+                suffix="%" min={-5} max={10} step={0.1} decimals={1} size="sm"
                 tooltip="Adjust personal inflation assumption for this scenario"
               />
               <NumberInput
                 label="Planning Horizon Offset"
                 value={s.planningHorizonOffsetYears}
                 onChange={v => updateScenario(s.id, { planningHorizonOffsetYears: v })}
-                suffix="years" min={-20} max={20} step={1} decimals={0}
+                suffix="years" min={-20} max={20} step={1} decimals={0} size="sm"
                 tooltip="Extend or shorten the planning horizon for longevity testing"
               />
               <NumberInput

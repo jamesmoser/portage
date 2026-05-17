@@ -41,7 +41,7 @@ export function WithdrawalStrategyTab() {
 
       <SectionCard title="Pension Income Splitting" width="half">
         <p className="text-xs text-slate-500 mb-3">
-          Up to 50% of eligible pension income (DB pension, RRIF income at 65+) can be attributed
+          Up to 50% of eligible pension income (defined benefit pension, RRIF income at 65+) can be attributed
           to the lower-income spouse, reducing household tax.
         </p>
         <div className="grid grid-cols-1 gap-3">
@@ -59,7 +59,7 @@ export function WithdrawalStrategyTab() {
               label="Percentage of eligible pension attributed to other spouse"
               value={ws.pensionSplitPct}
               onChange={v => update('withdrawalStrategy', { ...ws, pensionSplitPct: v })}
-              suffix="%" min={0} max={50} step={1} decimals={0}
+              suffix="%" min={0} max={50} step={1} decimals={0} size="sm"
               tooltip="0% = no splitting; 50% = maximum allowed"
             />
           )}

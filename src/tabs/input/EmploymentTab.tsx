@@ -3,6 +3,7 @@ import { CardGrid } from '../../components/CardGrid'
 import { SectionCard } from '../../components/SectionCard'
 import { InfoPanel } from '../../components/InfoPanel'
 import { NumberInput } from '../../components/NumberInput'
+import { DEFAULT_STATE } from '../../engine/defaults'
 
 export function EmploymentTab() {
   const { employmentA, employmentB, personA, personB, update } = useStore()
@@ -16,36 +17,36 @@ export function EmploymentTab() {
 
   return (
     <CardGrid>
-      <SectionCard title={`Employment — ${aName}`} width="half" personColor={personA.color}>
-        <p className="text-xs text-slate-400 mb-3">Income ceases at {aName}'s retirement date ({personA.retirementDate}).</p>
+      <SectionCard title={`Employment — ${aName}`} width="half" personColor={personA.color}
+        onReset={() => update('employmentA', DEFAULT_STATE.employmentA)}>
         <div className="space-y-3">
           <NumberInput label="Current Annual Employment Income" value={employmentA.annualAmount}
             onChange={v => update('employmentA', { ...employmentA, annualAmount: v })}
             prefix="$" min={0} step={1000} decimals={0} />
           <NumberInput label="Annual Income Growth Rate" value={employmentA.growthRatePct}
             onChange={v => update('employmentA', { ...employmentA, growthRatePct: v })}
-            suffix="% / year" min={0} max={20} step={0.1} decimals={1} />
+            suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm" />
         </div>
         <div className="mt-4">
           <InfoPanel>
-            At retirement (nominal): <strong>${retirementNominal(employmentA.annualAmount, employmentA.growthRatePct, personA.retirementDate).toLocaleString()}</strong>
+            Income ceases at {aName}'s retirement date ({personA.retirementDate}). The annual income at retirement is estimated to be <strong>${retirementNominal(employmentA.annualAmount, employmentA.growthRatePct, personA.retirementDate).toLocaleString()}</strong> (nominal).
           </InfoPanel>
         </div>
       </SectionCard>
 
-      <SectionCard title={`Employment — ${bName}`} width="half" personColor={personB.color}>
-        <p className="text-xs text-slate-400 mb-3">Income ceases at {bName}'s retirement date ({personB.retirementDate}).</p>
+      <SectionCard title={`Employment — ${bName}`} width="half" personColor={personB.color}
+        onReset={() => update('employmentB', DEFAULT_STATE.employmentB)}>
         <div className="space-y-3">
           <NumberInput label="Current Annual Employment Income" value={employmentB.annualAmount}
             onChange={v => update('employmentB', { ...employmentB, annualAmount: v })}
             prefix="$" min={0} step={1000} decimals={0} />
           <NumberInput label="Annual Income Growth Rate" value={employmentB.growthRatePct}
             onChange={v => update('employmentB', { ...employmentB, growthRatePct: v })}
-            suffix="% / year" min={0} max={20} step={0.1} decimals={1} />
+            suffix="% / year" min={0} max={20} step={0.1} decimals={1} size="sm" />
         </div>
         <div className="mt-4">
           <InfoPanel>
-            At retirement (nominal): <strong>${retirementNominal(employmentB.annualAmount, employmentB.growthRatePct, personB.retirementDate).toLocaleString()}</strong>
+            Income ceases at {bName}'s retirement date ({personB.retirementDate}). The annual income at retirement is estimated to be <strong>${retirementNominal(employmentB.annualAmount, employmentB.growthRatePct, personB.retirementDate).toLocaleString()}</strong> (nominal).
           </InfoPanel>
         </div>
       </SectionCard>

@@ -26,7 +26,9 @@ export interface DBPension {
   startDate: string             // first payment date
   annualAmount: number          // today's dollars, at start date, BEFORE bridge
   cpiIndexed: boolean
-  cpiIndexingCap: number        // max CPI adjustment per year (0 = uncapped)
+  indexingRatePct: number       // explicit annual indexing rate (% per year); auto-set to CPI when cpiIndexed toggled on
+  cpiIndexingCapEnabled: boolean // whether to apply the indexing cap
+  cpiIndexingCap: number        // max indexing rate per year when cap is enabled
   bridgeBenefitAmount: number   // additional annual amount until bridge end
   bridgeBenefitEndDate: string  // typically when CPP starts
   survivorBenefitPct: number    // 0–1, fraction of pension paid to survivor
@@ -39,16 +41,24 @@ export interface DBPension {
 // ─── CPP ─────────────────────────────────────────────────────────────────────
 
 export interface CPPSettings {
-  estimatedMonthlyAt65: number  // today's dollars, from Service Canada
-  startDate: string             // first payment date (must be 60–70)
+  estimatedMonthlyAt65: number                          // today's dollars — canonical value used by engine
+  startDate: string                                     // first payment date (must be 60–70)
+  inputMode: 'direct' | 'pctOfMax' | 'yearsAtMax'      // how the estimate was derived
+  maxMonthlyBenefit: number                             // combined CPP+CPP2 max used for pctOfMax/yearsAtMax
+  pctOfMax: number                                      // 0–100, used in pctOfMax mode
+  yearsAtMax: number                                    // years at/above YAMPE, used in yearsAtMax mode
 }
 
 // ─── OAS ─────────────────────────────────────────────────────────────────────
 
 export interface OASSettings {
-  estimatedMonthlyAt65: number  // standard OAS at age 65, today's dollars
-  startDate: string             // first payment date (must be 65–70)
-  gisEligible: boolean          // Guaranteed Income Supplement flag
+  estimatedMonthlyAt65: number                      // today's dollars — canonical value used by engine
+  startDate: string                                 // first payment date (must be 65–70)
+  inputMode: 'direct' | 'yearsOfResidency'          // how the estimate was derived
+  maxMonthlyBenefit: number                         // editable OAS max (default: 2024 max)
+  yearsOfResidency: number                          // Canadian residency years after age 18
+  gisEligible: boolean                              // include GIS supplement
+  gisMonthlyAmount: number                          // GIS monthly amount (today's $, not means-tested)
 }
 
 // ─── Employment Income ────────────────────────────────────────────────────────

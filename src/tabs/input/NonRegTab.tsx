@@ -8,6 +8,7 @@ import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { runProjection } from '../../engine/projection'
 import type { NonRegAccount } from '../../engine/types'
+import { CHART_COLORS } from '../PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
@@ -40,7 +41,7 @@ function NonRegSection({ label, account, onChange, personColor }: {
           <div className="col-span-2">
             <NumberInput label="Return Rate" value={account.returnRateOverridePct}
               onChange={v => onChange({ ...account, returnRateOverridePct: v })}
-              suffix="%" min={0} max={30} step={0.1} decimals={1} />
+              suffix="%" min={0} max={30} step={0.1} decimals={1} size="sm" />
           </div>
         )}
       </div>
@@ -54,17 +55,17 @@ function NonRegSection({ label, account, onChange, personColor }: {
           <NumberInput label="Canadian Eligible Dividends"
             value={account.eligibleDivYieldPct}
             onChange={v => onChange({ ...account, eligibleDivYieldPct: v })}
-            suffix="% / yr" min={0} max={20} step={0.1} decimals={1}
+            suffix="% / yr" min={0} max={20} step={0.1} decimals={1} size="sm"
             tooltip="Annual eligible dividend income as % of balance. Grossed up 38%, eligible for dividend tax credit." />
           <NumberInput label="Foreign Income"
             value={account.foreignIncomeYieldPct}
             onChange={v => onChange({ ...account, foreignIncomeYieldPct: v })}
-            suffix="% / yr" min={0} max={20} step={0.1} decimals={1}
+            suffix="% / yr" min={0} max={20} step={0.1} decimals={1} size="sm"
             tooltip="US/international distributions as % of balance. Taxed at full marginal rate." />
           <NumberInput label="Interest"
             value={account.interestYieldPct}
             onChange={v => onChange({ ...account, interestYieldPct: v })}
-            suffix="% / yr" min={0} max={20} step={0.1} decimals={1}
+            suffix="% / yr" min={0} max={20} step={0.1} decimals={1} size="sm"
             tooltip="Bond, GIC, or savings interest as % of balance. Taxed at full marginal rate." />
         </div>
       </div>
@@ -83,8 +84,8 @@ export function NonRegTab() {
 
   const years = dataPoints.map(d => d.year)
   const chartData: Data[] = [
-    { x: years, y: dataPoints.map(d => d.nonRegA), name: `${aName} Non-Reg`, type: 'bar', marker: { color: personA.color } },
-    { x: years, y: dataPoints.map(d => d.nonRegB), name: `${bName} Non-Reg`, type: 'bar', marker: { color: personB.color } },
+    { x: years, y: dataPoints.map(d => d.nonRegA), name: `${aName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
+    { x: years, y: dataPoints.map(d => d.nonRegB), name: `${bName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegB } },
   ]
 
   return (

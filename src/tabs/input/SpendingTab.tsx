@@ -124,7 +124,7 @@ export function SpendingTab() {
                   label={`Starts (${refName}'s Age)`}
                   value={linked ? computedSurvivorAge : phase.startAge}
                   onChange={v => updatePhase(phase.id, { startAge: v })}
-                  min={40} max={100} step={1} decimals={0}
+                  min={40} max={100} step={1} decimals={0} size="sm"
                   disabled={linked}
                   tooltip={linked ? "Automatically set to reference person's age at first death" : ''}
                 />
@@ -138,7 +138,7 @@ export function SpendingTab() {
                   label="Real Growth Rate"
                   value={phase.growthRatePct}
                   onChange={v => updatePhase(phase.id, { growthRatePct: v })}
-                  suffix="%" min={-10} max={20} step={0.1} decimals={1}
+                  suffix="%" min={-10} max={20} step={0.1} decimals={1} size="sm"
                   tooltip="Real spending growth above inflation within this phase. 0% = constant purchasing power. Negative = spending declines in real terms over time (typical as activity slows). Positive = lifestyle creep."
                 />
               </div>
@@ -187,7 +187,7 @@ export function SpendingTab() {
                 label={`${refName}'s Age`}
                 value={item.startAge}
                 onChange={v => updateItem(item.id, { startAge: v })}
-                min={40} max={110} step={1} decimals={0}
+                min={40} max={110} step={1} decimals={0} size="sm"
                 tooltip={`Converts to ${refName}'s birthday at this age: ${dateAtAge(refPerson.birthDate, item.startAge)}`}
               />
               <ToggleInput
