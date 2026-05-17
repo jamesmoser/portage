@@ -124,24 +124,15 @@ export interface CashAccounts {
 export interface OtherIncomeItem {
   id: string
   label: string
-  annualAmount: number    // today's dollars
+  annualAmount: number              // today's dollars
   startDate: string
   endDate: string
   taxable: boolean
   growthRatePct: number
+  attributedTo: 'personA' | 'personB' | 'joint'
 }
 
 export interface OtherIncome {
-  rentalGrossAnnual: number
-  rentalExpensesAnnual: number
-  partTimeA: { amount: number; startDate: string; endDate: string; growthRatePct: number }
-  partTimeB: { amount: number; startDate: string; endDate: string; growthRatePct: number }
-  businessIncome: number
-  businessIncomeEndDate: string
-  inheritanceAmount: number
-  inheritanceDate: string
-  lifeInsuranceA: number   // death benefit paid to estate
-  lifeInsuranceB: number
   otherItems: OtherIncomeItem[]
 }
 
@@ -305,11 +296,8 @@ export interface DataPoint {
   tfsaWithdrawalB: number
   nonRegWithdrawalA: number
   nonRegWithdrawalB: number
-  rentalIncome: number
-  partTimeA: number
-  partTimeB: number
-  otherIncome: number
-  inheritance: number
+  otherIncomeA: number
+  otherIncomeB: number
 
   // Tax summary (present-day dollars)
   grossIncomeA: number

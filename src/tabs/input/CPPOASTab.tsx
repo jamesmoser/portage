@@ -45,7 +45,7 @@ function buildBenefitValues(
 
 
 export function CPPOASTab() {
-  const { cppA, cppB, oasA, oasB, personA, personB, cpiRatePct, personalInflationRatePct, taxSettings, update } = useStore()
+  const { cppA, cppB, oasA, oasB, personA, personB, cpiRatePct, personalInflationRatePct, update } = useStore()
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
   const aName = personA.name || 'A'
   const bName = personB.name || 'B'
@@ -494,7 +494,7 @@ export function CPPOASTab() {
           data={govChartData}
           layout={{
             barmode: 'stack',
-            yaxis: { tickformat: '$,.0f', title: { text: "Annual $ (today's)", font: { size: 11 } } },
+            yaxis: { tickformat: ',.0f', title: { text: 'Annual Benefit ($)', font: { size: 11 } } },
             xaxis: { ...buildXAxis(allYears, xAxisMode, personA.birthDate, personB.birthDate) },
           }}
           style={{ height: 280 }}
@@ -502,24 +502,6 @@ export function CPPOASTab() {
         <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />
       </SectionCard>
 
-      {/* OAS Clawback */}
-      <SectionCard title="OAS Clawback" width="full"
-        onReset={() => update('taxSettings', { ...taxSettings, oasClawbackThreshold: DEFAULT_STATE.taxSettings.oasClawbackThreshold, oasClawbackRate: DEFAULT_STATE.taxSettings.oasClawbackRate })}>
-        <div className="grid grid-cols-2 gap-3 items-end">
-          <NumberInput
-            label="Clawback Threshold (today's $)"
-            value={taxSettings.oasClawbackThreshold}
-            onChange={v => update('taxSettings', { ...taxSettings, oasClawbackThreshold: v })}
-            prefix="$"
-            min={0} step={100} decimals={0}
-            tooltip="Net income above this threshold triggers OAS recovery tax. 2024 value: $90,997. Indexed to CPI each year."
-          />
-          <div className="text-xs text-slate-500 pb-1.5">
-            <span className="font-medium">Recovery tax:</span> 15% of net income above threshold, up to the full OAS received.
-            Individual, not household — calculated separately for each person.
-          </div>
-        </div>
-      </SectionCard>
     </CardGrid>
   )
 }

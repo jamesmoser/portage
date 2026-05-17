@@ -43,7 +43,7 @@ export function IncomeOverviewTab() {
     { x: years, y: dataPoints.map(d => d.rrifA + d.rrifB), name: 'RRIF Withdrawals', type: 'bar', marker: { color: CHART_COLORS.rrifA } },
     { x: years, y: dataPoints.map(d => d.tfsaWithdrawalA + d.tfsaWithdrawalB), name: 'TFSA Withdrawals', type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
     { x: years, y: dataPoints.map(d => d.nonRegWithdrawalA + d.nonRegWithdrawalB), name: 'Non-Reg Withdrawals', type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
-    { x: years, y: dataPoints.map(d => d.rentalIncome + d.partTimeA + d.partTimeB + d.otherIncome), name: 'Other Income', type: 'bar', marker: { color: CHART_COLORS.otherIncome } },
+    { x: years, y: dataPoints.map(d => d.otherIncomeA + d.otherIncomeB), name: 'Other Income', type: 'bar', marker: { color: CHART_COLORS.otherIncomeA } },
     { x: years, y: dataPoints.map(d => d.householdSpending), name: 'Spending Target', type: 'scatter', mode: 'markers', marker: { color: CHART_COLORS.spending, size: 4, symbol: 'line-ew', line: { color: CHART_COLORS.spending, width: 2 } } },
     { x: years, y: dataPoints.map(d => d.totalHouseholdNet), name: 'Net Income (after tax)', type: 'scatter', mode: 'markers', marker: { color: '#1e293b', size: 4, symbol: 'line-ew', line: { color: '#1e293b', width: 2 } } },
   ]
@@ -104,7 +104,7 @@ export function IncomeOverviewTab() {
         info="Stacked bars = annual gross income by source. Tick marks = net after tax (black) and spending target (red).">
         <PlotlyChart
           data={incomeData}
-          layout={{ barmode: 'stack', yaxis: { title: { text: "Annual $ (today's)", font: { size: 11 } }, tickformat: '$,.0f' }, xaxis: { ...xAxis } }}
+          layout={{ barmode: 'stack', yaxis: { title: { text: 'Annual Income ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxis } }}
           style={{ height: 420 }}
         />
       </SectionCard>
@@ -114,7 +114,7 @@ export function IncomeOverviewTab() {
           data={taxData}
           layout={{
             barmode: 'stack',
-            yaxis:  { title: { text: 'Tax Paid ($)', font: { size: 11 } }, tickformat: '$,.0f' },
+            yaxis:  { title: { text: 'Tax Paid ($)', font: { size: 11 } }, tickformat: ',.0f' },
             yaxis2: { title: { text: 'Effective Rate (%)', font: { size: 11 } }, overlaying: 'y', side: 'right', tickformat: '.1f', range: [0, 60] },
             xaxis: { ...xAxis },
           }}
@@ -125,7 +125,7 @@ export function IncomeOverviewTab() {
       <SectionCard title="Portfolio Balances — Present-Day Dollars">
         <PlotlyChart
           data={portfolioData}
-          layout={{ barmode: 'stack', yaxis: { title: { text: "Balance (today's $)", font: { size: 11 } }, tickformat: '$,.0f' }, xaxis: { ...xAxis } }}
+          layout={{ barmode: 'stack', yaxis: { title: { text: 'Account Balance ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxis } }}
           style={{ height: 320 }}
         />
         <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />

@@ -166,8 +166,15 @@ export function SpendingTab() {
         )}
 
         {additionalSpending.map(item => (
-          <div key={item.id} className="mb-2 p-3 border border-slate-200 rounded bg-slate-50">
-            <div className="grid grid-cols-2 xl:grid-cols-5 gap-2 items-end">
+          <div key={item.id} className="relative mb-2 p-3 pr-12 border border-slate-200 rounded bg-slate-50">
+            <button
+              onClick={() => removeItem(item.id)}
+              className="btn-danger absolute top-2 right-2"
+              aria-label="Remove"
+            >
+              X
+            </button>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 items-end">
               <div>
                 <label className="label-text">Label</label>
                 <input
@@ -196,15 +203,6 @@ export function SpendingTab() {
                 onChange={v => updateItem(item.id, { recurring: v })}
                 className="self-end pb-1"
               />
-              <div className="flex items-end justify-end">
-                <button
-                  onClick={() => removeItem(item.id)}
-                  className="btn-danger"
-                  aria-label="Remove"
-                >
-                  X
-                </button>
-              </div>
             </div>
           </div>
         ))}
@@ -215,7 +213,7 @@ export function SpendingTab() {
           data={chartData}
           layout={{
             xaxis: xAxis,
-            yaxis: { tickformat: '$,.0f', title: { text: "Today's $" } },
+            yaxis: { tickformat: ',.0f', title: { text: 'Annual Household Spending ($)', font: { size: 11 } } },
             barmode: 'stack',
             height: 280,
           }}

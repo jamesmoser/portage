@@ -218,16 +218,6 @@ export const DEFAULT_STATE: AppState = {
   },
 
   otherIncome: {
-    rentalGrossAnnual: 0,
-    rentalExpensesAnnual: 0,
-    partTimeA: { amount: 0, startDate: today, endDate: retireA, growthRatePct: 0 },
-    partTimeB: { amount: 0, startDate: today, endDate: retireB, growthRatePct: 0 },
-    businessIncome: 0,
-    businessIncomeEndDate: retireA,
-    inheritanceAmount: 0,
-    inheritanceDate: today,
-    lifeInsuranceA: 0,
-    lifeInsuranceB: 0,
     otherItems: [],
   },
 

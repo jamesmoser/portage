@@ -278,7 +278,7 @@ export function DBPensionTab() {
                 data={allTraces}
                 layout={{
                   barmode: 'stack',
-                  yaxis: { tickformat: '$,.0f', title: { text: "Annual income (today's $)", font: { size: 11 } } },
+                  yaxis: { tickformat: ',.0f', title: { text: 'Annual Income ($)', font: { size: 11 } } },
                   xaxis: { ...dbXAxis },
                 }}
                 style={{ height: 280 }}

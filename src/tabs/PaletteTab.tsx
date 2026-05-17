@@ -28,7 +28,8 @@ export const CHART_COLORS = {
   nonRegA:      '#3D4A52',  // Slate (deep)
   nonRegB:      '#7090A0',  // Slate (light)
 
-  otherIncome:  '#6B4A2E',  // Warm tan (single, no person split needed)
+  otherIncomeA: '#6B4A2E',  // Warm tan (deep)
+  otherIncomeB: '#A87850',  // Warm tan (light)
 
   spending:     '#7B1515',  // Brand red — reserved for spending targets
 }
@@ -96,7 +97,8 @@ const SWATCH_GROUPS = [
     group: 'Other Income',
     note: 'Rental, part-time, inheritance, etc.',
     swatches: [
-      { hex: CHART_COLORS.otherIncome, label: 'All sources' },
+      { hex: CHART_COLORS.otherIncomeA, label: 'Person A' },
+      { hex: CHART_COLORS.otherIncomeB, label: 'Person B' },
     ],
   },
   {
@@ -147,7 +149,7 @@ const chartData = [
   { x: YEARS, y: tfsaB,   type: 'bar', name: 'B — TFSA',              marker: { color: CHART_COLORS.tfsaB } },
   { x: YEARS, y: nonRegA, type: 'bar', name: 'A — Non-Reg',           marker: { color: CHART_COLORS.nonRegA } },
   { x: YEARS, y: nonRegB, type: 'bar', name: 'B — Non-Reg',           marker: { color: CHART_COLORS.nonRegB } },
-  { x: YEARS, y: other,   type: 'bar', name: 'Other Income',          marker: { color: CHART_COLORS.otherIncome } },
+  { x: YEARS, y: other,   type: 'bar', name: 'Other Income',          marker: { color: CHART_COLORS.otherIncomeA } },
   {
     x: YEARS, y: spend, type: 'scatter', mode: 'markers', name: 'Spending Target',
     marker: { color: CHART_COLORS.spending, size: 5, symbol: 'line-ew', line: { color: CHART_COLORS.spending, width: 2 } },
@@ -202,7 +204,7 @@ export function PaletteTab() {
           data={chartData}
           layout={{
             barmode: 'stack',
-            yaxis: { tickformat: '$,.0f', title: { text: "Annual income (today's $)", font: { size: 11 } } },
+            yaxis: { tickformat: ',.0f', title: { text: "Annual income (today's $)", font: { size: 11 } } },
             xaxis: { title: { text: 'Year', font: { size: 11 } } },
             legend: { orientation: 'h', y: -0.3, font: { size: 10 } },
           }}

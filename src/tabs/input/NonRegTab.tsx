@@ -102,7 +102,7 @@ export function NonRegTab() {
               data={chartData}
               layout={{
                 barmode: 'stack',
-                yaxis: { tickformat: '$,.0f', title: { text: "Balance (today's $)", font: { size: 11 } } },
+                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } } },
                 xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate) },
               }}
               style={{ height: 320 }}

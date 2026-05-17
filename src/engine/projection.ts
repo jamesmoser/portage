@@ -175,20 +175,26 @@ export function runProjection(state: AppState): ProjectionResult {
     let rrifA_nom = Math.min(rrifMinA + rrifAddA, rrspA)
     let rrifB_nom = Math.min(rrifMinB + rrifAddB, rrspB)
 
-    // ── Part-time / rental / other income ────────────────────────────────────
-    const ptA_nom = aAlive && onOrAfter(dateStr, state.otherIncome.partTimeA.startDate) && before(dateStr, state.otherIncome.partTimeA.endDate)
-      ? state.otherIncome.partTimeA.amount * Math.pow(1 + state.otherIncome.partTimeA.growthRatePct / 100, yearsFromNow) : 0
-    const ptB_nom = bAlive && onOrAfter(dateStr, state.otherIncome.partTimeB.startDate) && before(dateStr, state.otherIncome.partTimeB.endDate)
-      ? state.otherIncome.partTimeB.amount * Math.pow(1 + state.otherIncome.partTimeB.growthRatePct / 100, yearsFromNow) : 0
-    const rentalNet_nom = (state.otherIncome.rentalGrossAnnual - state.otherIncome.rentalExpensesAnnual) * inflFactor
-    let otherNom = 0
+    // ── Other income (unified — taxable items go into tax engine, non-taxable bypass it)
+    let otherTaxableA_nom = 0, otherTaxableB_nom = 0
+    let otherNonTaxA_nom = 0, otherNonTaxB_nom = 0
     for (const item of state.otherIncome.otherItems) {
-      if (onOrAfter(dateStr, item.startDate) && before(dateStr, item.endDate)) {
-        otherNom += item.annualAmount * Math.pow(1 + item.growthRatePct / 100, yearsFromNow)
+      const alive = item.attributedTo === 'personA' ? aAlive
+                  : item.attributedTo === 'personB' ? bAlive
+                  : aAlive || bAlive
+      if (!alive) continue
+      if (!onOrAfter(dateStr, item.startDate) || !before(dateStr, item.endDate)) continue
+      const value = item.annualAmount * Math.pow(1 + item.growthRatePct / 100, yearsFromNow)
+      const toA = item.attributedTo === 'personA' ? value : item.attributedTo === 'joint' ? value / 2 : 0
+      const toB = item.attributedTo === 'personB' ? value : item.attributedTo === 'joint' ? value / 2 : 0
+      if (item.taxable) {
+        otherTaxableA_nom += toA
+        otherTaxableB_nom += toB
+      } else {
+        otherNonTaxA_nom += toA
+        otherNonTaxB_nom += toB
       }
     }
-    const inheritNom = year === getYear(state.otherIncome.inheritanceDate) && state.otherIncome.inheritanceAmount > 0
-      ? state.otherIncome.inheritanceAmount * inflFactor : 0
 
     // ── Non-reg portfolio income ──────────────────────────────────────────────
     // Yields are annual income flows taxable each year regardless of sales.
@@ -224,7 +230,7 @@ export function runProjection(state: AppState): ProjectionResult {
 
     // ── Tax with pension splitting ────────────────────────────────────────────
     const taxInputA: TaxInput = {
-      employmentIncome: empA_nom,
+      employmentIncome: empA_nom + otherTaxableA_nom,
       pensionIncome:    dbBase_nom + dbBridge_nom + rrifA_nom,
       cppIncome:        cppA_nom,
       oasIncome:        oasA_nom,
@@ -235,7 +241,7 @@ export function runProjection(state: AppState): ProjectionResult {
       age: personAAgeInt,
     }
     const taxInputB: TaxInput = {
-      employmentIncome: empB_nom + ptA_nom + ptB_nom + rentalNet_nom + otherNom,
+      employmentIncome: empB_nom + otherTaxableB_nom,
       pensionIncome:    dbBaseB_nom + dbBridgeB_nom + rrifB_nom,
       cppIncome:        cppB_nom,
       oasIncome:        oasB_nom,
@@ -262,7 +268,8 @@ export function runProjection(state: AppState): ProjectionResult {
     }
     void splitPct
 
-    const totalNetNom = (aAlive ? taxA.netAfterTax : 0) + (bAlive ? taxB.netAfterTax : 0)
+    const totalNetNom = (aAlive ? taxA.netAfterTax + otherNonTaxA_nom : 0)
+                      + (bAlive ? taxB.netAfterTax + otherNonTaxB_nom : 0)
 
     // ── Withdrawal gap ────────────────────────────────────────────────────────
     let gap_nom = Math.max(0, spending_nom - totalNetNom)
@@ -354,11 +361,8 @@ export function runProjection(state: AppState): ProjectionResult {
       tfsaWithdrawalB:   pd(tfsaWithdrawB),
       nonRegWithdrawalA: pd(nonRegWithdrawA),
       nonRegWithdrawalB: pd(nonRegWithdrawB),
-      rentalIncome:   pd(rentalNet_nom),
-      partTimeA:      pd(ptA_nom),
-      partTimeB:      pd(ptB_nom),
-      otherIncome:    pd(otherNom),
-      inheritance:    pd(inheritNom),
+      otherIncomeA: pd(otherTaxableA_nom + otherNonTaxA_nom),
+      otherIncomeB: pd(otherTaxableB_nom + otherNonTaxB_nom),
 
       grossIncomeA: pd(aAlive ? taxA.grossIncome : 0),
       grossIncomeB: pd(bAlive ? taxB.grossIncome : 0),
