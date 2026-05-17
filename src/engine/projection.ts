@@ -41,6 +41,17 @@ function rrspContribNom(account: AppState['rrspA'], year: number, alive: boolean
   return base * endMonth / 12
 }
 
+function tfsaContribNom(account: AppState['tfsaA'], year: number, alive: boolean, inflFactor: number): number {
+  if (!alive || account.annualContribution <= 0) return 0
+  const endYear = getYear(account.contributionEndDate)
+  if (year > endYear) return 0
+  const base = account.annualContribution * inflFactor
+  if (account.contributionTiming === 'lump') return base
+  if (year < endYear) return base
+  const endMonth = new Date(account.contributionEndDate).getMonth() + 1
+  return base * endMonth / 12
+}
+
 function cppFactor(startDate: string, birthDate: string): number {
   const age = exactAgeAt(birthDate, startDate)
   const monthsFromAge65 = (age - 65) * 12
@@ -353,10 +364,8 @@ export function runProjection(state: AppState): ProjectionResult {
     const tfsaRetA  = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
     const tfsaRetB  = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
 
-    const tfsaContribA = aAlive && (state.tfsaA.contributionStopAtRetirement ? !retiredA : year <= state.tfsaA.contributionEndYear)
-      ? state.tfsaA.annualContribution * inflFactor : 0
-    const tfsaContribB = bAlive && (state.tfsaB.contributionStopAtRetirement ? !retiredB : year <= state.tfsaB.contributionEndYear)
-      ? state.tfsaB.annualContribution * inflFactor : 0
+    const tfsaContribA = tfsaContribNom(state.tfsaA, year, aAlive, inflFactor)
+    const tfsaContribB = tfsaContribNom(state.tfsaB, year, bAlive, inflFactor)
 
     const rrspContribA = rrspContribNom(state.rrspA, year, aAlive, isRrifA, inflFactor)
     const rrspContribB = rrspContribNom(state.rrspB, year, bAlive, isRrifB, inflFactor)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { CardGrid } from '../../components/CardGrid'
 import { SectionCard } from '../../components/SectionCard'
@@ -6,7 +6,7 @@ import { NumberInput } from '../../components/NumberInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
-import { runProjection } from '../../engine/projection'
+import { exactAgeAt, getYear, dateAtAge } from '../../engine/dates'
 import type { NonRegAccount } from '../../engine/types'
 import { CHART_COLORS } from '../PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,11 +80,37 @@ export function NonRegTab() {
   const bName = personB.name || 'Person B'
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
 
-  const { dataPoints } = useMemo(() => runProjection(state), [state])
+  const currentYear = new Date().getFullYear()
+  const pi = state.personalInflationRatePct / 100
+  const rates = state.returnRates
+  const refBirth = (state.ageReferencePerson === 'personB' ? personB : personA).birthDate
+  const endYearA = getYear(dateAtAge(personA.birthDate, personA.planningEndAge))
+  const endYearB = getYear(dateAtAge(personB.birthDate, personB.planningEndAge))
+  const years = Array.from({ length: Math.max(endYearA, endYearB) - currentYear + 1 }, (_, i) => currentYear + i)
 
-  const years = dataPoints.map(d => d.year)
-  const nonRegAVals = dataPoints.map(d => d.nonRegA)
-  const nonRegBVals = dataPoints.map(d => d.nonRegB)
+  const retireYearA = getYear(personA.retirementDate)
+  const retireYearB = getYear(personB.retirementDate)
+
+  const nonRegAVals: number[] = [], nonRegBVals: number[] = []
+  let balA = nonRegA.balance, balB = nonRegB.balance
+  for (const year of years) {
+    const yp = year - currentYear
+    const infl = Math.pow(1 + pi, yp)
+    const aAlive = year <= endYearA, bAlive = year <= endYearB
+    // Spousal rollover at death (balance + ACB transfer, gain stays deferred)
+    if (!aAlive && balA > 0) { balB += balA; balA = 0 }
+    if (!bAlive && balB > 0) { balA += balB; balB = 0 }
+    const age = exactAgeAt(refBirth, `${year}-06-15`)
+    const nomRet = (acct: NonRegAccount) => acct.returnRateOverrideEnabled ? acct.returnRateOverridePct / 100
+      : age < 55 ? rates.upTo55 / 100 : age < 65 ? rates.from55to65 / 100
+      : age < 70 ? rates.from65to70 / 100 : rates.from70plus / 100
+    const contribA = aAlive && year < retireYearA && nonRegA.annualContribution > 0 ? nonRegA.annualContribution * infl : 0
+    const contribB = bAlive && year < retireYearB && nonRegB.annualContribution > 0 ? nonRegB.annualContribution * infl : 0
+    balA = (balA + contribA) * (1 + nomRet(nonRegA))
+    balB = (balB + contribB) * (1 + nomRet(nonRegB))
+    nonRegAVals.push(balA / infl)
+    nonRegBVals.push(balB / infl)
+  }
   const maxNonReg = Math.max(0, ...nonRegAVals.map((a, i) => a + nonRegBVals[i]))
   const chartData: Data[] = [
     { x: years, y: nonRegAVals, name: `${aName} Non-Reg`, type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
@@ -98,25 +124,18 @@ export function NonRegTab() {
       <NonRegSection label={`Non-Registered — ${bName}`}
         account={nonRegB} onChange={v => update('nonRegB', v)} personColor={personB.color} />
 
-      <SectionCard title="Non-Registered Balances — Present-Day Dollars" width="full">
-        {dataPoints.length > 0 ? (
-          <>
-            <PlotlyChart
-              data={chartData}
-              layout={{
-                barmode: 'stack',
-                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxNonReg > 0 ? maxNonReg * 1.05 : 10000] },
-                xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
-              }}
-              style={{ height: 320 }}
-            />
-            <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />
-          </>
-        ) : (
-          <div className="h-32 flex items-center justify-center text-sm text-slate-400">
-            Enter a balance or contribution to see the projection.
-          </div>
-        )}
+      <SectionCard title="Non-Registered Balances" width="full"
+        info="Account balance without plan withdrawals — contributions (until retirement) and growth only. The full plan balance (after spending gap withdrawals) is shown in the Income Overview tab.">
+        <PlotlyChart
+          data={chartData}
+          layout={{
+            barmode: 'stack',
+            yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxNonReg > 0 ? maxNonReg * 1.05 : 10000] },
+            xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
+          }}
+          style={{ height: 320 }}
+        />
+        <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />
       </SectionCard>
     </CardGrid>
   )

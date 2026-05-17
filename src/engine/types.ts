@@ -91,8 +91,8 @@ export interface RRSPAccount {
 export interface TFSAAccount {
   balance: number
   annualContribution: number
-  contributionStopAtRetirement: boolean
-  contributionEndYear: number          // used when contributionStopAtRetirement is false
+  contributionEndDate: string           // date of last contribution (often = retirement date)
+  contributionTiming: 'lump' | 'spread' // lump = full year applied Jan 1; spread = pro-rated to end date
   returnRateOverrideEnabled: boolean
   returnRateOverridePct: number
 }

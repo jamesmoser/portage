@@ -204,8 +204,8 @@ export const DEFAULT_STATE: AppState = {
     returnRateOverridePct: 0,
   },
 
-  tfsaA: { balance: 0, annualContribution: 0, contributionStopAtRetirement: true, contributionEndYear: new Date().getFullYear(), returnRateOverrideEnabled: false, returnRateOverridePct: 0 },
-  tfsaB: { balance: 0, annualContribution: 0, contributionStopAtRetirement: true, contributionEndYear: new Date().getFullYear(), returnRateOverrideEnabled: false, returnRateOverridePct: 0 },
+  tfsaA: { balance: 0, annualContribution: 0, contributionEndDate: dateAtAge(birthA, 92), contributionTiming: 'lump', returnRateOverrideEnabled: false, returnRateOverridePct: 0 },
+  tfsaB: { balance: 0, annualContribution: 0, contributionEndDate: dateAtAge(birthB, 95), contributionTiming: 'lump', returnRateOverrideEnabled: false, returnRateOverridePct: 0 },
 
   nonRegA: {
     balance: 0, acb: 0, annualContribution: 0,

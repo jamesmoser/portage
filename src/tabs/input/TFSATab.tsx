@@ -1,15 +1,72 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { CardGrid } from '../../components/CardGrid'
 import { SectionCard } from '../../components/SectionCard'
 import { NumberInput } from '../../components/NumberInput'
+import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
-import { runProjection } from '../../engine/projection'
+import { DEFAULT_STATE } from '../../engine/defaults'
+import { exactAgeAt, getYear, dateAtAge } from '../../engine/dates'
 import { CHART_COLORS } from '../PaletteTab'
+import type { TFSAAccount } from '../../engine/types'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
+
+function TFSASection({ label, account, birthDate, planningEndAge, retirementDate, onChange, onReset, personColor }: {
+  label: string
+  account: TFSAAccount
+  birthDate: string
+  planningEndAge: number
+  retirementDate: string
+  onChange: (v: TFSAAccount) => void
+  onReset: () => void
+  personColor?: string
+}) {
+  const deathDate = dateAtAge(birthDate, planningEndAge)
+  return (
+    <SectionCard title={label} width="half" personColor={personColor} onReset={onReset}>
+      <div className="grid grid-cols-2 gap-3">
+        <NumberInput label="Current Balance" value={account.balance}
+          onChange={v => onChange({ ...account, balance: v })}
+          prefix="$" min={0} step={1000} decimals={0} />
+        <div />
+        <ToggleInput label="Override Return Rate"
+          value={account.returnRateOverrideEnabled}
+          onChange={v => onChange({ ...account, returnRateOverrideEnabled: v })} />
+        <NumberInput label="Return Rate" value={account.returnRateOverridePct}
+          onChange={v => onChange({ ...account, returnRateOverridePct: v })}
+          suffix="%" min={-30} max={30} step={0.1} decimals={1} size="sm"
+          disabled={!account.returnRateOverrideEnabled} />
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-slate-100 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <ToggleInput label="Lump Sum at Year Start"
+            value={account.contributionTiming === 'lump'}
+            onChange={v => onChange({ ...account, contributionTiming: v ? 'lump' : 'spread' })}
+            tooltip="On: full annual contribution applied Jan 1. Off: contribution spread evenly, with the final year pro-rated to the end date month." />
+          <NumberInput label="Annual Contribution" value={account.annualContribution}
+            onChange={v => onChange({ ...account, annualContribution: v })}
+            prefix="$" min={0} step={500} decimals={0} />
+        </div>
+        <div className="flex items-end gap-2">
+          <DateInput label="Last Contribution Date" value={account.contributionEndDate}
+            onChange={v => onChange({ ...account, contributionEndDate: v })} />
+          <button type="button" className="btn-primary shrink-0"
+            onClick={() => onChange({ ...account, contributionEndDate: retirementDate })}>
+            Use Retirement Date
+          </button>
+          <button type="button" className="btn-primary shrink-0"
+            onClick={() => onChange({ ...account, contributionEndDate: deathDate })}>
+            Use Date of Death
+          </button>
+        </div>
+      </div>
+    </SectionCard>
+  )
+}
 
 export function TFSATab() {
   const state = useStore()
@@ -17,21 +74,42 @@ export function TFSATab() {
   const aName = personA.name || 'Person A'
   const bName = personB.name || 'Person B'
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
+
   const currentYear = new Date().getFullYear()
+  const pi = state.personalInflationRatePct / 100
+  const rates = state.returnRates
+  const refBirth = (state.ageReferencePerson === 'personB' ? personB : personA).birthDate
+  const endYearA = getYear(dateAtAge(personA.birthDate, personA.planningEndAge))
+  const endYearB = getYear(dateAtAge(personB.birthDate, personB.planningEndAge))
+  const years = Array.from({ length: Math.max(endYearA, endYearB) - currentYear + 1 }, (_, i) => currentYear + i)
 
-  // When unchecking "stop at retirement", ensure a valid year is shown (guard against stale 0 in localStorage)
-  const setStopAtRetirementA = useCallback((v: boolean) => {
-    update('tfsaA', { ...tfsaA, contributionStopAtRetirement: v, contributionEndYear: !v && tfsaA.contributionEndYear < 2000 ? currentYear : tfsaA.contributionEndYear })
-  }, [tfsaA, currentYear, update])
-  const setStopAtRetirementB = useCallback((v: boolean) => {
-    update('tfsaB', { ...tfsaB, contributionStopAtRetirement: v, contributionEndYear: !v && tfsaB.contributionEndYear < 2000 ? currentYear : tfsaB.contributionEndYear })
-  }, [tfsaB, currentYear, update])
+  function tfsaContrib(account: TFSAAccount, year: number, infl: number): number {
+    if (account.annualContribution <= 0) return 0
+    const endYear = getYear(account.contributionEndDate)
+    if (year > endYear) return 0
+    const base = account.annualContribution * infl
+    return (account.contributionTiming === 'lump' || year < endYear)
+      ? base : base * (new Date(account.contributionEndDate).getMonth() + 1) / 12
+  }
 
-  const { dataPoints } = useMemo(() => runProjection(state), [state])
-
-  const years = dataPoints.map(d => d.year)
-  const tfsaAVals = dataPoints.map(d => d.tfsaA)
-  const tfsaBVals = dataPoints.map(d => d.tfsaB)
+  const tfsaAVals: number[] = [], tfsaBVals: number[] = []
+  let balA = tfsaA.balance, balB = tfsaB.balance
+  for (const year of years) {
+    const yp = year - currentYear
+    const infl = Math.pow(1 + pi, yp)
+    const aAlive = year <= endYearA, bAlive = year <= endYearB
+    // Spousal rollover at death
+    if (!aAlive && balA > 0) { balB += balA; balA = 0 }
+    if (!bAlive && balB > 0) { balA += balB; balB = 0 }
+    const age = exactAgeAt(refBirth, `${year}-06-15`)
+    const nomRet = (acct: TFSAAccount) => acct.returnRateOverrideEnabled ? acct.returnRateOverridePct / 100
+      : age < 55 ? rates.upTo55 / 100 : age < 65 ? rates.from55to65 / 100
+      : age < 70 ? rates.from65to70 / 100 : rates.from70plus / 100
+    balA = (balA + (aAlive ? tfsaContrib(tfsaA, year, infl) : 0)) * (1 + nomRet(tfsaA))
+    balB = (balB + (bAlive ? tfsaContrib(tfsaB, year, infl) : 0)) * (1 + nomRet(tfsaB))
+    tfsaAVals.push(balA / infl)
+    tfsaBVals.push(balB / infl)
+  }
   const maxTfsa = Math.max(0, ...tfsaAVals.map((a, i) => a + tfsaBVals[i]))
   const chartData: Data[] = [
     { x: years, y: tfsaAVals, name: `${aName} TFSA`, type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
@@ -40,79 +118,31 @@ export function TFSATab() {
 
   return (
     <CardGrid>
-      <SectionCard title={`TFSA — ${aName}`} width="half" personColor={personA.color}>
-        <div className="space-y-3">
-          <NumberInput label="Current Balance" value={tfsaA.balance}
-            onChange={v => update('tfsaA', { ...tfsaA, balance: v })}
-            prefix="$" min={0} step={1000} decimals={0} />
-          <NumberInput label="Annual Contribution" value={tfsaA.annualContribution}
-            onChange={v => update('tfsaA', { ...tfsaA, annualContribution: v })}
-            prefix="$" min={0} step={500} decimals={0} />
-          <ToggleInput label="Stop Contributions at Retirement"
-            value={tfsaA.contributionStopAtRetirement}
-            onChange={setStopAtRetirementA} />
-          {!tfsaA.contributionStopAtRetirement && (
-            <NumberInput label="Final Contribution Year" value={tfsaA.contributionEndYear}
-              onChange={v => update('tfsaA', { ...tfsaA, contributionEndYear: v })}
-              min={2000} max={2100} step={1} decimals={0} size="sm" />
-          )}
-          <ToggleInput label="Override Return Rate"
-            value={tfsaA.returnRateOverrideEnabled}
-            onChange={v => update('tfsaA', { ...tfsaA, returnRateOverrideEnabled: v })} />
-          {tfsaA.returnRateOverrideEnabled && (
-            <NumberInput label="Return Rate" value={tfsaA.returnRateOverridePct}
-              onChange={v => update('tfsaA', { ...tfsaA, returnRateOverridePct: v })}
-              suffix="%" min={0} max={30} step={0.1} decimals={1} size="sm" />
-          )}
-        </div>
-      </SectionCard>
+      <TFSASection label={`TFSA — ${aName}`}
+        account={tfsaA} birthDate={personA.birthDate} planningEndAge={personA.planningEndAge}
+        retirementDate={personA.retirementDate}
+        onChange={v => update('tfsaA', v)}
+        onReset={() => update('tfsaA', { ...DEFAULT_STATE.tfsaA, contributionEndDate: dateAtAge(personA.birthDate, personA.planningEndAge) })}
+        personColor={personA.color} />
+      <TFSASection label={`TFSA — ${bName}`}
+        account={tfsaB} birthDate={personB.birthDate} planningEndAge={personB.planningEndAge}
+        retirementDate={personB.retirementDate}
+        onChange={v => update('tfsaB', v)}
+        onReset={() => update('tfsaB', { ...DEFAULT_STATE.tfsaB, contributionEndDate: dateAtAge(personB.birthDate, personB.planningEndAge) })}
+        personColor={personB.color} />
 
-      <SectionCard title={`TFSA — ${bName}`} width="half" personColor={personB.color}>
-        <div className="space-y-3">
-          <NumberInput label="Current Balance" value={tfsaB.balance}
-            onChange={v => update('tfsaB', { ...tfsaB, balance: v })}
-            prefix="$" min={0} step={1000} decimals={0} />
-          <NumberInput label="Annual Contribution" value={tfsaB.annualContribution}
-            onChange={v => update('tfsaB', { ...tfsaB, annualContribution: v })}
-            prefix="$" min={0} step={500} decimals={0} />
-          <ToggleInput label="Stop Contributions at Retirement"
-            value={tfsaB.contributionStopAtRetirement}
-            onChange={setStopAtRetirementB} />
-          {!tfsaB.contributionStopAtRetirement && (
-            <NumberInput label="Final Contribution Year" value={tfsaB.contributionEndYear}
-              onChange={v => update('tfsaB', { ...tfsaB, contributionEndYear: v })}
-              min={2000} max={2100} step={1} decimals={0} size="sm" />
-          )}
-          <ToggleInput label="Override Return Rate"
-            value={tfsaB.returnRateOverrideEnabled}
-            onChange={v => update('tfsaB', { ...tfsaB, returnRateOverrideEnabled: v })} />
-          {tfsaB.returnRateOverrideEnabled && (
-            <NumberInput label="Return Rate" value={tfsaB.returnRateOverridePct}
-              onChange={v => update('tfsaB', { ...tfsaB, returnRateOverridePct: v })}
-              suffix="%" min={0} max={30} step={0.1} decimals={1} size="sm" />
-          )}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="TFSA Balances — Present-Day Dollars" width="full">
-        {dataPoints.length > 0 ? (
-          <>
-            <PlotlyChart
-              data={chartData}
-              layout={{
-                barmode: 'stack',
-                yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxTfsa > 0 ? maxTfsa * 1.05 : 10000] },
-                xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
-              }}
-              style={{ height: 320 }}
-            />
-            <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />
-          </>
-        ) : (
-          <div className="h-32 flex items-center justify-center text-sm text-slate-400">
-            Enter a balance or contribution to see the projection.
-          </div>
-        )}
+      <SectionCard title="TFSA Balances" width="full"
+        info="Account balance without plan withdrawals — contributions and growth only. The full plan balance (after spending gap withdrawals) is shown in the Income Overview tab.">
+        <PlotlyChart
+          data={chartData}
+          layout={{
+            barmode: 'stack',
+            yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxTfsa > 0 ? maxTfsa * 1.05 : 10000] },
+            xaxis: { ...buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge) },
+          }}
+          style={{ height: 320 }}
+        />
+        <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />
       </SectionCard>
     </CardGrid>
   )
