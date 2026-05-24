@@ -1,7 +1,7 @@
 // Default values for the full AppState — all monetary values in today's dollars.
 // Tax brackets use 2024 reference values and are indexed forward by CPI in the engine.
 
-import type { AppState, TaxSettings } from './types'
+import type { AppState, TaxSettings, WhatIfs } from './types'
 import { todayStr, dateAtAge } from './dates'
 
 const today = todayStr()
@@ -69,6 +69,20 @@ const birthA = `${new Date().getFullYear() - 52}-06-15`
 const birthB = `${new Date().getFullYear() - 50}-03-22`
 const retireA = dateAtAge(birthA, 55)
 const retireB = dateAtAge(birthB, 53)
+
+export const DEFAULT_WHATIFS: WhatIfs = {
+  returnRateOffset:  { enabled: false, value: 0 },
+  inflationRate:     { enabled: false, value: 3.0 },
+  longevityA:        { enabled: false, value: 92 },
+  longevityB:        { enabled: false, value: 95 },
+  cppStartAgeA:      { enabled: false, value: 65 },
+  cppStartAgeB:      { enabled: false, value: 65 },
+  oasStartAgeA:      { enabled: false, value: 65 },
+  oasStartAgeB:      { enabled: false, value: 65 },
+  withdrawalOrder:   { enabled: false, value: 'optimized' },
+  fixedPctStrategy:  { enabled: false, value: { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0 } },
+  pensionSplit:      { enabled: false, value: { mode: 'auto', pct: 0 } },
+}
 
 export const DEFAULT_STATE: AppState = {
   personA: {
@@ -244,12 +258,14 @@ export const DEFAULT_STATE: AppState = {
     withdrawalOrder: 'optimized',
     pensionSplitMode: 'auto',
     pensionSplitPct: 0,
-    rrspMeltdownEnabled: false,
-    rrspMeltdownTargetAnnual: 0,
-    rrspMeltdownEndDate: dateAtAge(birthA, 71),
-    tfsaRebalancingEnabled: true,
+    drawdownEnabled:   false,
+    drawdownRrspPct:   4,
+    drawdownRrspMin:   0,
+    drawdownTfsaPct:   4,
+    drawdownTfsaMin:   0,
+    drawdownNonRegPct: 4,
+    drawdownNonRegMin: 0,
   },
 
   scenarios: [],
-  activeScenarioId: null,
 }

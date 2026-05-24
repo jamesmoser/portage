@@ -215,6 +215,32 @@ export function runProjection(state: AppState): ProjectionResult {
     let rrifA_nom = Math.min(rrifMinA + rrifAddA, rrspA)
     let rrifB_nom = Math.min(rrifMinB + rrifAddB, rrspB)
 
+    // ── Fixed % RRSP/RRIF override (pre-tax) ─────────────────────────────────
+    // Sets rrifA/B_nom to max(pct × balance, min, rrif_mandatory) before tax so
+    // the draw flows correctly through pension-income splitting and tax.
+    if (withdrawalStrategy.drawdownEnabled) {
+      const ws = withdrawalStrategy
+      if (aAlive) {
+        const target = Math.max(
+          ws.drawdownRrspPct / 100 * rrspA,
+          ws.drawdownRrspMin * inflFactor,
+          isRrifA ? rrifMinA : 0,
+        )
+        rrifA_nom = Math.min(target, rrspA)
+        // Pre-RRIF: reduce balance directly; growth step won't subtract for pre-RRIF accounts
+        if (!isRrifA) rrspA = Math.max(0, rrspA - rrifA_nom)
+      }
+      if (bAlive) {
+        const target = Math.max(
+          ws.drawdownRrspPct / 100 * rrspB,
+          ws.drawdownRrspMin * inflFactor,
+          isRrifB ? rrifMinB : 0,
+        )
+        rrifB_nom = Math.min(target, rrspB)
+        if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
+      }
+    }
+
     // ── Other income (unified — taxable items go into tax engine, non-taxable bypass it)
     let otherTaxableA_nom = 0, otherTaxableB_nom = 0
     let otherNonTaxA_nom = 0, otherNonTaxB_nom = 0
@@ -311,44 +337,80 @@ export function runProjection(state: AppState): ProjectionResult {
     const totalNetNom = (aAlive ? taxA.netAfterTax + otherNonTaxA_nom : 0)
                       + (bAlive ? taxB.netAfterTax + otherNonTaxB_nom : 0)
 
-    // ── Withdrawal gap ────────────────────────────────────────────────────────
-    let gap_nom = Math.max(0, spending_nom - totalNetNom)
-
-    const hisaDraw = Math.min(gap_nom, hisa)
-    hisa -= hisaDraw
-    gap_nom -= hisaDraw
-
+    // ── Withdrawal gap / Fixed % drawdown ─────────────────────────────────────
     let tfsaWithdrawA = 0, tfsaWithdrawB = 0
     let nonRegWithdrawA = 0, nonRegWithdrawB = 0
+    let fpExtra = 0      // additional household cash from FP TFSA + Non-Reg draws
+    let gap_nom: number
 
-    if (gap_nom > 0) {
-      const order = withdrawalStrategy.withdrawalOrder
-      const half  = gap_nom / 2
-
-      if (order === 'tfsa_first' || order === 'optimized') {
-        tfsaWithdrawA = Math.min(aAlive ? half : 0, tfsaA)
-        tfsaWithdrawB = Math.min(bAlive ? half : 0, tfsaB)
-        gap_nom = Math.max(0, gap_nom - tfsaWithdrawA - tfsaWithdrawB)
+    if (withdrawalStrategy.drawdownEnabled) {
+      // Fixed % mode: proactive TFSA and Non-Reg draws (RRSP/RRIF already set above)
+      const ws = withdrawalStrategy
+      if (aAlive) {
+        tfsaWithdrawA = Math.min(
+          Math.max(ws.drawdownTfsaPct / 100 * tfsaA, ws.drawdownTfsaMin * inflFactor),
+          tfsaA,
+        )
         tfsaA -= tfsaWithdrawA
-        tfsaB -= tfsaWithdrawB
-      }
-      if (gap_nom > 0 && (order === 'nonreg_first' || order === 'optimized')) {
-        nonRegWithdrawA = Math.min(aAlive ? gap_nom / 2 : 0, nonRegA)
-        nonRegWithdrawB = Math.min(bAlive ? gap_nom / 2 : 0, nonRegB)
-        gap_nom = Math.max(0, gap_nom - nonRegWithdrawA - nonRegWithdrawB)
+        nonRegWithdrawA = Math.min(
+          Math.max(ws.drawdownNonRegPct / 100 * nonRegA, ws.drawdownNonRegMin * inflFactor),
+          nonRegA,
+        )
         if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
-        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
         nonRegA -= nonRegWithdrawA
+      }
+      if (bAlive) {
+        tfsaWithdrawB = Math.min(
+          Math.max(ws.drawdownTfsaPct / 100 * tfsaB, ws.drawdownTfsaMin * inflFactor),
+          tfsaB,
+        )
+        tfsaB -= tfsaWithdrawB
+        nonRegWithdrawB = Math.min(
+          Math.max(ws.drawdownNonRegPct / 100 * nonRegB, ws.drawdownNonRegMin * inflFactor),
+          nonRegB,
+        )
+        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
         nonRegB -= nonRegWithdrawB
       }
-      if (gap_nom > 0 && (order === 'rrsp_first' || order === 'optimized')) {
-        const rrspDrawA = !isRrifA && aAlive ? Math.min(gap_nom / 2, rrspA) : 0
-        const rrspDrawB = !isRrifB && bAlive ? Math.min(gap_nom / 2, rrspB) : 0
-        rrifA_nom += rrspDrawA
-        rrifB_nom += rrspDrawB
-        rrspA -= rrspDrawA
-        rrspB -= rrspDrawB
-        gap_nom = Math.max(0, gap_nom - rrspDrawA - rrspDrawB)
+      fpExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB
+      // HISA covers any residual shortfall; surplus stays in HISA (no reinvestment modelled)
+      const fpShortfall = Math.max(0, spending_nom - totalNetNom - fpExtra)
+      const hisaDraw    = Math.min(fpShortfall, hisa)
+      hisa    -= hisaDraw
+      gap_nom  = Math.max(0, fpShortfall - hisaDraw)
+    } else {
+      gap_nom = Math.max(0, spending_nom - totalNetNom)
+      const hisaDraw = Math.min(gap_nom, hisa)
+      hisa    -= hisaDraw
+      gap_nom -= hisaDraw
+      if (gap_nom > 0) {
+        const order = withdrawalStrategy.withdrawalOrder
+        const half  = gap_nom / 2
+        if (order === 'tfsa_first' || order === 'optimized') {
+          tfsaWithdrawA = Math.min(aAlive ? half : 0, tfsaA)
+          tfsaWithdrawB = Math.min(bAlive ? half : 0, tfsaB)
+          gap_nom = Math.max(0, gap_nom - tfsaWithdrawA - tfsaWithdrawB)
+          tfsaA -= tfsaWithdrawA
+          tfsaB -= tfsaWithdrawB
+        }
+        if (gap_nom > 0 && (order === 'nonreg_first' || order === 'optimized')) {
+          nonRegWithdrawA = Math.min(aAlive ? gap_nom / 2 : 0, nonRegA)
+          nonRegWithdrawB = Math.min(bAlive ? gap_nom / 2 : 0, nonRegB)
+          gap_nom = Math.max(0, gap_nom - nonRegWithdrawA - nonRegWithdrawB)
+          if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
+          if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
+          nonRegA -= nonRegWithdrawA
+          nonRegB -= nonRegWithdrawB
+        }
+        if (gap_nom > 0 && (order === 'rrsp_first' || order === 'optimized')) {
+          const rrspDrawA = !isRrifA && aAlive ? Math.min(gap_nom / 2, rrspA) : 0
+          const rrspDrawB = !isRrifB && bAlive ? Math.min(gap_nom / 2, rrspB) : 0
+          rrifA_nom += rrspDrawA
+          rrifB_nom += rrspDrawB
+          rrspA -= rrspDrawA
+          rrspB -= rrspDrawB
+          gap_nom = Math.max(0, gap_nom - rrspDrawA - rrspDrawB)
+        }
       }
     }
 
@@ -415,12 +477,12 @@ export function runProjection(state: AppState): ProjectionResult {
       oasClawbackB: pd(bAlive ? taxB.oasClawback : 0),
       netIncomeA:   pd(aAlive ? taxA.netAfterTax : 0),
       netIncomeB:   pd(bAlive ? taxB.netAfterTax : 0),
-      totalHouseholdNet: pd(totalNetNom),
+      totalHouseholdNet: pd(totalNetNom + fpExtra),
       effectiveTaxRateA: aAlive ? taxA.effectiveRate : 0,
       effectiveTaxRateB: bAlive ? taxB.effectiveRate : 0,
 
       householdSpending: pd(spending_nom),
-      cashFlow:          pd(totalNetNom - spending_nom),
+      cashFlow:          pd(totalNetNom + fpExtra - spending_nom),
 
       rrspA:  pd(rrspA),
       rrspB:  pd(rrspB),

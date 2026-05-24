@@ -207,14 +207,64 @@ export interface TaxSettings {
 export type WithdrawalOrder = 'tfsa_first' | 'rrsp_first' | 'nonreg_first' | 'optimized'
 export type PensionSplitMode = 'auto' | 'manual'
 
+// Parameters for the Fixed % drawdown strategy
+export interface DrawdownConfig {
+  rrspPct:    number    // % of balance withdrawn per year
+  rrspMin:    number    // minimum annual withdrawal (today's $)
+  tfsaPct:    number
+  tfsaMin:    number
+  nonRegPct:  number
+  nonRegMin:  number
+}
+
 export interface WithdrawalStrategy {
-  withdrawalOrder: WithdrawalOrder
+  withdrawalOrder:  WithdrawalOrder
   pensionSplitMode: PensionSplitMode
-  pensionSplitPct: number           // 0–50, person A to person B; used when mode=manual
-  rrspMeltdownEnabled: boolean
-  rrspMeltdownTargetAnnual: number  // annual RRSP withdrawal above regular needs
-  rrspMeltdownEndDate: string
-  tfsaRebalancingEnabled: boolean   // redeposit to TFSA after RRSP meltdown
+  pensionSplitPct:  number           // 0–50, person A to person B; used when mode=manual
+
+  // Fixed % drawdown — set by what-if; base plan always has drawdownEnabled=false
+  drawdownEnabled:   boolean
+  drawdownRrspPct:   number
+  drawdownRrspMin:   number
+  drawdownTfsaPct:   number
+  drawdownTfsaMin:   number
+  drawdownNonRegPct: number
+  drawdownNonRegMin: number
+}
+
+// ─── What-if Overrides ────────────────────────────────────────────────────────
+
+export interface WhatIf<T> {
+  enabled: boolean
+  value: T
+}
+
+export interface WhatIfs {
+  returnRateOffset:  WhatIf<number>          // ±% added to all return rate tiers
+  inflationRate:     WhatIf<number>          // personal inflation rate override
+  longevityA:        WhatIf<number>          // planning end age override
+  longevityB:        WhatIf<number>
+  cppStartAgeA:      WhatIf<number>          // CPP start age (60–70)
+  cppStartAgeB:      WhatIf<number>
+  oasStartAgeA:      WhatIf<number>          // OAS start age (65–70)
+  oasStartAgeB:      WhatIf<number>
+  withdrawalOrder:   WhatIf<WithdrawalOrder>
+  fixedPctStrategy:  WhatIf<DrawdownConfig>
+  pensionSplit:      WhatIf<{ mode: PensionSplitMode; pct: number }>
+}
+
+// ─── Headline Metrics ─────────────────────────────────────────────────────────
+
+export interface HeadlineMetrics {
+  planFullyFunded:      boolean        // true if cashFlow >= 0 every year
+  solventThroughAge:    number | null  // ref person's age in last year with cashFlow >= 0
+  solventThroughYear:   number | null  // calendar year of last solvent year
+  portfolioAtDeath:     number         // total portfolio in final projection year (today's $)
+  peakPortfolio:        number
+  peakPortfolioYear:    number
+  lifetimeTaxPaid:      number         // PV sum of all taxes + OAS clawback (today's $)
+  avgEffectiveTaxRate:  number         // 0–1, household weighted average
+  oasClawbackYears:     number
 }
 
 // ─── Scenarios ────────────────────────────────────────────────────────────────
@@ -222,15 +272,8 @@ export interface WithdrawalStrategy {
 export interface Scenario {
   id: string
   name: string
-  returnRateOffsetPct: number          // +/- from base rates
-  personalInflationOffsetPct: number
-  planningHorizonOffsetYears: number   // extend/shorten planning end
-  cppStartDateOverrideA: string        // '' = use default
-  cppStartDateOverrideB: string
-  oasStartDateOverrideA: string
-  oasStartDateOverrideB: string
-  spendingShockAmount: number          // one-time additional spending
-  spendingShockDate: string
+  whatIfs: WhatIfs
+  savedAt: string   // ISO date string
 }
 
 // ─── Full Application State ───────────────────────────────────────────────────
@@ -272,7 +315,6 @@ export interface AppState {
   withdrawalStrategy: WithdrawalStrategy
 
   scenarios: Scenario[]
-  activeScenarioId: string | null
 }
 
 // ─── Projection Output ────────────────────────────────────────────────────────

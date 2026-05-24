@@ -139,7 +139,7 @@ export function CPPOASTab() {
     <CardGrid>
       {/* CPP Person A */}
       <SectionCard title={`CPP — ${personA.name || 'Person A'}`} width="half" personColor={personA.color}
-        onReset={() => update('cppA', { estimatedMonthlyAt65: 0, startDate: dateAtAge(personA.birthDate, 65) })}
+        onReset={() => update('cppA', { ...cppA, estimatedMonthlyAt65: 0, startDate: dateAtAge(personA.birthDate, 65) })}
         info={cppInfoModal}>
         <div className="space-y-3">
           <SelectInput
@@ -224,7 +224,7 @@ export function CPPOASTab() {
 
       {/* CPP Person B */}
       <SectionCard title={`CPP — ${personB.name || 'Person B'}`} width="half" personColor={personB.color}
-        onReset={() => update('cppB', { estimatedMonthlyAt65: 0, startDate: dateAtAge(personB.birthDate, 65) })}
+        onReset={() => update('cppB', { ...cppB, estimatedMonthlyAt65: 0, startDate: dateAtAge(personB.birthDate, 65) })}
         info={cppInfoModal}>
         <div className="space-y-3">
           <SelectInput

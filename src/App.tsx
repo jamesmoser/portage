@@ -6,16 +6,12 @@ import { DashboardTab }   from './tabs/DashboardTab'
 import { AssumptionsTab } from './tabs/AssumptionsTab'
 import { IncomeTab }      from './tabs/IncomeTab'
 import { InvestmentsTab } from './tabs/InvestmentsTab'
-import { ScenariosTab }   from './tabs/input/ScenariosTab'
-import { PaletteTab }     from './tabs/PaletteTab'
 
 const TABS = [
   { id: 'dashboard',   label: 'Dashboard',   Component: DashboardTab   },
   { id: 'assumptions', label: 'Assumptions', Component: AssumptionsTab },
   { id: 'income',      label: 'Income',      Component: IncomeTab      },
   { id: 'investments', label: 'Investments', Component: InvestmentsTab },
-  { id: 'scenarios',   label: 'Scenarios',   Component: ScenariosTab   },
-  { id: 'palette',     label: '🎨 Palette',  Component: PaletteTab     },
 ]
 
 export default function App() {

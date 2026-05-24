@@ -177,6 +177,67 @@ For cards that are part of a nested object (e.g. `taxSettings`), import `DEFAULT
 
 ---
 
+## Dashboard — What-If UI Components
+
+### WhatIfSection
+Groups related what-if rows under a category label:
+```tsx
+<WhatIfSection title="Market">   {/* uppercase tracking-wider brand-red label */}
+  <WhatIfRow .../>
+  <WhatIfRow .../>
+</WhatIfSection>
+```
+Renders a `divide-y divide-slate-100` bordered block. Children are WhatIfRows or custom divs.
+
+### WhatIfRow
+Standard toggleable what-if entry (checkbox + label + base value / input children):
+```tsx
+<WhatIfRow
+  enabled={whatIfs.someKey.enabled}
+  onToggle={v => updateWhatIf('someKey', { enabled: v, value: v ? baseValue : currentValue })}
+  label="Human-readable label"
+  baseLabel="value from base plan"   {/* shown as "Base: X" when disabled, "instead of X" when enabled */}
+>
+  {/* inputs shown only when enabled */}
+  <NumberInput label="" value={whatIfs.someKey.value} onChange={...} size="sm" />
+</WhatIfRow>
+```
+
+**Toggle-on convention**: when toggling on, pre-populate `value` from the base plan (not the current what-if value), so the user sees what they're departing from.
+
+### Custom what-if rows (sub-table pattern)
+When a what-if requires a table of parameters (e.g. Drawdown Strategy), wrap the toggle and table in a single `<div>` as a direct child of `WhatIfSection` so the section's `divide-y` puts one divider before the whole block:
+```tsx
+<div>
+  <div className="flex items-center gap-3 px-3 py-2.5">
+    <input type="checkbox" ... style={{ accentColor: '#7B1515' }} />
+    <span className="text-sm w-52 shrink-0">Label</span>
+    {enabled ? <SelectInput .../> : <span className="text-xs text-slate-400">Base: ...</span>}
+  </div>
+  {enabled && (
+    <div className="px-3 pb-3">{/* table */}</div>
+  )}
+</div>
+```
+
+### MetricCard
+Key outcome tile — shows current value with optional frozen comparison delta:
+```tsx
+<MetricCard
+  label="Portfolio at Death"
+  value={fmt.format(metrics.portfolioAtDeath)}
+  note="today's $"                       {/* optional sub-label */}
+  frozen={frozenFor(current, frozen)}    {/* shows ▲/▼ delta when non-null */}
+  betterWhenHigher={true}                {/* controls green/red colouring */}
+/>
+```
+6 MetricCards in `grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6`.
+
+### Scenario controls
+Live at the top of the What-If panel. Pattern: active scenario name + "Save As…" inline input + "Load ▾" dropdown with per-scenario delete + "Reset All". The Load dropdown is a positioned `<div>` with `z-20`, not a native `<select>`.
+
+---
+
 ## Canadian Tax Rules (2024 base, CPI-indexed forward)
 
 - Capital gains inclusion: **50%** for all gains as of 2025 (proposed 66.67% above $250k was cancelled Jan 2025)

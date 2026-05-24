@@ -1,7 +1,7 @@
-import { RRSPTab }      from './input/RRSPTab'
-import { TFSATab }      from './input/TFSATab'
-import { NonRegTab }    from './input/NonRegTab'
-import { CashTab }      from './input/CashTab'
+import { RRSPTab }        from './input/RRSPTab'
+import { TFSATab }        from './input/TFSATab'
+import { NonRegTab }      from './input/NonRegTab'
+import { CashTab }        from './input/CashTab'
 import { SectionDivider } from '../components/SectionDivider'
 
 export function InvestmentsTab() {
