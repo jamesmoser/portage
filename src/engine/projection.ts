@@ -256,6 +256,7 @@ export function runProjection(state: AppState): ProjectionResult {
     let otherTaxableA_nom = 0, otherTaxableB_nom = 0
     let otherNonTaxA_nom  = 0, otherNonTaxB_nom  = 0
     let spending_nom = 0
+    let aliveMonths = 0  // count of months where at least one person is alive
 
     for (let month = 1; month <= 12; month++) {
       const monthDate = `${year}-${String(month).padStart(2, '0')}-01`
@@ -263,15 +264,19 @@ export function runProjection(state: AppState): ProjectionResult {
       // Per-month alive: active in a month if the month start is on or before the death date.
       const mAAlive = aAlive && monthDate <= deathDateA
       const mBAlive = bAlive && monthDate <= deathDateB
+      const anyAlive = mAAlive || mBAlive
 
       // ── Spending phase ──────────────────────────────────────────────────────
-      // Find the last phase whose startDate has been reached this month.
-      if (phaseCalcs.length > 0) {
-        let activeIdx = 0
-        for (let i = 0; i < phaseCalcs.length; i++) {
-          if (monthDate >= phaseCalcs[i].startDate) activeIdx = i
+      // Only accumulate spending in months where at least one person is alive.
+      if (anyAlive) {
+        aliveMonths++
+        if (phaseCalcs.length > 0) {
+          let activeIdx = 0
+          for (let i = 0; i < phaseCalcs.length; i++) {
+            if (monthDate >= phaseCalcs[i].startDate) activeIdx = i
+          }
+          spending_nom += phaseCalcs[activeIdx].monthly
         }
-        spending_nom += phaseCalcs[activeIdx].monthly
       }
 
       // ── Employment ─────────────────────────────────────────────────────────
@@ -364,12 +369,14 @@ export function runProjection(state: AppState): ProjectionResult {
     const nonRegForeignB_nom  = nonRegB * (state.nonRegB.foreignIncomeYieldPct / 100)
 
     // ── Additional spending items (annual — one-time or recurring from a start age) ──
+    // Pro-rate by alive months so the final year of the plan isn't inflated.
+    const aliveMonthFrac = aliveMonths / 12
     for (const item of state.additionalSpending) {
       const itemDate = dateAtDecimalAge(refBirth, item.startAge)
       if (item.recurring) {
-        if (jan1(year) >= itemDate) spending_nom += item.amount * inflFactor
+        if (jan1(year) >= itemDate) spending_nom += item.amount * inflFactor * aliveMonthFrac
       } else {
-        if (getYear(itemDate) === year) spending_nom += item.amount * inflFactor
+        if (getYear(itemDate) === year) spending_nom += item.amount * inflFactor * aliveMonthFrac
       }
     }
 
