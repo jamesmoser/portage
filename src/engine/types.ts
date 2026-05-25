@@ -207,14 +207,32 @@ export interface TaxSettings {
 export type WithdrawalOrder = 'tfsa_first' | 'rrsp_first' | 'nonreg_first' | 'optimized'
 export type PensionSplitMode = 'auto' | 'manual'
 
-// Parameters for the Fixed % drawdown strategy
+// ─── Drawdown Strategies ──────────────────────────────────────────────────────
+
+export type DrawdownStrategyType = 'none' | 'spendGap' | 'fixedWithdrawal' | 'fixedPct'
+
+// Fixed % of balance per year, with a floor amount
 export interface DrawdownConfig {
-  rrspPct:    number    // % of balance withdrawn per year
-  rrspMin:    number    // minimum annual withdrawal (today's $)
-  tfsaPct:    number
-  tfsaMin:    number
-  nonRegPct:  number
-  nonRegMin:  number
+  rrspPct:   number    // % of balance withdrawn per year
+  rrspMin:   number    // minimum annual withdrawal (today's $)
+  tfsaPct:   number
+  tfsaMin:   number
+  nonRegPct: number
+  nonRegMin: number
+}
+
+// Fixed annual dollar withdrawal per account (today's $, inflated each year)
+export interface FixedWithdrawalConfig {
+  rrspAmount:    number
+  tfsaAmount:    number
+  nonRegAmount:  number
+}
+
+// Shape stored in the drawdownStrategy what-if value
+export interface DrawdownStrategyConfig {
+  strategyType:    DrawdownStrategyType
+  fixedPct:        DrawdownConfig
+  fixedWithdrawal: FixedWithdrawalConfig
 }
 
 export interface WithdrawalStrategy {
@@ -222,14 +240,10 @@ export interface WithdrawalStrategy {
   pensionSplitMode: PensionSplitMode
   pensionSplitPct:  number           // 0–50, person A to person B; used when mode=manual
 
-  // Fixed % drawdown — set by what-if; base plan always has drawdownEnabled=false
-  drawdownEnabled:   boolean
-  drawdownRrspPct:   number
-  drawdownRrspMin:   number
-  drawdownTfsaPct:   number
-  drawdownTfsaMin:   number
-  drawdownNonRegPct: number
-  drawdownNonRegMin: number
+  // Active drawdown strategy — 'none' means spend-gap-only (no proactive draws)
+  drawdownStrategy:        DrawdownStrategyType
+  drawdownFixedPct:        DrawdownConfig
+  drawdownFixedWithdrawal: FixedWithdrawalConfig
 }
 
 // ─── What-if Overrides ────────────────────────────────────────────────────────
@@ -249,22 +263,42 @@ export interface WhatIfs {
   oasStartAgeA:      WhatIf<number>          // OAS start age (65–70)
   oasStartAgeB:      WhatIf<number>
   withdrawalOrder:   WhatIf<WithdrawalOrder>
-  fixedPctStrategy:  WhatIf<DrawdownConfig>
   pensionSplit:      WhatIf<{ mode: PensionSplitMode; pct: number }>
+  drawdownStrategy:  WhatIf<DrawdownStrategyConfig>
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────
 
 export interface HeadlineMetrics {
-  planFullyFunded:      boolean        // true if cashFlow >= 0 every year
-  solventThroughAge:    number | null  // ref person's age in last year with cashFlow >= 0
-  solventThroughYear:   number | null  // calendar year of last solvent year
-  portfolioAtDeath:     number         // total portfolio in final projection year (today's $)
-  peakPortfolio:        number
-  peakPortfolioYear:    number
-  lifetimeTaxPaid:      number         // PV sum of all taxes + OAS clawback (today's $)
-  avgEffectiveTaxRate:  number         // 0–1, household weighted average
-  oasClawbackYears:     number
+  // Portfolio — today's $
+  portfolioAtStart:    number
+  peakPortfolio:       number
+  peakPortfolioYear:   number
+  portfolioAtDeathA:   number   // total portfolio in year personA reaches planningEndAge
+  portfolioAtDeathB:   number   // total portfolio in final year (personB planning end)
+
+  // Spending shortfall — today's $
+  shortfallYears:      number   // years where cashFlow < 0
+  totalYears:          number
+  shortfallPct:        number   // 0–1
+  avgAnnualShortfall:  number   // average over shortfall years only
+  peakAnnualShortfall: number
+  peakShortfallYear:   number
+
+  // Tax — today's $, household
+  lifetimeTaxPaid:     number
+  avgEffectiveTaxRate: number   // 0–1
+  peakTaxYear:         number
+  peakTaxAmount:       number   // household tax in peak year
+
+  // Government benefits — today's $
+  totalCPPCollected:   number   // household
+  totalOASCollected:   number   // household gross (before clawback)
+  totalOASClawback:    number   // household total clawback repaid
+  oasClawbackYears:    number
+  oasClawbackPct:      number   // 0–1, clawback years / OAS-active years
+  cppVs65:             number   // actual collected minus what collecting at 65 would have yielded; positive = timing benefited you
+  oasVs65:             number   // same for OAS (gross vs gross; clawback shown separately)
 }
 
 // ─── Scenarios ────────────────────────────────────────────────────────────────

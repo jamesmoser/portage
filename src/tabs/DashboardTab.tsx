@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { SectionCard } from '../components/SectionCard'
+import { SectionDivider } from '../components/SectionDivider'
 import { NumberInput } from '../components/NumberInput'
 import { SelectInput } from '../components/SelectInput'
 import { PlotlyChart } from '../components/PlotlyChart'
@@ -8,27 +9,16 @@ import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelecto
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt } from '../engine/dates'
-import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode } from '../engine/types'
+import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType } from '../engine/types'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
-const fmt    = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
+const _fmtObj = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
+const fmt    = (v: number) => _fmtObj.format(v)
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
-
-function formatSolvency(m: HeadlineMetrics): string {
-  if (m.planFullyFunded)          return 'Fully funded ✓'
-  if (m.solventThroughAge == null) return 'Never funded'
-  return `Age ${Math.ceil(m.solventThroughAge)} (${m.solventThroughYear})`
-}
-
-function solvencyScore(m: HeadlineMetrics): number {
-  if (m.planFullyFunded)          return Infinity
-  if (m.solventThroughAge == null) return -Infinity
-  return m.solventThroughAge
-}
 
 const WITHDRAWAL_ORDER_OPTIONS: { value: string; label: string }[] = [
   { value: 'optimized',    label: 'Optimized' },
@@ -48,6 +38,20 @@ const PENSION_SPLIT_OPTIONS: { value: string; label: string }[] = [
   { value: 'auto',   label: 'Auto (optimized)' },
   { value: 'manual', label: 'Manual' },
 ]
+
+const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[] = [
+  { value: 'none',            label: 'None' },
+  { value: 'spendGap',        label: 'Spend-Gap Only' },
+  { value: 'fixedWithdrawal', label: 'Fixed Withdrawals' },
+  { value: 'fixedPct',        label: 'Fixed Percentage' },
+]
+
+const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
+  none:             'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
+  spendGap:         'Withdraw only what is needed to cover the spending shortfall each year — nothing more. Accounts are drawn in the configured withdrawal order (TFSA first, Non-Reg, RRSP/RRIF, etc.). RRIF mandatory minimums are always withdrawn regardless of need.',
+  fixedWithdrawal:  'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
+  fixedPct:         'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -100,27 +104,42 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
   )
 }
 
-function MetricCard({ label, value, note, frozen, betterWhenHigher = true }: {
+function MetricCard({ label, value, sub, frozen, betterWhenHigher = true }: {
   label: string
   value: string
-  note?: string
-  frozen?: { value: string; numericDelta: number } | null
+  sub?: string
+  frozen?: { value: string; sub?: string; numericDelta: number } | null
   betterWhenHigher?: boolean
 }) {
-  const isBetter = frozen ? (betterWhenHigher ? frozen.numericDelta > 0 : frozen.numericDelta < 0) : false
-  const isWorse  = frozen ? (betterWhenHigher ? frozen.numericDelta < 0 : frozen.numericDelta > 0) : false
+  const isBetter = frozen != null && (betterWhenHigher ? frozen.numericDelta > 0 : frozen.numericDelta < 0)
+  const isWorse  = frozen != null && (betterWhenHigher ? frozen.numericDelta < 0 : frozen.numericDelta > 0)
+  const arrow    = frozen != null && frozen.numericDelta !== 0 ? (isBetter ? '▲' : '▼') : null
+  const arrowColor = isBetter ? 'text-green-500' : isWorse ? 'text-red-500' : 'text-slate-400'
+
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3">
-      <div className="text-xs text-slate-400 mb-0.5">{label}</div>
-      <div className="text-base font-bold text-slate-800">{value}</div>
-      {note && <div className="text-[11px] text-slate-400">{note}</div>}
-      {frozen && frozen.numericDelta !== 0 && (
-        <div className={`text-[11px] mt-1 font-medium ${isBetter ? 'text-green-600' : isWorse ? 'text-red-600' : 'text-slate-400'}`}>
-          {isBetter ? '▲' : '▼'} Frozen: {frozen.value}
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      {frozen != null ? (
+        <div className="flex flex-1 divide-x divide-slate-200">
+          <div className="flex-1 min-w-0 px-3 py-2.5">
+            <div className="text-xs text-slate-400 leading-tight mb-1.5">{label}</div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-slate-800 leading-tight">{value}</span>
+              {arrow && <span className={`text-base font-bold leading-none shrink-0 ${arrowColor}`}>{arrow}</span>}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">{sub ?? '\u00A0'}</div>
+          </div>
+          <div className="flex-1 min-w-0 px-3 py-2.5 bg-blue-50">
+            <div className="text-xs text-blue-400 leading-tight mb-1.5">Frozen</div>
+            <div className="text-base font-semibold text-slate-500 leading-tight">{frozen.value}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">{frozen.sub ?? '\u00A0'}</div>
+          </div>
         </div>
-      )}
-      {frozen && frozen.numericDelta === 0 && (
-        <div className="text-[11px] mt-1 text-slate-400">= Frozen: {frozen.value}</div>
+      ) : (
+        <div className="px-3 py-2.5 flex-1">
+          <div className="text-xs text-slate-400 leading-tight mb-1.5">{label}</div>
+          <div className="text-base font-bold text-slate-800 leading-tight">{value}</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">{sub ?? '\u00A0'}</div>
+        </div>
       )}
     </div>
   )
@@ -163,8 +182,9 @@ export function DashboardTab() {
   )
   const { dataPoints, warnings } = useMemo(() => runProjection(effectiveState), [effectiveState])
   const metrics = useMemo(
-    () => computeHeadlineMetrics(dataPoints, ageReferencePerson),
-    [dataPoints, ageReferencePerson],
+    () => computeHeadlineMetrics(dataPoints, ageReferencePerson, effectiveState as AppState),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dataPoints, ageReferencePerson, effectiveState],
   )
 
   // ── Scenario controls state ────────────────────────────────────────────────
@@ -200,21 +220,20 @@ export function DashboardTab() {
 
   // ── Frozen metric helpers ─────────────────────────────────────────────────
 
-  function frozenFor(current: number, frozenVal: number | undefined, betterWhenHigh = true) {
+  function frozenFor(
+    current: number,
+    frozenVal: number | undefined,
+    formatter: (v: number) => string,
+    betterWhenHigh = true,
+    frozenSub?: string,
+  ) {
     if (frozenMetrics == null || frozenVal == null) return undefined
     return {
-      value:        frozenVal >= 1000 ? fmt.format(frozenVal)
-                    : frozenVal <= 1 ? fmtPct(frozenVal)
-                    : String(frozenVal),
+      value:        formatter(frozenVal),
+      sub:          frozenSub,
       numericDelta: betterWhenHigh ? current - frozenVal : frozenVal - current,
     }
   }
-
-  // Solvency frozen comparison (uses score, not raw numeric)
-  const solFrozen = frozenMetrics ? {
-    value:        formatSolvency(frozenMetrics),
-    numericDelta: solvencyScore(metrics) - solvencyScore(frozenMetrics),
-  } : undefined
 
   // ── Chart data ────────────────────────────────────────────────────────────
 
@@ -258,6 +277,7 @@ export function DashboardTab() {
     <div className="space-y-4">
 
       {/* ── What-If Panel ─────────────────────────────────────────────────── */}
+      <SectionDivider title="Scenarios" />
       <SectionCard title="What-If Analysis" width="full">
 
         {/* Scenario controls */}
@@ -326,7 +346,135 @@ export function DashboardTab() {
           </button>
         </div>
 
-        {/* What-if rows */}
+        {/* ── Drawdown Strategy ───────────────────────────────────────────── */}
+        <div className="mb-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#7B1515' }}>
+            Drawdown Strategy
+          </div>
+          <div className="rounded border-2 border-slate-300 bg-slate-50 p-4">
+            <div className="flex items-start gap-4 flex-wrap">
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-sm font-medium text-slate-700 w-20 shrink-0">Strategy</span>
+                <SelectInput
+                  label=""
+                  value={whatIfs.drawdownStrategy.value.strategyType}
+                  onChange={v => {
+                    const type = v as DrawdownStrategyType
+                    updateWhatIf('drawdownStrategy', {
+                      enabled: type !== 'none',
+                      value: { ...whatIfs.drawdownStrategy.value, strategyType: type },
+                    })
+                  }}
+                  options={DRAWDOWN_STRATEGY_OPTIONS}
+                />
+              </div>
+              <p className="text-xs text-slate-500 flex-1 min-w-0 self-center">
+                {DRAWDOWN_STRATEGY_DESCRIPTIONS[whatIfs.drawdownStrategy.value.strategyType]}
+              </p>
+            </div>
+
+            {/* Fixed Withdrawals config */}
+            {whatIfs.drawdownStrategy.value.strategyType === 'fixedWithdrawal' && (
+              <div className="mt-3 overflow-x-auto rounded border border-slate-200 text-xs">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-white border-b border-slate-200">
+                      <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — today's dollars, inflated each year</th>
+                    </tr>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                      <th className="px-3 py-1.5 text-left font-medium">Account</th>
+                      <th className="px-3 py-1.5 text-center font-medium">Amount ($ / yr)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {([
+                      ['RRSP / RRIF', 'rrspAmount'   ],
+                      ['TFSA',        'tfsaAmount'   ],
+                      ['Non-Reg',     'nonRegAmount' ],
+                    ] as const).map(([label, key]) => (
+                      <tr key={label} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-1.5 text-slate-600 font-medium">{label}</td>
+                        <td className="px-2 py-1">
+                          <NumberInput label=""
+                            value={whatIfs.drawdownStrategy.value.fixedWithdrawal[key]}
+                            onChange={v => updateWhatIf('drawdownStrategy', {
+                              value: {
+                                ...whatIfs.drawdownStrategy.value,
+                                fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [key]: v },
+                              },
+                            })}
+                            min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="px-3 py-2 text-[10px] text-slate-400">
+                  RRSP/RRIF draws also respect mandatory RRIF minimums. Draws occur before tax.
+                </p>
+              </div>
+            )}
+
+            {/* Fixed Percentage config */}
+            {whatIfs.drawdownStrategy.value.strategyType === 'fixedPct' && (
+              <div className="mt-3 overflow-x-auto rounded border border-slate-200 text-xs">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-white border-b border-slate-200">
+                      <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — % of balance, with floor</th>
+                    </tr>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                      <th className="px-3 py-1.5 text-left font-medium">Account</th>
+                      <th className="px-3 py-1.5 text-center font-medium">Rate (% / yr)</th>
+                      <th className="px-3 py-1.5 text-center font-medium">Floor ($ / yr)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {([
+                      ['RRSP / RRIF', 'rrspPct',   'rrspMin'   ],
+                      ['TFSA',        'tfsaPct',   'tfsaMin'   ],
+                      ['Non-Reg',     'nonRegPct', 'nonRegMin' ],
+                    ] as const).map(([label, pctKey, minKey]) => (
+                      <tr key={label} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-1.5 text-slate-600 font-medium">{label}</td>
+                        <td className="px-2 py-1">
+                          <NumberInput label=""
+                            value={whatIfs.drawdownStrategy.value.fixedPct[pctKey]}
+                            onChange={v => updateWhatIf('drawdownStrategy', {
+                              value: {
+                                ...whatIfs.drawdownStrategy.value,
+                                fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [pctKey]: v },
+                              },
+                            })}
+                            min={0} max={100} step={0.5} decimals={1} size="sm" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <NumberInput label=""
+                            value={whatIfs.drawdownStrategy.value.fixedPct[minKey]}
+                            onChange={v => updateWhatIf('drawdownStrategy', {
+                              value: {
+                                ...whatIfs.drawdownStrategy.value,
+                                fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [minKey]: v },
+                              },
+                            })}
+                            min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="px-3 py-2 text-[10px] text-slate-400">
+                  Each year: withdraw max(rate × balance, floor). RRSP/RRIF also respects mandatory RRIF minimums. Draws occur before tax.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Base Plan Modifications ──────────────────────────────────────── */}
+        <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#7B1515' }}>
+          Base Plan Modifications
+        </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6">
           <div className="space-y-3">
 
@@ -454,78 +602,6 @@ export function DashboardTab() {
                     suffix="%" min={0} max={50} step={1} decimals={0} size="sm" />
                 )}
               </WhatIfRow>
-              {/* Drawdown Strategy — select-style; sub-table expands when a strategy is chosen */}
-              <div>
-                <div className="flex items-center gap-3 px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={whatIfs.fixedPctStrategy.enabled}
-                    onChange={e => updateWhatIf('fixedPctStrategy', { enabled: e.target.checked })}
-                    className="w-4 h-4 rounded shrink-0 cursor-pointer"
-                    style={{ accentColor: '#7B1515' }}
-                  />
-                  <span className={`text-sm w-52 shrink-0 ${whatIfs.fixedPctStrategy.enabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
-                    Drawdown Strategy
-                  </span>
-                  {whatIfs.fixedPctStrategy.enabled ? (
-                    <div className="flex items-center gap-2">
-                      <SelectInput label=""
-                        value="fixedPct"
-                        onChange={() => {}}
-                        options={[{ value: 'fixedPct', label: 'Fixed % Drawdown' }]}
-                      />
-                      <span className="text-xs text-slate-400">instead of <span className="font-medium text-slate-500">None</span></span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-400">Base: <span className="font-medium text-slate-500">None</span></span>
-                  )}
-                </div>
-                {whatIfs.fixedPctStrategy.enabled && (
-                  <div className="px-3 pb-3">
-                    <div className="overflow-x-auto rounded border border-slate-200 text-xs">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-3 py-1.5 text-left font-medium text-slate-600">Account</th>
-                            <th className="px-3 py-1.5 text-center font-medium text-slate-600">Rate (% / yr)</th>
-                            <th className="px-3 py-1.5 text-center font-medium text-slate-600">Minimum ($ / yr)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {([
-                            ['RRSP / RRIF', 'rrspPct',   'rrspMin'   ],
-                            ['TFSA',        'tfsaPct',   'tfsaMin'   ],
-                            ['Non-Reg',     'nonRegPct', 'nonRegMin' ],
-                          ] as const).map(([label, pctKey, minKey]) => (
-                            <tr key={label} className="hover:bg-slate-50/50">
-                              <td className="px-3 py-1.5 text-slate-600 font-medium">{label}</td>
-                              <td className="px-2 py-1">
-                                <NumberInput label=""
-                                  value={whatIfs.fixedPctStrategy.value[pctKey]}
-                                  onChange={v => updateWhatIf('fixedPctStrategy', {
-                                    value: { ...whatIfs.fixedPctStrategy.value, [pctKey]: v },
-                                  })}
-                                  min={0} max={100} step={0.5} decimals={1} size="sm" />
-                              </td>
-                              <td className="px-2 py-1">
-                                <NumberInput label=""
-                                  value={whatIfs.fixedPctStrategy.value[minKey]}
-                                  onChange={v => updateWhatIf('fixedPctStrategy', {
-                                    value: { ...whatIfs.fixedPctStrategy.value, [minKey]: v },
-                                  })}
-                                  min={0} max={500_000} step={1000} decimals={0} size="sm" />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1.5">
-                      Each year: withdraw max(rate × balance, minimum). RRSP/RRIF also respects mandatory RRIF minimums. Draws happen before tax.
-                    </p>
-                  </div>
-                )}
-              </div>
             </WhatIfSection>
 
           </div>
@@ -533,82 +609,131 @@ export function DashboardTab() {
       </SectionCard>
 
       {/* ── Key Outcomes ──────────────────────────────────────────────────── */}
-      <SectionCard
-        title="Key Outcomes"
-        width="full"
-        headerRight={
-          <div className="flex items-center gap-2">
-            {frozenMetrics && (
-              <button className="btn-secondary text-xs py-1" onClick={clearFreeze}>
-                Clear Freeze
-              </button>
-            )}
-            <button
-              className="btn-primary text-xs py-1"
-              onClick={() => freezeMetrics(metrics)}
-              title="Freeze current values as a comparison baseline"
-            >
-              {frozenMetrics ? 'Re-Freeze' : 'Freeze'}
-            </button>
-          </div>
-        }
-      >
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-          <MetricCard
-            label="Plan Coverage"
-            value={formatSolvency(metrics)}
-            frozen={solFrozen}
-            betterWhenHigher={true}
-          />
-          <MetricCard
-            label="Portfolio at Death"
-            value={fmt.format(metrics.portfolioAtDeath)}
-            note="today's $"
-            frozen={frozenFor(metrics.portfolioAtDeath, frozenMetrics?.portfolioAtDeath)}
-            betterWhenHigher={true}
-          />
-          <MetricCard
-            label="Peak Portfolio"
-            value={fmt.format(metrics.peakPortfolio)}
-            note={`in ${metrics.peakPortfolioYear}`}
-            frozen={frozenFor(metrics.peakPortfolio, frozenMetrics?.peakPortfolio)}
-            betterWhenHigher={true}
-          />
-          <MetricCard
-            label="Lifetime Tax Paid"
-            value={fmt.format(metrics.lifetimeTaxPaid)}
-            note="today's $, household"
-            frozen={frozenMetrics ? {
-              value:        fmt.format(frozenMetrics.lifetimeTaxPaid),
-              numericDelta: frozenMetrics.lifetimeTaxPaid - metrics.lifetimeTaxPaid,
-            } : undefined}
-            betterWhenHigher={true}
-          />
-          <MetricCard
-            label="Avg Effective Tax Rate"
-            value={fmtPct(metrics.avgEffectiveTaxRate)}
-            note="household"
-            frozen={frozenMetrics ? {
-              value:        fmtPct(frozenMetrics.avgEffectiveTaxRate),
-              numericDelta: frozenMetrics.avgEffectiveTaxRate - metrics.avgEffectiveTaxRate,
-            } : undefined}
-            betterWhenHigher={true}
-          />
-          <MetricCard
-            label="OAS Clawback Years"
-            value={metrics.oasClawbackYears === 0 ? 'None' : `${metrics.oasClawbackYears} yrs`}
-            frozen={frozenMetrics ? {
-              value:        frozenMetrics.oasClawbackYears === 0 ? 'None' : `${frozenMetrics.oasClawbackYears} yrs`,
-              numericDelta: frozenMetrics.oasClawbackYears - metrics.oasClawbackYears,
-            } : undefined}
-            betterWhenHigher={true}
-          />
+      <SectionDivider title="Outcomes" />
+      <SectionCard title="Key Outcomes" width="full">
+        <div className="flex justify-end mb-3">
+          {frozenMetrics && (
+            <button className="btn-secondary mr-2" onClick={clearFreeze}>Clear Freeze</button>
+          )}
+          <button
+            className="btn-primary"
+            onClick={() => freezeMetrics(metrics)}
+            title="Freeze current values as a comparison baseline"
+          >
+            {frozenMetrics ? 'Re-Freeze' : 'Freeze'}
+          </button>
         </div>
-        {frozenMetrics && (
-          <p className="text-[11px] text-slate-400 mt-3">
-            ▲ / ▼ compares current values to frozen baseline. Green = improvement.
-          </p>
-        )}
+
+        <div className="space-y-4">
+
+          {/* Portfolio */}
+          <div className="rounded border border-slate-200">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+              <span className="text-sm font-medium text-slate-700">Portfolio</span>
+            </div>
+            <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+              <MetricCard label="At Start"
+                value={fmt(metrics.portfolioAtStart)}
+                frozen={frozenFor(metrics.portfolioAtStart, frozenMetrics?.portfolioAtStart, fmt)} />
+              <MetricCard label="Peak"
+                value={fmt(metrics.peakPortfolio)}
+                sub={`in ${metrics.peakPortfolioYear}`}
+                frozen={frozenFor(metrics.peakPortfolio, frozenMetrics?.peakPortfolio, fmt, true,
+                  frozenMetrics ? `in ${frozenMetrics.peakPortfolioYear}` : undefined)} />
+              <MetricCard label={`At ${aName}'s Death`}
+                value={fmt(metrics.portfolioAtDeathA)}
+                frozen={frozenFor(metrics.portfolioAtDeathA, frozenMetrics?.portfolioAtDeathA, fmt)} />
+              <MetricCard label={`At ${bName}'s Death`}
+                value={fmt(metrics.portfolioAtDeathB)}
+                frozen={frozenFor(metrics.portfolioAtDeathB, frozenMetrics?.portfolioAtDeathB, fmt)} />
+            </div>
+          </div>
+
+          {/* Spending */}
+          <div className="rounded border border-slate-200">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+              <span className="text-sm font-medium text-slate-700">Spending</span>
+            </div>
+            <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+              <MetricCard label="Shortfall — Years"
+                betterWhenHigher={false}
+                value={metrics.shortfallYears === 0 ? 'None' : `${metrics.shortfallYears} of ${metrics.totalYears} yrs`}
+                sub={metrics.shortfallYears > 0 ? fmtPct(metrics.shortfallPct) : undefined}
+                frozen={frozenFor(metrics.shortfallYears, frozenMetrics?.shortfallYears,
+                  v => v === 0 ? 'None' : `${v} yrs`, false,
+                  frozenMetrics && frozenMetrics.shortfallYears > 0 ? fmtPct(frozenMetrics.shortfallPct) : undefined)} />
+              <MetricCard label="Shortfall — Annual Avg"
+                betterWhenHigher={false}
+                value={metrics.avgAnnualShortfall < 1 ? 'None' : fmt(metrics.avgAnnualShortfall)}
+                frozen={frozenFor(metrics.avgAnnualShortfall, frozenMetrics?.avgAnnualShortfall,
+                  v => v < 1 ? 'None' : fmt(v), false)} />
+              <MetricCard label="Shortfall — Peak Year"
+                betterWhenHigher={false}
+                value={metrics.peakAnnualShortfall < 1 ? 'None' : fmt(metrics.peakAnnualShortfall)}
+                sub={metrics.peakShortfallYear > 0 ? `in ${metrics.peakShortfallYear}` : undefined}
+                frozen={frozenFor(metrics.peakAnnualShortfall, frozenMetrics?.peakAnnualShortfall,
+                  v => v < 1 ? 'None' : fmt(v), false,
+                  frozenMetrics && frozenMetrics.peakShortfallYear > 0 ? `in ${frozenMetrics.peakShortfallYear}` : undefined)} />
+            </div>
+          </div>
+
+          {/* Tax */}
+          <div className="rounded border border-slate-200">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+              <span className="text-sm font-medium text-slate-700">Tax</span>
+            </div>
+            <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+              <MetricCard label="Lifetime Total"
+                betterWhenHigher={false}
+                value={fmt(metrics.lifetimeTaxPaid)}
+                frozen={frozenFor(metrics.lifetimeTaxPaid, frozenMetrics?.lifetimeTaxPaid, fmt, false)} />
+              <MetricCard label="Avg Effective Rate"
+                betterWhenHigher={false}
+                value={fmtPct(metrics.avgEffectiveTaxRate)}
+                frozen={frozenFor(metrics.avgEffectiveTaxRate, frozenMetrics?.avgEffectiveTaxRate, fmtPct, false)} />
+              <MetricCard label="Peak Year"
+                betterWhenHigher={false}
+                value={fmt(metrics.peakTaxAmount)}
+                sub={`in ${metrics.peakTaxYear}`}
+                frozen={frozenFor(metrics.peakTaxAmount, frozenMetrics?.peakTaxAmount, fmt, false,
+                  frozenMetrics ? `in ${frozenMetrics.peakTaxYear}` : undefined)} />
+            </div>
+          </div>
+
+          {/* Government Benefits */}
+          <div className="rounded border border-slate-200">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+              <span className="text-sm font-medium text-slate-700">Government Benefits</span>
+            </div>
+            <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+              <MetricCard label="CPP — Total Collected"
+                value={fmt(metrics.totalCPPCollected)}
+                frozen={frozenFor(metrics.totalCPPCollected, frozenMetrics?.totalCPPCollected, fmt)} />
+              <MetricCard label="OAS — Total Collected"
+                value={fmt(metrics.totalOASCollected)}
+                frozen={frozenFor(metrics.totalOASCollected, frozenMetrics?.totalOASCollected, fmt)} />
+              <MetricCard label="OAS — Clawback"
+                betterWhenHigher={false}
+                value={metrics.oasClawbackYears === 0 ? 'None' : `${metrics.oasClawbackYears} yrs`}
+                sub={metrics.oasClawbackYears > 0 ? `${fmtPct(metrics.oasClawbackPct)} of OAS years` : undefined}
+                frozen={frozenFor(metrics.oasClawbackYears, frozenMetrics?.oasClawbackYears,
+                  v => v === 0 ? 'None' : `${v} yrs`, false,
+                  frozenMetrics && frozenMetrics.oasClawbackYears > 0
+                    ? `${fmtPct(frozenMetrics.oasClawbackPct)} of OAS years` : undefined)} />
+              <MetricCard label="CPP — vs Age 65 Start"
+                betterWhenHigher={true}
+                value={(metrics.cppVs65 >= 0 ? '+' : '') + fmt(metrics.cppVs65)}
+                frozen={frozenFor(metrics.cppVs65, frozenMetrics?.cppVs65,
+                  v => (v >= 0 ? '+' : '') + fmt(v))} />
+              <MetricCard label="OAS — vs Age 65 Start"
+                betterWhenHigher={true}
+                value={(metrics.oasVs65 >= 0 ? '+' : '') + fmt(metrics.oasVs65)}
+                frozen={frozenFor(metrics.oasVs65, frozenMetrics?.oasVs65,
+                  v => (v >= 0 ? '+' : '') + fmt(v))} />
+            </div>
+          </div>
+
+        </div>
       </SectionCard>
 
       {/* ── Projection warnings ────────────────────────────────────────────── */}
@@ -675,16 +800,16 @@ export function DashboardTab() {
                 <tr key={d.year} className={`border-b border-slate-100 ${d.cashFlow < 0 ? 'bg-red-50' : ''}`}>
                   <td className="px-2 py-1 border border-slate-100 font-medium text-slate-700">{d.year}</td>
                   <td className="px-2 py-1 border border-slate-100 text-right text-slate-600">{d.personAAge.toFixed(1)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt.format(d.grossIncomeA)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt.format(d.grossIncomeB)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmt.format(d.taxA)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmt.format(d.taxB)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt.format(d.totalHouseholdNet)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt.format(d.householdSpending)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.grossIncomeA)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.grossIncomeB)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmt(d.taxA)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmt(d.taxB)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt(d.totalHouseholdNet)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.householdSpending)}</td>
                   <td className={`px-2 py-1 border border-slate-100 text-right font-medium ${d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                    {fmt.format(d.cashFlow)}
+                    {fmt(d.cashFlow)}
                   </td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt.format(d.totalPortfolio)}</td>
+                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.totalPortfolio)}</td>
                 </tr>
               ))}
             </tbody>

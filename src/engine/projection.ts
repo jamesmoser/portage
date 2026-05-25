@@ -215,31 +215,40 @@ export function runProjection(state: AppState): ProjectionResult {
     let rrifA_nom = Math.min(rrifMinA + rrifAddA, rrspA)
     let rrifB_nom = Math.min(rrifMinB + rrifAddB, rrspB)
 
-    // ── Fixed % RRSP/RRIF override (pre-tax) ─────────────────────────────────
-    // Sets rrifA/B_nom to max(pct × balance, min, rrif_mandatory) before tax so
-    // the draw flows correctly through pension-income splitting and tax.
-    if (withdrawalStrategy.drawdownEnabled) {
-      const ws = withdrawalStrategy
+    // ── RRSP/RRIF draws (pre-tax) ────────────────────────────────────────────
+    // Draws are set here so they flow through pension splitting and tax.
+    // 'none': zero everything — purely analytical, no account draws at all.
+    // 'spendGap': mandatory RRIF minimums only (set above); gap fill happens post-tax.
+    // 'fixedPct'/'fixedWithdrawal': proactive draws override the mandatory minimum.
+    if (withdrawalStrategy.drawdownStrategy === 'none') {
+      rrifA_nom = 0
+      rrifB_nom = 0
+    } else if (withdrawalStrategy.drawdownStrategy === 'fixedPct') {
+      const fp = withdrawalStrategy.drawdownFixedPct
       if (aAlive) {
-        const target = Math.max(
-          ws.drawdownRrspPct / 100 * rrspA,
-          ws.drawdownRrspMin * inflFactor,
-          isRrifA ? rrifMinA : 0,
-        )
+        const target = Math.max(fp.rrspPct / 100 * rrspA, fp.rrspMin * inflFactor, isRrifA ? rrifMinA : 0)
         rrifA_nom = Math.min(target, rrspA)
-        // Pre-RRIF: reduce balance directly; growth step won't subtract for pre-RRIF accounts
         if (!isRrifA) rrspA = Math.max(0, rrspA - rrifA_nom)
       }
       if (bAlive) {
-        const target = Math.max(
-          ws.drawdownRrspPct / 100 * rrspB,
-          ws.drawdownRrspMin * inflFactor,
-          isRrifB ? rrifMinB : 0,
-        )
+        const target = Math.max(fp.rrspPct / 100 * rrspB, fp.rrspMin * inflFactor, isRrifB ? rrifMinB : 0)
+        rrifB_nom = Math.min(target, rrspB)
+        if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
+      }
+    } else if (withdrawalStrategy.drawdownStrategy === 'fixedWithdrawal') {
+      const fw = withdrawalStrategy.drawdownFixedWithdrawal
+      if (aAlive) {
+        const target = Math.max(fw.rrspAmount * inflFactor, isRrifA ? rrifMinA : 0)
+        rrifA_nom = Math.min(target, rrspA)
+        if (!isRrifA) rrspA = Math.max(0, rrspA - rrifA_nom)
+      }
+      if (bAlive) {
+        const target = Math.max(fw.rrspAmount * inflFactor, isRrifB ? rrifMinB : 0)
         rrifB_nom = Math.min(target, rrspB)
         if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
       }
     }
+    // 'spendGap': rrifA/B_nom stays at mandatory minimum + additionalWithdrawalAboveMinimum (set above)
 
     // ── Other income (unified — taxable items go into tax engine, non-taxable bypass it)
     let otherTaxableA_nom = 0, otherTaxableB_nom = 0
@@ -337,48 +346,19 @@ export function runProjection(state: AppState): ProjectionResult {
     const totalNetNom = (aAlive ? taxA.netAfterTax + otherNonTaxA_nom : 0)
                       + (bAlive ? taxB.netAfterTax + otherNonTaxB_nom : 0)
 
-    // ── Withdrawal gap / Fixed % drawdown ─────────────────────────────────────
+    // ── Gap fill / account draws ──────────────────────────────────────────────
     let tfsaWithdrawA = 0, tfsaWithdrawB = 0
     let nonRegWithdrawA = 0, nonRegWithdrawB = 0
-    let fpExtra = 0      // additional household cash from FP TFSA + Non-Reg draws
+    let proactiveExtra = 0
     let gap_nom: number
 
-    if (withdrawalStrategy.drawdownEnabled) {
-      // Fixed % mode: proactive TFSA and Non-Reg draws (RRSP/RRIF already set above)
-      const ws = withdrawalStrategy
-      if (aAlive) {
-        tfsaWithdrawA = Math.min(
-          Math.max(ws.drawdownTfsaPct / 100 * tfsaA, ws.drawdownTfsaMin * inflFactor),
-          tfsaA,
-        )
-        tfsaA -= tfsaWithdrawA
-        nonRegWithdrawA = Math.min(
-          Math.max(ws.drawdownNonRegPct / 100 * nonRegA, ws.drawdownNonRegMin * inflFactor),
-          nonRegA,
-        )
-        if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
-        nonRegA -= nonRegWithdrawA
-      }
-      if (bAlive) {
-        tfsaWithdrawB = Math.min(
-          Math.max(ws.drawdownTfsaPct / 100 * tfsaB, ws.drawdownTfsaMin * inflFactor),
-          tfsaB,
-        )
-        tfsaB -= tfsaWithdrawB
-        nonRegWithdrawB = Math.min(
-          Math.max(ws.drawdownNonRegPct / 100 * nonRegB, ws.drawdownNonRegMin * inflFactor),
-          nonRegB,
-        )
-        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
-        nonRegB -= nonRegWithdrawB
-      }
-      fpExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB
-      // HISA covers any residual shortfall; surplus stays in HISA (no reinvestment modelled)
-      const fpShortfall = Math.max(0, spending_nom - totalNetNom - fpExtra)
-      const hisaDraw    = Math.min(fpShortfall, hisa)
-      hisa    -= hisaDraw
-      gap_nom  = Math.max(0, fpShortfall - hisaDraw)
-    } else {
+    if (withdrawalStrategy.drawdownStrategy === 'none') {
+      // No account draws whatsoever — portfolios grow freely; shortfall reported but uncovered.
+      gap_nom = Math.max(0, spending_nom - totalNetNom)
+
+    } else if (withdrawalStrategy.drawdownStrategy === 'spendGap') {
+      // Draw only enough to cover the spending shortfall, in the configured withdrawal order.
+      // RRIF mandatory minimums (set above) are already included in totalNetNom via tax engine.
       gap_nom = Math.max(0, spending_nom - totalNetNom)
       const hisaDraw = Math.min(gap_nom, hisa)
       hisa    -= hisaDraw
@@ -412,6 +392,47 @@ export function runProjection(state: AppState): ProjectionResult {
           gap_nom = Math.max(0, gap_nom - rrspDrawA - rrspDrawB)
         }
       }
+
+    } else {
+      // 'fixedPct' or 'fixedWithdrawal': proactive TFSA and Non-Reg draws (RRSP/RRIF already set above).
+      if (withdrawalStrategy.drawdownStrategy === 'fixedPct') {
+        const fp = withdrawalStrategy.drawdownFixedPct
+        if (aAlive) {
+          tfsaWithdrawA = Math.min(Math.max(fp.tfsaPct / 100 * tfsaA, fp.tfsaMin * inflFactor), tfsaA)
+          tfsaA -= tfsaWithdrawA
+          nonRegWithdrawA = Math.min(Math.max(fp.nonRegPct / 100 * nonRegA, fp.nonRegMin * inflFactor), nonRegA)
+          if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
+          nonRegA -= nonRegWithdrawA
+        }
+        if (bAlive) {
+          tfsaWithdrawB = Math.min(Math.max(fp.tfsaPct / 100 * tfsaB, fp.tfsaMin * inflFactor), tfsaB)
+          tfsaB -= tfsaWithdrawB
+          nonRegWithdrawB = Math.min(Math.max(fp.nonRegPct / 100 * nonRegB, fp.nonRegMin * inflFactor), nonRegB)
+          if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
+          nonRegB -= nonRegWithdrawB
+        }
+      } else {
+        const fw = withdrawalStrategy.drawdownFixedWithdrawal
+        if (aAlive) {
+          tfsaWithdrawA = Math.min(fw.tfsaAmount * inflFactor, tfsaA)
+          tfsaA -= tfsaWithdrawA
+          nonRegWithdrawA = Math.min(fw.nonRegAmount * inflFactor, nonRegA)
+          if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
+          nonRegA -= nonRegWithdrawA
+        }
+        if (bAlive) {
+          tfsaWithdrawB = Math.min(fw.tfsaAmount * inflFactor, tfsaB)
+          tfsaB -= tfsaWithdrawB
+          nonRegWithdrawB = Math.min(fw.nonRegAmount * inflFactor, nonRegB)
+          if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
+          nonRegB -= nonRegWithdrawB
+        }
+      }
+      proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB
+      const shortfall = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
+      const hisaDraw  = Math.min(shortfall, hisa)
+      hisa    -= hisaDraw
+      gap_nom  = Math.max(0, shortfall - hisaDraw)
     }
 
     if (gap_nom > 0.01) {
@@ -477,12 +498,12 @@ export function runProjection(state: AppState): ProjectionResult {
       oasClawbackB: pd(bAlive ? taxB.oasClawback : 0),
       netIncomeA:   pd(aAlive ? taxA.netAfterTax : 0),
       netIncomeB:   pd(bAlive ? taxB.netAfterTax : 0),
-      totalHouseholdNet: pd(totalNetNom + fpExtra),
+      totalHouseholdNet: pd(totalNetNom + proactiveExtra),
       effectiveTaxRateA: aAlive ? taxA.effectiveRate : 0,
       effectiveTaxRateB: bAlive ? taxB.effectiveRate : 0,
 
       householdSpending: pd(spending_nom),
-      cashFlow:          pd(totalNetNom + fpExtra - spending_nom),
+      cashFlow:          pd(totalNetNom + proactiveExtra - spending_nom),
 
       rrspA:  pd(rrspA),
       rrspB:  pd(rrspB),

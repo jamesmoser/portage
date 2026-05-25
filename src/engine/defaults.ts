@@ -80,8 +80,15 @@ export const DEFAULT_WHATIFS: WhatIfs = {
   oasStartAgeA:      { enabled: false, value: 65 },
   oasStartAgeB:      { enabled: false, value: 65 },
   withdrawalOrder:   { enabled: false, value: 'optimized' },
-  fixedPctStrategy:  { enabled: false, value: { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0 } },
   pensionSplit:      { enabled: false, value: { mode: 'auto', pct: 0 } },
+  drawdownStrategy:  {
+    enabled: false,
+    value: {
+      strategyType: 'none',
+      fixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0 },
+      fixedWithdrawal: { rrspAmount: 0, tfsaAmount: 0, nonRegAmount: 0 },
+    },
+  },
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -255,16 +262,12 @@ export const DEFAULT_STATE: AppState = {
   taxSettings: DEFAULT_TAX_SETTINGS,
 
   withdrawalStrategy: {
-    withdrawalOrder: 'optimized',
+    withdrawalOrder:  'optimized',
     pensionSplitMode: 'auto',
-    pensionSplitPct: 0,
-    drawdownEnabled:   false,
-    drawdownRrspPct:   4,
-    drawdownRrspMin:   0,
-    drawdownTfsaPct:   4,
-    drawdownTfsaMin:   0,
-    drawdownNonRegPct: 4,
-    drawdownNonRegMin: 0,
+    pensionSplitPct:  0,
+    drawdownStrategy:        'none',
+    drawdownFixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0 },
+    drawdownFixedWithdrawal: { rrspAmount: 0, tfsaAmount: 0, nonRegAmount: 0 },
   },
 
   scenarios: [],
