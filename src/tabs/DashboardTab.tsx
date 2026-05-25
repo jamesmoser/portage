@@ -432,9 +432,10 @@ export function DashboardTab() {
   const [xAxisModePortfolio, setXAxisModePortfolio] = useState<XAxisMode>('year')
 
   type IncomeMode   = 'gross' | 'net'
-  type IncomePerson = 'both' | 'A' | 'B'
+  type ChartPerson  = 'both' | 'A' | 'B'
   const [incomeMode,     setIncomeMode]     = useState<IncomeMode>('gross')
-  const [incomePerson,   setIncomePerson]   = useState<IncomePerson>('both')
+  const [incomePerson,   setIncomePerson]   = useState<ChartPerson>('both')
+  const [taxPerson,      setTaxPerson]      = useState<ChartPerson>('both')
   const [enabledSources, setEnabledSources] = useState<Set<SourceKey>>(() => new Set(ALL_SOURCE_KEYS))
 
   // ── Modal state ─────────────────────────────────────────────────────────────
@@ -557,12 +558,13 @@ export function DashboardTab() {
         enabledSources.has(s._src)
       ))
 
-  const taxData: Data[] = withTotals([
-    { x: years, y: dataPoints.map(d => d.taxA), name: `${aName} Tax`, type: 'bar', marker: { color: '#ef4444' } },
-    { x: years, y: dataPoints.map(d => d.taxB), name: `${bName} Tax`, type: 'bar', marker: { color: '#f97316' } },
-    { x: years, y: dataPoints.map(d => d.effectiveTaxRateA * 100), name: `${aName} Effective Rate`, type: 'scatter', mode: 'markers', yaxis: 'y2', marker: { color: '#dc2626', size: 4, symbol: 'circle' }, hovertemplate: '%{fullData.name}: %{y:.1f}%<extra></extra>' },
-    { x: years, y: dataPoints.map(d => d.effectiveTaxRateB * 100), name: `${bName} Effective Rate`, type: 'scatter', mode: 'markers', yaxis: 'y2', marker: { color: '#ea580c', size: 4, symbol: 'circle' }, hovertemplate: '%{fullData.name}: %{y:.1f}%<extra></extra>' },
-  ])
+  const allTaxSeries: Data[] = [
+    { x: years, y: dataPoints.map(d => d.taxA), name: `${aName} Tax`, type: 'bar', marker: { color: '#ef4444' }, _p: 'A' },
+    { x: years, y: dataPoints.map(d => d.taxB), name: `${bName} Tax`, type: 'bar', marker: { color: '#f97316' }, _p: 'B' },
+  ]
+  const taxData: Data[] = withTotals(
+    allTaxSeries.filter(s => taxPerson === 'both' || s._p === taxPerson)
+  )
 
   const portfolioData: Data[] = withTotals([
     { x: years, y: dataPoints.map(d => d.rrspA),   name: `${aName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifA } },
@@ -1360,7 +1362,7 @@ export function DashboardTab() {
         <div className="flex items-center gap-1.5 flex-wrap mb-3">
 
           {/* Person — first */}
-          {([['both', 'Household'], ['A', aName], ['B', bName]] as [IncomePerson, string][]).map(([v, label]) => (
+          {([['both', 'Household'], ['A', aName], ['B', bName]] as [ChartPerson, string][]).map(([v, label]) => (
             <button key={v} onClick={() => setIncomePerson(v)}
               className={`px-2.5 py-1 rounded border text-sm transition-colors ${
                 incomePerson === v
@@ -1436,15 +1438,25 @@ export function DashboardTab() {
         <ChartLegend data={incomeData} />
       </SectionCard>
 
-      <SectionCard title="Tax Paid — Present-Day Dollars" width="full"
-        onReset={() => setXAxisModeTax('year')}>
+      <SectionCard title="Tax Paid" width="full"
+        onReset={() => { setXAxisModeTax('year'); setTaxPerson('both') }}>
+        {/* ── Tax filter bar ──────────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          {([['both', 'Household'], ['A', aName], ['B', bName]] as [ChartPerson, string][]).map(([v, label]) => (
+            <button key={v} onClick={() => setTaxPerson(v)}
+              className={`px-2.5 py-1 rounded border text-sm transition-colors ${
+                taxPerson === v ? 'text-white border-[#7B1515]' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+              }`}
+              style={taxPerson === v ? { backgroundColor: '#7B1515' } : {}}
+            >{label}</button>
+          ))}
+        </div>
         <PlotlyChart
           data={taxData}
           layout={{
             barmode: 'stack',
-            yaxis:  { title: { text: 'Tax Paid ($)', font: { size: 11 } }, tickformat: ',.0f' },
-            yaxis2: { title: { text: 'Effective Rate (%)', font: { size: 11 } }, overlaying: 'y', side: 'right', tickformat: '.1f', range: [0, 60] },
-            xaxis:  { ...xAxisTax },
+            yaxis: { title: { text: 'Tax Paid ($)', font: { size: 11 } }, tickformat: ',.0f' },
+            xaxis: { ...xAxisTax },
           }}
           style={{ height: 320 }}
         />
