@@ -57,12 +57,11 @@ const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
 
 function WhatIfSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="text-[11px] font-semibold uppercase tracking-wider mb-1 mt-3 first:mt-0"
-        style={{ color: '#7B1515' }}>
-        {title}
+    <div className="rounded border border-slate-200">
+      <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+        <span className="text-sm font-medium text-slate-700">{title}</span>
       </div>
-      <div className="rounded border border-slate-200 divide-y divide-slate-100 bg-white">
+      <div className="divide-y divide-slate-100 bg-white">
         {children}
       </div>
     </div>
@@ -100,6 +99,65 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
           Base: <span className="font-medium text-slate-500">{baseLabel}</span>
         </span>
       )}
+    </div>
+  )
+}
+
+function LongevitySlider({
+  label, currentAge, baseAge, value, enabled, onChange,
+}: {
+  label: string
+  currentAge: number
+  baseAge: number
+  value: number
+  enabled: boolean
+  onChange: (age: number, enabled: boolean) => void
+}) {
+  const min      = Math.floor(currentAge)
+  const max      = 100
+  const val      = Math.max(min, Math.min(max, value))
+  const fillPct  = ((val  - min) / (max - min)) * 100
+  const basePct  = ((baseAge - min) / (max - min)) * 100
+  const active   = enabled
+  const trackFill = active ? '#7B1515' : '#cbd5e1'
+  const trackRest = '#e2e8f0'
+
+  return (
+    <div className="px-3 py-3">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-slate-600">{label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold tabular-nums"
+            style={{ color: active ? '#7B1515' : '#94a3b8' }}>
+            {val}
+          </span>
+          {!active && <span className="text-xs text-slate-400">base plan</span>}
+        </div>
+      </div>
+
+      {/* Slider + tick mark */}
+      <div className="relative pb-6">
+        <input
+          type="range"
+          min={min} max={max} step={1} value={val}
+          onChange={e => { const v = parseInt(e.target.value); onChange(v, v !== baseAge) }}
+          className="longevity-slider w-full"
+          style={{
+            color:      trackFill,
+            background: `linear-gradient(to right, ${trackFill} ${fillPct}%, ${trackRest} ${fillPct}%)`,
+          }}
+        />
+        <div className="absolute bottom-0 flex flex-col items-center pointer-events-none"
+          style={{ left: `${basePct}%`, transform: 'translateX(-50%)' }}>
+          <div className="w-px h-2.5 bg-slate-400" />
+          <span className="text-[9px] text-slate-400 whitespace-nowrap leading-none mt-0.5">base</span>
+        </div>
+      </div>
+
+      <div className="flex justify-between text-[10px] text-slate-400">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
     </div>
   )
 }
@@ -166,6 +224,10 @@ export function DashboardTab() {
   const bName = personB.name || 'Person B'
 
   // ── Base plan "instead of" labels ─────────────────────────────────────────
+
+  const todayIso    = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const currentAgeA = exactAgeAt(personA.birthDate, todayIso)
+  const currentAgeB = exactAgeAt(personB.birthDate, todayIso)
 
   const cppBaseAgeA = Math.round(exactAgeAt(personA.birthDate, cppA.startDate))
   const cppBaseAgeB = Math.round(exactAgeAt(personB.birthDate, cppB.startDate))
@@ -276,206 +338,213 @@ export function DashboardTab() {
   return (
     <div className="space-y-4">
 
-      {/* ── What-If Panel ─────────────────────────────────────────────────── */}
+      {/* ── Scenario Card ─────────────────────────────────────────────────── */}
       <SectionDivider title="Scenarios" />
-      <SectionCard title="What-If Analysis" width="full">
-
-        {/* Scenario controls */}
-        <div className="flex items-center gap-3 flex-wrap pb-3 mb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Scenario:</span>
-            {activeScenario
-              ? <span className="text-sm font-semibold text-slate-700">{activeScenario.name}</span>
-              : <span className="text-sm text-slate-400 italic">None loaded</span>
-            }
+      <SectionCard title="Scenario" width="full">
+        <div className="overflow-x-auto rounded border border-slate-200">
+          <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+            <span className="text-sm font-medium text-slate-700">Saved Scenarios</span>
           </div>
-
-          {savingAs ? (
-            <div className="flex items-center gap-1">
-              <input
-                className="input-field text-xs py-1 w-44"
-                placeholder="Scenario name…"
-                value={saveName}
-                autoFocus
-                onChange={e => setSaveName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setSavingAs(false) }}
-              />
-              <button className="btn-primary text-xs py-1 px-2" onClick={handleSave}>Save</button>
-              <button className="btn-secondary text-xs py-1 px-2" onClick={() => setSavingAs(false)}>Cancel</button>
+          <div className="px-3 py-3 flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Active:</span>
+              {activeScenario
+                ? <span className="text-sm font-semibold text-slate-700">{activeScenario.name}</span>
+                : <span className="text-sm text-slate-400 italic">None loaded</span>
+              }
             </div>
-          ) : (
-            <button
-              className="btn-primary text-xs"
-              onClick={() => { setSavingAs(true); setSaveName(activeScenario?.name ?? '') }}
-            >
-              Save As…
-            </button>
-          )}
 
-          {scenarios.length > 0 && (
-            <div className="relative">
-              <button className="btn-secondary text-xs" onClick={() => setShowLoad(o => !o)}>
-                Load ▾
-              </button>
-              {showLoad && (
-                <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-20">
-                  {scenarios.map(s => (
-                    <div key={s.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-50">
-                      <button
-                        className="text-sm text-slate-700 text-left flex-1 truncate"
-                        onClick={() => { loadScenario(s.id); setShowLoad(false) }}
-                      >
-                        {s.name}
-                      </button>
-                      <button
-                        className="text-xs text-slate-400 hover:text-red-600 ml-2 shrink-0"
-                        onClick={() => deleteScenario(s.id)}
-                        title="Delete scenario"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <button className="btn-secondary text-xs" onClick={resetWhatIfs}>
-            Reset All
-          </button>
-        </div>
-
-        {/* ── Drawdown Strategy ───────────────────────────────────────────── */}
-        <div className="mb-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#7B1515' }}>
-            Drawdown Strategy
-          </div>
-          <div className="rounded border-2 border-slate-300 bg-slate-50 p-4">
-            <div className="flex items-start gap-4 flex-wrap">
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-sm font-medium text-slate-700 w-20 shrink-0">Strategy</span>
-                <SelectInput
-                  label=""
-                  value={whatIfs.drawdownStrategy.value.strategyType}
-                  onChange={v => {
-                    const type = v as DrawdownStrategyType
-                    updateWhatIf('drawdownStrategy', {
-                      enabled: type !== 'none',
-                      value: { ...whatIfs.drawdownStrategy.value, strategyType: type },
-                    })
-                  }}
-                  options={DRAWDOWN_STRATEGY_OPTIONS}
+            {savingAs ? (
+              <div className="flex items-center gap-1">
+                <input
+                  className="input-field text-xs py-1 w-44"
+                  placeholder="Scenario name…"
+                  value={saveName}
+                  autoFocus
+                  onChange={e => setSaveName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setSavingAs(false) }}
                 />
+                <button className="btn-primary text-xs py-1 px-2" onClick={handleSave}>Save</button>
+                <button className="btn-secondary text-xs py-1 px-2" onClick={() => setSavingAs(false)}>Cancel</button>
               </div>
-              <p className="text-xs text-slate-500 flex-1 min-w-0 self-center">
-                {DRAWDOWN_STRATEGY_DESCRIPTIONS[whatIfs.drawdownStrategy.value.strategyType]}
+            ) : (
+              <button className="btn-primary" onClick={() => { setSavingAs(true); setSaveName(activeScenario?.name ?? '') }}>
+                Save As…
+              </button>
+            )}
+
+            {scenarios.length > 0 && (
+              <div className="relative">
+                <button className="btn-secondary" onClick={() => setShowLoad(o => !o)}>
+                  Load ▾
+                </button>
+                {showLoad && (
+                  <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-20">
+                    {scenarios.map(s => (
+                      <div key={s.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-50">
+                        <button
+                          className="text-sm text-slate-700 text-left flex-1 truncate"
+                          onClick={() => { loadScenario(s.id); setShowLoad(false) }}
+                        >
+                          {s.name}
+                        </button>
+                        <button
+                          className="text-xs text-slate-400 hover:text-red-600 ml-2 shrink-0"
+                          onClick={() => deleteScenario(s.id)}
+                          title="Delete scenario"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button className="btn-secondary" onClick={resetWhatIfs}>Reset All</button>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* ── Drawdown Strategy Card ────────────────────────────────────────── */}
+      <SectionCard title="Drawdown Strategy" width="full">
+        <div className="space-y-3">
+          <div className="overflow-x-auto rounded border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Strategy</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr className="hover:bg-slate-50/50">
+                  <td className="px-3 py-2 text-slate-600 w-40">Type</td>
+                  <td className="px-2 py-1.5">
+                    <SelectInput
+                      label=""
+                      value={whatIfs.drawdownStrategy.value.strategyType}
+                      onChange={v => {
+                        const type = v as DrawdownStrategyType
+                        updateWhatIf('drawdownStrategy', {
+                          enabled: type !== 'none',
+                          value: { ...whatIfs.drawdownStrategy.value, strategyType: type },
+                        })
+                      }}
+                      options={DRAWDOWN_STRATEGY_OPTIONS}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="px-3 py-2 text-xs text-slate-500">
+                    {DRAWDOWN_STRATEGY_DESCRIPTIONS[whatIfs.drawdownStrategy.value.strategyType]}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Fixed Withdrawals config */}
+          {whatIfs.drawdownStrategy.value.strategyType === 'fixedWithdrawal' && (
+            <div className="overflow-x-auto rounded border border-slate-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — today's dollars, inflated each year</th>
+                  </tr>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                    <th className="px-3 py-2 text-left font-medium">Account</th>
+                    <th className="px-3 py-2 font-medium">Amount ($ / yr)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {([
+                    ['RRSP / RRIF', 'rrspAmount'   ],
+                    ['TFSA',        'tfsaAmount'   ],
+                    ['Non-Reg',     'nonRegAmount' ],
+                  ] as const).map(([label, key]) => (
+                    <tr key={label} className="hover:bg-slate-50/50">
+                      <td className="px-3 py-2 text-slate-600 w-1/2">{label}</td>
+                      <td className="px-2 py-1.5 w-1/2">
+                        <NumberInput label=""
+                          value={whatIfs.drawdownStrategy.value.fixedWithdrawal[key]}
+                          onChange={v => updateWhatIf('drawdownStrategy', {
+                            value: {
+                              ...whatIfs.drawdownStrategy.value,
+                              fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [key]: v },
+                            },
+                          })}
+                          min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-100">
+                RRSP/RRIF draws also respect mandatory RRIF minimums. Draws occur before tax.
               </p>
             </div>
+          )}
 
-            {/* Fixed Withdrawals config */}
-            {whatIfs.drawdownStrategy.value.strategyType === 'fixedWithdrawal' && (
-              <div className="mt-3 overflow-x-auto rounded border border-slate-200 text-xs">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-white border-b border-slate-200">
-                      <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — today's dollars, inflated each year</th>
+          {/* Fixed Percentage config */}
+          {whatIfs.drawdownStrategy.value.strategyType === 'fixedPct' && (
+            <div className="overflow-x-auto rounded border border-slate-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — % of balance, with floor</th>
+                  </tr>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                    <th className="px-3 py-2 text-left font-medium">Account</th>
+                    <th className="px-3 py-2 font-medium">Rate (% / yr)</th>
+                    <th className="px-3 py-2 font-medium">Floor ($ / yr)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {([
+                    ['RRSP / RRIF', 'rrspPct',   'rrspMin'   ],
+                    ['TFSA',        'tfsaPct',   'tfsaMin'   ],
+                    ['Non-Reg',     'nonRegPct', 'nonRegMin' ],
+                  ] as const).map(([label, pctKey, minKey]) => (
+                    <tr key={label} className="hover:bg-slate-50/50">
+                      <td className="px-3 py-2 text-slate-600 w-1/3">{label}</td>
+                      <td className="px-2 py-1.5 w-1/3">
+                        <NumberInput label=""
+                          value={whatIfs.drawdownStrategy.value.fixedPct[pctKey]}
+                          onChange={v => updateWhatIf('drawdownStrategy', {
+                            value: {
+                              ...whatIfs.drawdownStrategy.value,
+                              fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [pctKey]: v },
+                            },
+                          })}
+                          min={0} max={100} step={0.5} decimals={1} size="sm" />
+                      </td>
+                      <td className="px-2 py-1.5 w-1/3">
+                        <NumberInput label=""
+                          value={whatIfs.drawdownStrategy.value.fixedPct[minKey]}
+                          onChange={v => updateWhatIf('drawdownStrategy', {
+                            value: {
+                              ...whatIfs.drawdownStrategy.value,
+                              fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [minKey]: v },
+                            },
+                          })}
+                          min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                      </td>
                     </tr>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                      <th className="px-3 py-1.5 text-left font-medium">Account</th>
-                      <th className="px-3 py-1.5 text-center font-medium">Amount ($ / yr)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {([
-                      ['RRSP / RRIF', 'rrspAmount'   ],
-                      ['TFSA',        'tfsaAmount'   ],
-                      ['Non-Reg',     'nonRegAmount' ],
-                    ] as const).map(([label, key]) => (
-                      <tr key={label} className="hover:bg-slate-50/50">
-                        <td className="px-3 py-1.5 text-slate-600 font-medium">{label}</td>
-                        <td className="px-2 py-1">
-                          <NumberInput label=""
-                            value={whatIfs.drawdownStrategy.value.fixedWithdrawal[key]}
-                            onChange={v => updateWhatIf('drawdownStrategy', {
-                              value: {
-                                ...whatIfs.drawdownStrategy.value,
-                                fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [key]: v },
-                              },
-                            })}
-                            min={0} max={500_000} step={1000} decimals={0} size="sm" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="px-3 py-2 text-[10px] text-slate-400">
-                  RRSP/RRIF draws also respect mandatory RRIF minimums. Draws occur before tax.
-                </p>
-              </div>
-            )}
-
-            {/* Fixed Percentage config */}
-            {whatIfs.drawdownStrategy.value.strategyType === 'fixedPct' && (
-              <div className="mt-3 overflow-x-auto rounded border border-slate-200 text-xs">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-white border-b border-slate-200">
-                      <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — % of balance, with floor</th>
-                    </tr>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                      <th className="px-3 py-1.5 text-left font-medium">Account</th>
-                      <th className="px-3 py-1.5 text-center font-medium">Rate (% / yr)</th>
-                      <th className="px-3 py-1.5 text-center font-medium">Floor ($ / yr)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {([
-                      ['RRSP / RRIF', 'rrspPct',   'rrspMin'   ],
-                      ['TFSA',        'tfsaPct',   'tfsaMin'   ],
-                      ['Non-Reg',     'nonRegPct', 'nonRegMin' ],
-                    ] as const).map(([label, pctKey, minKey]) => (
-                      <tr key={label} className="hover:bg-slate-50/50">
-                        <td className="px-3 py-1.5 text-slate-600 font-medium">{label}</td>
-                        <td className="px-2 py-1">
-                          <NumberInput label=""
-                            value={whatIfs.drawdownStrategy.value.fixedPct[pctKey]}
-                            onChange={v => updateWhatIf('drawdownStrategy', {
-                              value: {
-                                ...whatIfs.drawdownStrategy.value,
-                                fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [pctKey]: v },
-                              },
-                            })}
-                            min={0} max={100} step={0.5} decimals={1} size="sm" />
-                        </td>
-                        <td className="px-2 py-1">
-                          <NumberInput label=""
-                            value={whatIfs.drawdownStrategy.value.fixedPct[minKey]}
-                            onChange={v => updateWhatIf('drawdownStrategy', {
-                              value: {
-                                ...whatIfs.drawdownStrategy.value,
-                                fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [minKey]: v },
-                              },
-                            })}
-                            min={0} max={500_000} step={1000} decimals={0} size="sm" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="px-3 py-2 text-[10px] text-slate-400">
-                  Each year: withdraw max(rate × balance, floor). RRSP/RRIF also respects mandatory RRIF minimums. Draws occur before tax.
-                </p>
-              </div>
-            )}
-          </div>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-100">
+                Each year: withdraw max(rate × balance, floor). RRSP/RRIF also respects mandatory RRIF minimums. Draws occur before tax.
+              </p>
+            </div>
+          )}
         </div>
+      </SectionCard>
 
-        {/* ── Base Plan Modifications ──────────────────────────────────────── */}
-        <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#7B1515' }}>
-          Base Plan Modifications
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6">
+      {/* ── Base Plan Modifications Card ──────────────────────────────────── */}
+      <SectionCard title="Base Plan Modifications" width="full">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-3">
 
             <WhatIfSection title="Market">
@@ -503,26 +572,22 @@ export function DashboardTab() {
             </WhatIfSection>
 
             <WhatIfSection title="Longevity">
-              <WhatIfRow
+              <LongevitySlider
+                label={`${aName}'s Age at Death`}
+                currentAge={currentAgeA}
+                baseAge={personA.planningEndAge}
+                value={whatIfs.longevityA.enabled ? whatIfs.longevityA.value : personA.planningEndAge}
                 enabled={whatIfs.longevityA.enabled}
-                onToggle={v => updateWhatIf('longevityA', { enabled: v, value: v ? personA.planningEndAge : whatIfs.longevityA.value })}
-                label={`${aName} dies at age`}
-                baseLabel={`${personA.planningEndAge}`}
-              >
-                <NumberInput label="" value={whatIfs.longevityA.value}
-                  onChange={v => updateWhatIf('longevityA', { value: v })}
-                  suffix="years" min={60} max={110} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
-              <WhatIfRow
+                onChange={(age, active) => updateWhatIf('longevityA', { enabled: active, value: age })}
+              />
+              <LongevitySlider
+                label={`${bName}'s Age at Death`}
+                currentAge={currentAgeB}
+                baseAge={personB.planningEndAge}
+                value={whatIfs.longevityB.enabled ? whatIfs.longevityB.value : personB.planningEndAge}
                 enabled={whatIfs.longevityB.enabled}
-                onToggle={v => updateWhatIf('longevityB', { enabled: v, value: v ? personB.planningEndAge : whatIfs.longevityB.value })}
-                label={`${bName} dies at age`}
-                baseLabel={`${personB.planningEndAge}`}
-              >
-                <NumberInput label="" value={whatIfs.longevityB.value}
-                  onChange={v => updateWhatIf('longevityB', { value: v })}
-                  suffix="years" min={60} max={110} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
+                onChange={(age, active) => updateWhatIf('longevityB', { enabled: active, value: age })}
+              />
             </WhatIfSection>
 
           </div>
