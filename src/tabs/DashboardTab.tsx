@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { SectionCard } from '../components/SectionCard'
 import { SectionDivider } from '../components/SectionDivider'
@@ -37,6 +37,15 @@ type ModalDef = {
 const _fmtObj = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
 const fmt    = (v: number) => _fmtObj.format(v)
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
+const fmtT   = (v: number) => Math.abs(v) < 0.5 ? '—' : fmt(v)   // dash for zero in table cells
+
+type TableGroupKey = 'year' | 'income' | 'tax' | 'portfolio'
+type TableCol = {
+  label: string
+  value: (d: DataPoint) => number
+  format?: (v: number, d: DataPoint) => string
+  className?: string
+}
 
 const WITHDRAWAL_ORDER_OPTIONS: { value: string; label: string }[] = [
   { value: 'optimized',    label: 'Optimized' },
@@ -448,6 +457,9 @@ export function DashboardTab() {
   const [portfolioPerson, setPortfolioPerson] = useState<ChartPerson>('both')
   const [enabledSources,           setEnabledSources]           = useState<Set<SourceKey>>(() => new Set(ALL_SOURCE_KEYS))
   const [enabledPortfolioAccounts, setEnabledPortfolioAccounts] = useState<Set<PortfolioKey>>(() => new Set(ALL_PORTFOLIO_KEYS))
+  const [expandedTableGroups, setExpandedTableGroups] = useState<Set<TableGroupKey>>(new Set())
+  const toggleTableGroup = (key: TableGroupKey) =>
+    setExpandedTableGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
 
   // ── Modal state ─────────────────────────────────────────────────────────────
   const [modalDef, setModalDef] = useState<ModalDef | null>(null)
@@ -592,6 +604,69 @@ export function DashboardTab() {
       enabledPortfolioAccounts.has(s._acct as PortfolioKey)
     )
   )
+
+  // ── Summary table column definitions ─────────────────────────────────────
+
+  const yearOpen      = expandedTableGroups.has('year')
+  const incomeOpen    = expandedTableGroups.has('income')
+  const taxOpen       = expandedTableGroups.has('tax')
+  const portfolioOpen = expandedTableGroups.has('portfolio')
+
+  const a = aName, b = bName   // short aliases for compact column label strings
+
+  const yearTableCols: TableCol[] = yearOpen ? [
+    { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                          className: 'font-medium text-slate-700 text-left' },
+    { label: `Age — ${a}`, value: d => d.personAAge, format: (v, d) => d.year > endYearA ? `(${v.toFixed(1)})` : v.toFixed(1),            className: 'text-slate-600' },
+    { label: `Age — ${b}`, value: d => d.personBAge, format: (v, d) => d.year > endYearB ? `(${v.toFixed(1)})` : v.toFixed(1),            className: 'text-slate-600' },
+  ] : [
+    { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                          className: 'font-medium text-slate-700 text-left' },
+  ]
+
+  const incomeTableCols: TableCol[] = incomeOpen ? [
+    { label: `Emp — ${a}`,    value: d => d.employmentA },
+    { label: `Emp — ${b}`,    value: d => d.employmentB },
+    { label: `DB — ${a}`,     value: d => d.dbPensionBase },
+    { label: `Bridge — ${a}`, value: d => d.dbBridge },
+    { label: `DB — ${b}`,     value: d => d.dbPensionBaseB },
+    { label: `Bridge — ${b}`, value: d => d.dbBridgeB },
+    { label: `CPP — ${a}`,    value: d => d.cppA },
+    { label: `CPP — ${b}`,    value: d => d.cppB },
+    { label: `OAS — ${a}`,    value: d => d.oasA },
+    { label: `OAS — ${b}`,    value: d => d.oasB },
+    { label: `RRIF — ${a}`,   value: d => d.rrifA },
+    { label: `RRIF — ${b}`,   value: d => d.rrifB },
+    { label: `TFSA — ${a}`,   value: d => d.tfsaWithdrawalA },
+    { label: `TFSA — ${b}`,   value: d => d.tfsaWithdrawalB },
+    { label: `NR — ${a}`,     value: d => d.nonRegWithdrawalA },
+    { label: `NR — ${b}`,     value: d => d.nonRegWithdrawalB },
+    { label: `Other — ${a}`,  value: d => d.otherIncomeA },
+    { label: `Other — ${b}`,  value: d => d.otherIncomeB },
+  ] : [
+    { label: `Gross — ${a}`, value: d => d.grossIncomeA },
+    { label: `Gross — ${b}`, value: d => d.grossIncomeB },
+  ]
+
+  const taxTableCols: TableCol[] = taxOpen ? [
+    { label: `Tax — ${a}`,      value: d => d.taxA },
+    { label: `Tax — ${b}`,      value: d => d.taxB },
+    { label: `Clawback — ${a}`, value: d => d.oasClawbackA },
+    { label: `Clawback — ${b}`, value: d => d.oasClawbackB },
+  ] : [
+    { label: `Tax — ${a}`, value: d => d.taxA },
+    { label: `Tax — ${b}`, value: d => d.taxB },
+  ]
+
+  const portfolioTableCols: TableCol[] = portfolioOpen ? [
+    { label: `RRSP — ${a}`, value: d => d.rrspA },
+    { label: `RRSP — ${b}`, value: d => d.rrspB },
+    { label: `TFSA — ${a}`, value: d => d.tfsaA },
+    { label: `TFSA — ${b}`, value: d => d.tfsaB },
+    { label: `NR — ${a}`,   value: d => d.nonRegA },
+    { label: `NR — ${b}`,   value: d => d.nonRegB },
+    { label: 'HISA',         value: d => d.hisa },
+  ] : [
+    { label: 'Total', value: d => d.totalPortfolio },
+  ]
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1536,36 +1611,76 @@ export function DashboardTab() {
       {/* ── Annual Summary Table ───────────────────────────────────────────── */}
       <SectionCard title="Annual Summary Table" width="full">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-100">
-                <th className="px-2 py-1.5 text-left  font-medium text-slate-600 border border-slate-200">Year</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">{aName} Age</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Gross A</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Gross B</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Tax A</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Tax B</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Net HH</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Spending</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Cash Flow</th>
-                <th className="px-2 py-1.5 text-right font-medium text-slate-600 border border-slate-200">Portfolio</th>
+              {/* Row 1 — group headers */}
+              <tr style={{ backgroundColor: '#7B1515' }} className="text-white">
+                {(['year', 'income', 'tax', 'portfolio'] as TableGroupKey[]).map(key => {
+                  const cols = { year: yearTableCols, income: incomeTableCols, tax: taxTableCols, portfolio: portfolioTableCols }[key]
+                  const open = expandedTableGroups.has(key)
+                  const label = { year: 'Year', income: 'Income', tax: 'Tax', portfolio: 'Portfolio' }[key]
+                  const after: React.ReactNode = key === 'tax'
+                    ? <>
+                        <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom whitespace-nowrap">Net HH</th>
+                        <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom">Spending</th>
+                        <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom whitespace-nowrap">Cash Flow</th>
+                      </>
+                    : null
+                  return (
+                    <React.Fragment key={key}>
+                      <th colSpan={cols.length} className="px-2 py-1 font-bold border border-red-900">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{label}</span>
+                          <button onClick={() => toggleTableGroup(key)} title={open ? 'Collapse' : 'Expand'}
+                            className="text-red-300 hover:text-white transition-colors text-[10px] leading-none font-mono">
+                            {open ? '◀' : '▶'}
+                          </button>
+                        </div>
+                      </th>
+                      {after}
+                    </React.Fragment>
+                  )
+                })}
+              </tr>
+
+              {/* Row 2 — sub-column labels */}
+              <tr style={{ backgroundColor: '#6B1010' }} className="text-red-100">
+                {yearTableCols.map(col => (
+                  <th key={col.label} className={`px-2 py-1 font-bold border border-red-900 whitespace-nowrap ${col.className?.includes('text-left') ? 'text-left' : 'text-right'}`}>{col.label}</th>
+                ))}
+                {incomeTableCols.map(col => (
+                  <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
+                ))}
+                {taxTableCols.map(col => (
+                  <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
+                ))}
+                {portfolioTableCols.map(col => (
+                  <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {dataPoints.map(d => (
-                <tr key={d.year} className={`border-b border-slate-100 ${d.cashFlow < 0 ? 'bg-red-50' : ''}`}>
-                  <td className="px-2 py-1 border border-slate-100 font-medium text-slate-700">{d.year}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right text-slate-600">{d.personAAge.toFixed(1)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.grossIncomeA)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.grossIncomeB)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmt(d.taxA)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmt(d.taxB)}</td>
+              {dataPoints.map((d, i) => (
+                <tr key={d.year} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                  {yearTableCols.map(col => (
+                    <td key={col.label} className={`px-2 py-1 border border-slate-100 ${col.className ?? 'text-right'}`}>
+                      {col.format ? col.format(col.value(d), d) : fmtT(col.value(d))}
+                    </td>
+                  ))}
+                  {incomeTableCols.map(col => (
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right">{fmtT(col.value(d))}</td>
+                  ))}
+                  {taxTableCols.map(col => (
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmtT(col.value(d))}</td>
+                  ))}
                   <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt(d.totalHouseholdNet)}</td>
                   <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.householdSpending)}</td>
                   <td className={`px-2 py-1 border border-slate-100 text-right font-medium ${d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}`}>
                     {fmt(d.cashFlow)}
                   </td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.totalPortfolio)}</td>
+                  {portfolioTableCols.map(col => (
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right">{fmtT(col.value(d))}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
