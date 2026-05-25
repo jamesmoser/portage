@@ -79,6 +79,15 @@ const SOURCE_DEFS: { key: SourceKey; label: string; color: string }[] = [
   { key: 'other',      label: 'Other',      color: CHART_COLORS.otherIncomeA },
 ]
 
+type PortfolioKey = 'rrif' | 'tfsa' | 'nonReg' | 'hisa'
+const ALL_PORTFOLIO_KEYS: PortfolioKey[] = ['rrif', 'tfsa', 'nonReg', 'hisa']
+const PORTFOLIO_DEFS: { key: PortfolioKey; label: string; color: string }[] = [
+  { key: 'rrif',   label: 'RRSP/RRIF', color: CHART_COLORS.rrifA },
+  { key: 'tfsa',   label: 'TFSA',      color: CHART_COLORS.tfsaA },
+  { key: 'nonReg', label: 'Non-Reg',   color: CHART_COLORS.nonRegA },
+  { key: 'hisa',   label: 'HISA/Cash', color: '#94a3b8' },
+]
+
 const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
   none:             'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
   spendGap:         'Withdraw only what is needed to cover the spending shortfall each year — nothing more. Accounts are drawn in the configured withdrawal order (TFSA first, Non-Reg, RRSP/RRIF, etc.). RRIF mandatory minimums are always withdrawn regardless of need.',
@@ -436,7 +445,9 @@ export function DashboardTab() {
   const [incomeMode,     setIncomeMode]     = useState<IncomeMode>('gross')
   const [incomePerson,   setIncomePerson]   = useState<ChartPerson>('both')
   const [taxPerson,      setTaxPerson]      = useState<ChartPerson>('both')
-  const [enabledSources, setEnabledSources] = useState<Set<SourceKey>>(() => new Set(ALL_SOURCE_KEYS))
+  const [portfolioPerson, setPortfolioPerson] = useState<ChartPerson>('both')
+  const [enabledSources,           setEnabledSources]           = useState<Set<SourceKey>>(() => new Set(ALL_SOURCE_KEYS))
+  const [enabledPortfolioAccounts, setEnabledPortfolioAccounts] = useState<Set<PortfolioKey>>(() => new Set(ALL_PORTFOLIO_KEYS))
 
   // ── Modal state ─────────────────────────────────────────────────────────────
   const [modalDef, setModalDef] = useState<ModalDef | null>(null)
@@ -566,15 +577,21 @@ export function DashboardTab() {
     allTaxSeries.filter(s => taxPerson === 'both' || s._p === taxPerson)
   )
 
-  const portfolioData: Data[] = withTotals([
-    { x: years, y: dataPoints.map(d => d.rrspA),   name: `${aName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifA } },
-    { x: years, y: dataPoints.map(d => d.rrspB),   name: `${bName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifB } },
-    { x: years, y: dataPoints.map(d => d.tfsaA),   name: `${aName} TFSA`,      type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
-    { x: years, y: dataPoints.map(d => d.tfsaB),   name: `${bName} TFSA`,      type: 'bar', marker: { color: CHART_COLORS.tfsaB } },
-    { x: years, y: dataPoints.map(d => d.nonRegA), name: `${aName} Non-Reg`,   type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
-    { x: years, y: dataPoints.map(d => d.nonRegB), name: `${bName} Non-Reg`,   type: 'bar', marker: { color: CHART_COLORS.nonRegB } },
-    { x: years, y: dataPoints.map(d => d.hisa),    name: 'HISA / Cash',        type: 'bar', marker: { color: '#94a3b8' } },
-  ])
+  const allPortfolioSeries: Data[] = [
+    { x: years, y: dataPoints.map(d => d.rrspA),   name: `${aName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifA }, _p: 'A', _acct: 'rrif'   },
+    { x: years, y: dataPoints.map(d => d.rrspB),   name: `${bName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifB }, _p: 'B', _acct: 'rrif'   },
+    { x: years, y: dataPoints.map(d => d.tfsaA),   name: `${aName} TFSA`,      type: 'bar', marker: { color: CHART_COLORS.tfsaA }, _p: 'A', _acct: 'tfsa'   },
+    { x: years, y: dataPoints.map(d => d.tfsaB),   name: `${bName} TFSA`,      type: 'bar', marker: { color: CHART_COLORS.tfsaB }, _p: 'B', _acct: 'tfsa'   },
+    { x: years, y: dataPoints.map(d => d.nonRegA), name: `${aName} Non-Reg`,   type: 'bar', marker: { color: CHART_COLORS.nonRegA }, _p: 'A', _acct: 'nonReg' },
+    { x: years, y: dataPoints.map(d => d.nonRegB), name: `${bName} Non-Reg`,   type: 'bar', marker: { color: CHART_COLORS.nonRegB }, _p: 'B', _acct: 'nonReg' },
+    { x: years, y: dataPoints.map(d => d.hisa),    name: 'HISA / Cash',        type: 'bar', marker: { color: '#94a3b8' },                   _acct: 'hisa'   },
+  ]
+  const portfolioData: Data[] = withTotals(
+    allPortfolioSeries.filter(s =>
+      (portfolioPerson === 'both' || s._p === portfolioPerson || s._p === undefined) &&
+      enabledPortfolioAccounts.has(s._acct as PortfolioKey)
+    )
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1464,8 +1481,49 @@ export function DashboardTab() {
         <ChartLegend data={taxData} />
       </SectionCard>
 
-      <SectionCard title="Portfolio Balances — Present-Day Dollars" width="full"
-        onReset={() => setXAxisModePortfolio('year')}>
+      <SectionCard title="Portfolio Balances" width="full"
+        onReset={() => { setXAxisModePortfolio('year'); setPortfolioPerson('both'); setEnabledPortfolioAccounts(new Set(ALL_PORTFOLIO_KEYS)) }}>
+        {/* ── Portfolio filter bar ─────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          {([['both', 'Household'], ['A', aName], ['B', bName]] as [ChartPerson, string][]).map(([v, label]) => (
+            <button key={v} onClick={() => setPortfolioPerson(v)}
+              className={`px-2.5 py-1 rounded border text-sm transition-colors ${
+                portfolioPerson === v ? 'text-white border-[#7B1515]' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+              }`}
+              style={portfolioPerson === v ? { backgroundColor: '#7B1515' } : {}}
+            >{label}</button>
+          ))}
+          <div className="w-px h-5 bg-slate-200 shrink-0 mx-1" />
+          {PORTFOLIO_DEFS.map(acct => {
+            const active = enabledPortfolioAccounts.has(acct.key)
+            return (
+              <button key={acct.key}
+                onClick={() => setEnabledPortfolioAccounts(prev => {
+                  const next = new Set(prev)
+                  if (next.has(acct.key)) next.delete(acct.key)
+                  else next.add(acct.key)
+                  return next
+                })}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-sm transition-colors ${
+                  active ? 'text-white border-[#7B1515]' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
+                }`}
+                style={active ? { backgroundColor: '#7B1515' } : {}}>
+                <span className="w-2 h-2 rounded-sm shrink-0"
+                  style={{ backgroundColor: active ? 'rgba(255,255,255,0.65)' : acct.color }} />
+                {acct.label}
+              </button>
+            )
+          })}
+          <div className="w-px h-5 bg-slate-200 shrink-0 mx-1" />
+          <button onClick={() => setEnabledPortfolioAccounts(new Set(ALL_PORTFOLIO_KEYS))}
+            className="px-2.5 py-1 rounded border text-sm bg-white text-slate-500 border-slate-200 hover:border-slate-400 transition-colors">
+            All
+          </button>
+          <button onClick={() => setEnabledPortfolioAccounts(new Set())}
+            className="px-2.5 py-1 rounded border text-sm bg-white text-slate-500 border-slate-200 hover:border-slate-400 transition-colors">
+            None
+          </button>
+        </div>
         <PlotlyChart
           data={portfolioData}
           layout={{ barmode: 'stack', yaxis: { title: { text: 'Account Balance ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxisPortfolio } }}
