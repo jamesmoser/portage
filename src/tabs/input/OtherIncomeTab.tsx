@@ -6,7 +6,7 @@ import { NumberInput } from '../../components/NumberInput'
 import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { SelectInput } from '../../components/SelectInput'
-import { PlotlyChart } from '../../components/PlotlyChart'
+import { PlotlyChart, withTotals } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { todayStr } from '../../engine/dates'
 import { runProjection } from '../../engine/projection'
@@ -143,7 +143,7 @@ export function OtherIncomeTab() {
 
       <SectionCard title="Other Income" width="full">
         <PlotlyChart
-          data={chartData}
+          data={withTotals(chartData)}
           layout={{
             barmode: 'stack',
             yaxis: { tickformat: ',.0f', title: { text: 'Annual Income ($)', font: { size: 11 } }, range: [0, maxOther > 0 ? maxOther * 1.05 : 50000] },

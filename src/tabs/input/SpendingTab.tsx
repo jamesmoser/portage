@@ -5,7 +5,7 @@ import { CardGrid } from '../../components/CardGrid'
 import { SectionCard } from '../../components/SectionCard'
 import { NumberInput } from '../../components/NumberInput'
 import { ToggleInput } from '../../components/ToggleInput'
-import { PlotlyChart } from '../../components/PlotlyChart'
+import { PlotlyChart, withTotals } from '../../components/PlotlyChart'
 import { XAxisSelector, buildXAxis } from '../../components/XAxisSelector'
 import type { XAxisMode } from '../../components/XAxisSelector'
 import { runProjection } from '../../engine/projection'
@@ -210,7 +210,7 @@ export function SpendingTab() {
       <SectionCard title="Spending by Year" width="full"
         info="Total household spending per year in today's dollars, including phase base amounts (with growth) and any additional spending items. Use this to verify recurring and one-time items are applying as expected.">
         <PlotlyChart
-          data={chartData}
+          data={withTotals(chartData)}
           layout={{
             xaxis: xAxis,
             yaxis: { tickformat: ',.0f', title: { text: 'Annual Household Spending ($)', font: { size: 11 } } },

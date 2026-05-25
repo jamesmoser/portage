@@ -6,7 +6,7 @@ import { NumberInput } from '../../components/NumberInput'
 import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { SelectInput } from '../../components/SelectInput'
-import { PlotlyChart } from '../../components/PlotlyChart'
+import { PlotlyChart, withTotals } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { exactAgeAt, dateAtAge } from '../../engine/dates'
 import { runProjection } from '../../engine/projection'
@@ -468,7 +468,7 @@ export function CPPOASTab() {
       <SectionCard title="Government Benefits" width="full"
         info={<p className="text-sm">Combined CPP and OAS payments for both people in present-day dollars. OAS is shown without clawback applied.</p>}>
         <PlotlyChart
-          data={govChartData}
+          data={withTotals(govChartData)}
           layout={{
             barmode: 'stack',
             yaxis: { tickformat: ',.0f', title: { text: 'Annual Benefit ($)', font: { size: 11 } } },

@@ -5,7 +5,7 @@ import { SectionCard } from '../../components/SectionCard'
 import { NumberInput } from '../../components/NumberInput'
 import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
-import { PlotlyChart } from '../../components/PlotlyChart'
+import { PlotlyChart, withTotals } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { exactAgeAt, getYear, dateAtAge } from '../../engine/dates'
 import { DEFAULT_STATE } from '../../engine/defaults'
@@ -189,7 +189,7 @@ export function NonRegTab() {
       <SectionCard title="Non-Registered Balances" width="full"
         info="Account balance without plan withdrawals — contributions (until retirement) and growth only. The full plan balance (after spending gap withdrawals) is shown in the Income Overview tab.">
         <PlotlyChart
-          data={chartData}
+          data={withTotals(chartData)}
           layout={{
             barmode: 'stack',
             yaxis: { tickformat: ',.0f', title: { text: 'Account Balance ($)', font: { size: 11 } }, range: [0, maxNonReg > 0 ? maxNonReg * 1.05 : 10000] },

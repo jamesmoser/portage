@@ -10,6 +10,26 @@ type PlotlyConfig = any
 // Re-export the plotly Data type for use in other files via a compatible alias
 export type { PlotlyData as Data }
 
+/**
+ * Injects per-year bar totals into each bar series as customdata so hovertemplates
+ * can display both the segment value and the full stack total.
+ * Apply to any stacked bar chart data array before passing to PlotlyChart.
+ */
+export function withTotals(series: PlotlyData[]): PlotlyData[] {
+  const barSeries = series.filter((s: PlotlyData) => s.type === 'bar')
+  const n = (barSeries[0]?.x as number[] | undefined)?.length ?? 0
+  const totals = Array.from({ length: n }, (_, i) =>
+    barSeries.reduce((sum: number, s: PlotlyData) => sum + ((s.y as number[])[i] || 0), 0)
+  )
+  return series.map((s: PlotlyData) =>
+    s.type !== 'bar' ? s : {
+      ...s,
+      customdata: totals,
+      hovertemplate: '%{fullData.name}: $%{y:,.0f}<br>Total: $%{customdata:,.0f}<extra></extra>',
+    }
+  )
+}
+
 interface Props {
   data: PlotlyData[]
   layout?: Partial<PlotlyLayout>

@@ -5,7 +5,7 @@ import { SectionCard } from '../../components/SectionCard'
 import { NumberInput } from '../../components/NumberInput'
 import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
-import { PlotlyChart } from '../../components/PlotlyChart'
+import { PlotlyChart, withTotals } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { InfoPanel } from '../../components/InfoPanel'
 import { getYear, dateAtAge, dateAtDecimalAge } from '../../engine/dates'
@@ -297,7 +297,7 @@ export function DBPensionTab() {
         {hasData
           ? <>
               <PlotlyChart
-                data={allTraces}
+                data={withTotals(allTraces)}
                 layout={{
                   barmode: 'stack',
                   yaxis: { tickformat: ',.0f', title: { text: 'Annual Income ($)', font: { size: 11 } } },

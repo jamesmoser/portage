@@ -4,7 +4,7 @@ import { SectionCard } from '../components/SectionCard'
 import { SectionDivider } from '../components/SectionDivider'
 import { NumberInput } from '../components/NumberInput'
 import { SelectInput } from '../components/SelectInput'
-import { PlotlyChart } from '../components/PlotlyChart'
+import { PlotlyChart, withTotals } from '../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelector'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
@@ -134,25 +134,6 @@ function ChartLegend({ data }: { data: Data[] }) {
         )
       })}
     </div>
-  )
-}
-
-// ─── withTotals ───────────────────────────────────────────────────────────────
-// Injects per-year bar totals into each bar series as customdata so hovertemplates
-// can display both the segment value and the full stack total.
-
-function withTotals(series: Data[]): Data[] {
-  const barSeries = series.filter(s => s.type === 'bar')
-  const n = (barSeries[0]?.x as number[] | undefined)?.length ?? 0
-  const totals = Array.from({ length: n }, (_, i) =>
-    barSeries.reduce((sum, s) => sum + (((s.y as number[])[i]) || 0), 0)
-  )
-  return series.map(s =>
-    s.type !== 'bar' ? s : {
-      ...s,
-      customdata: totals,
-      hovertemplate: '%{fullData.name}: $%{y:,.0f}<br>Total: $%{customdata:,.0f}<extra></extra>',
-    }
   )
 }
 
