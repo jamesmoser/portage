@@ -499,9 +499,9 @@ export function DashboardTab() {
   }
 
   const years = dataPoints.map(d => d.year)
-  const xAxisIncome    = buildXAxis(years, xAxisModeIncome,    personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
-  const xAxisTax       = buildXAxis(years, xAxisModeTax,       personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
-  const xAxisPortfolio = buildXAxis(years, xAxisModePortfolio, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
+  const xAxisIncome    = buildXAxis(years, xAxisModeIncome,    effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
+  const xAxisTax       = buildXAxis(years, xAxisModeTax,       effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
+  const xAxisPortfolio = buildXAxis(years, xAxisModePortfolio, effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
 
   // ── Frozen metric helpers ─────────────────────────────────────────────────
 
