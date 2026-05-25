@@ -64,11 +64,71 @@ const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[
   { value: 'fixedPct',        label: 'Fixed Percentage' },
 ]
 
+// ─── Income chart filter constants ────────────────────────────────────────────
+
+type SourceKey = 'employment' | 'dbPension' | 'cpp' | 'oas' | 'rrif' | 'tfsa' | 'nonReg' | 'other'
+const ALL_SOURCE_KEYS: SourceKey[] = ['employment', 'dbPension', 'cpp', 'oas', 'rrif', 'tfsa', 'nonReg', 'other']
+const SOURCE_DEFS: { key: SourceKey; label: string; color: string }[] = [
+  { key: 'employment', label: 'Employment', color: CHART_COLORS.employmentA },
+  { key: 'dbPension',  label: 'DB Pension', color: CHART_COLORS.pensionA },
+  { key: 'cpp',        label: 'CPP',        color: CHART_COLORS.cppA },
+  { key: 'oas',        label: 'OAS',        color: CHART_COLORS.oasA },
+  { key: 'rrif',       label: 'RRIF',       color: CHART_COLORS.rrifA },
+  { key: 'tfsa',       label: 'TFSA',       color: CHART_COLORS.tfsaA },
+  { key: 'nonReg',     label: 'Non-Reg',    color: CHART_COLORS.nonRegA },
+  { key: 'other',      label: 'Other',      color: CHART_COLORS.otherIncomeA },
+]
+
 const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
   none:             'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
   spendGap:         'Withdraw only what is needed to cover the spending shortfall each year — nothing more. Accounts are drawn in the configured withdrawal order (TFSA first, Non-Reg, RRSP/RRIF, etc.). RRIF mandatory minimums are always withdrawn regardless of need.',
   fixedWithdrawal:  'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
   fixedPct:         'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
+}
+
+// ─── ChartLegend ──────────────────────────────────────────────────────────────
+
+function ChartLegend({ data }: { data: Data[] }) {
+  const items = data.filter(s =>
+    Array.isArray(s.y) && (s.y as number[]).some((v: number) => Math.abs(v) > 0.01)
+  )
+  if (items.length === 0) return null
+  return (
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 pb-1">
+      {items.map((s: Data, i: number) => {
+        const color = s.marker?.color ?? s.line?.color ?? '#94a3b8'
+        const isScatter = s.type === 'scatter'
+        return (
+          <div key={i} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+            {isScatter
+              ? <span className="inline-block w-3 h-0.5 rounded-full" style={{ backgroundColor: color }} />
+              : <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+            }
+            {s.name}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── withTotals ───────────────────────────────────────────────────────────────
+// Injects per-year bar totals into each bar series as customdata so hovertemplates
+// can display both the segment value and the full stack total.
+
+function withTotals(series: Data[]): Data[] {
+  const barSeries = series.filter(s => s.type === 'bar')
+  const n = (barSeries[0]?.x as number[] | undefined)?.length ?? 0
+  const totals = Array.from({ length: n }, (_, i) =>
+    barSeries.reduce((sum, s) => sum + (((s.y as number[])[i]) || 0), 0)
+  )
+  return series.map(s =>
+    s.type !== 'bar' ? s : {
+      ...s,
+      customdata: totals,
+      hovertemplate: '%{fullData.name}: $%{y:,.0f}<br>Total: $%{customdata:,.0f}<extra></extra>',
+    }
+  )
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -367,7 +427,15 @@ export function DashboardTab() {
 
   // ── Chart state ───────────────────────────────────────────────────────────
 
-  const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
+  const [xAxisModeIncome,    setXAxisModeIncome]    = useState<XAxisMode>('year')
+  const [xAxisModeTax,       setXAxisModeTax]       = useState<XAxisMode>('year')
+  const [xAxisModePortfolio, setXAxisModePortfolio] = useState<XAxisMode>('year')
+
+  type IncomeMode   = 'gross' | 'net'
+  type IncomePerson = 'both' | 'A' | 'B'
+  const [incomeMode,     setIncomeMode]     = useState<IncomeMode>('gross')
+  const [incomePerson,   setIncomePerson]   = useState<IncomePerson>('both')
+  const [enabledSources, setEnabledSources] = useState<Set<SourceKey>>(() => new Set(ALL_SOURCE_KEYS))
 
   // ── Modal state ─────────────────────────────────────────────────────────────
   const [modalDef, setModalDef] = useState<ModalDef | null>(null)
@@ -431,8 +499,9 @@ export function DashboardTab() {
   }
 
   const years = dataPoints.map(d => d.year)
-  const xAxis = buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate,
-    personA.planningEndAge, personB.planningEndAge)
+  const xAxisIncome    = buildXAxis(years, xAxisModeIncome,    personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
+  const xAxisTax       = buildXAxis(years, xAxisModeTax,       personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
+  const xAxisPortfolio = buildXAxis(years, xAxisModePortfolio, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
 
   // ── Frozen metric helpers ─────────────────────────────────────────────────
 
@@ -453,31 +522,49 @@ export function DashboardTab() {
 
   // ── Chart data ────────────────────────────────────────────────────────────
 
-  const incomeData: Data[] = [
-    { x: years, y: dataPoints.map(d => d.employmentA),                          name: `${aName} Employment`,     type: 'bar', marker: { color: CHART_COLORS.employmentA } },
-    { x: years, y: dataPoints.map(d => d.employmentB),                          name: `${bName} Employment`,     type: 'bar', marker: { color: CHART_COLORS.employmentB } },
-    { x: years, y: dataPoints.map(d => d.dbPensionBase + d.dbPensionBaseB),     name: 'DB Pension (lifetime)',   type: 'bar', marker: { color: CHART_COLORS.pensionA } },
-    { x: years, y: dataPoints.map(d => d.dbBridge + d.dbBridgeB),               name: 'DB Bridge Benefit',       type: 'bar', marker: { color: CHART_COLORS.pensionBridgeA } },
-    { x: years, y: dataPoints.map(d => d.cppA),                                 name: `${aName} CPP`,            type: 'bar', marker: { color: CHART_COLORS.cppA } },
-    { x: years, y: dataPoints.map(d => d.cppB),                                 name: `${bName} CPP`,            type: 'bar', marker: { color: CHART_COLORS.cppB } },
-    { x: years, y: dataPoints.map(d => d.oasA),                                 name: `${aName} OAS`,            type: 'bar', marker: { color: CHART_COLORS.oasA } },
-    { x: years, y: dataPoints.map(d => d.oasB),                                 name: `${bName} OAS`,            type: 'bar', marker: { color: CHART_COLORS.oasB } },
-    { x: years, y: dataPoints.map(d => d.rrifA + d.rrifB),                      name: 'RRIF Withdrawals',        type: 'bar', marker: { color: CHART_COLORS.rrifA } },
-    { x: years, y: dataPoints.map(d => d.tfsaWithdrawalA + d.tfsaWithdrawalB),  name: 'TFSA Withdrawals',        type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
-    { x: years, y: dataPoints.map(d => d.nonRegWithdrawalA + d.nonRegWithdrawalB), name: 'Non-Reg Withdrawals',  type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
-    { x: years, y: dataPoints.map(d => d.otherIncomeA + d.otherIncomeB),        name: 'Other Income',            type: 'bar', marker: { color: CHART_COLORS.otherIncomeA } },
-    { x: years, y: dataPoints.map(d => d.householdSpending), name: 'Spending Target',   type: 'scatter', mode: 'markers', marker: { color: CHART_COLORS.spending, size: 4, symbol: 'line-ew', line: { color: CHART_COLORS.spending, width: 2 } } },
-    { x: years, y: dataPoints.map(d => d.totalHouseholdNet), name: 'Net Income (after tax)', type: 'scatter', mode: 'markers', marker: { color: '#1e293b', size: 4, symbol: 'line-ew', line: { color: '#1e293b', width: 2 } } },
+  // Gross income series — tagged with _p (person) and _src (source type) for filtering
+  const allIncomeSeries: Data[] = [
+    { x: years, y: dataPoints.map(d => d.employmentA),       name: `${aName} Employment`, type: 'bar', marker: { color: CHART_COLORS.employmentA },    _p: 'A', _src: 'employment' },
+    { x: years, y: dataPoints.map(d => d.employmentB),       name: `${bName} Employment`, type: 'bar', marker: { color: CHART_COLORS.employmentB },    _p: 'B', _src: 'employment' },
+    { x: years, y: dataPoints.map(d => d.dbPensionBase),     name: `${aName} DB Pension`, type: 'bar', marker: { color: CHART_COLORS.pensionA },        _p: 'A', _src: 'dbPension'  },
+    { x: years, y: dataPoints.map(d => d.dbBridge),          name: `${aName} DB Bridge`,  type: 'bar', marker: { color: CHART_COLORS.pensionBridgeA },  _p: 'A', _src: 'dbPension'  },
+    { x: years, y: dataPoints.map(d => d.dbPensionBaseB),    name: `${bName} DB Pension`, type: 'bar', marker: { color: CHART_COLORS.pensionB },        _p: 'B', _src: 'dbPension'  },
+    { x: years, y: dataPoints.map(d => d.dbBridgeB),         name: `${bName} DB Bridge`,  type: 'bar', marker: { color: CHART_COLORS.pensionBridgeB },  _p: 'B', _src: 'dbPension'  },
+    { x: years, y: dataPoints.map(d => d.cppA),              name: `${aName} CPP`,        type: 'bar', marker: { color: CHART_COLORS.cppA },            _p: 'A', _src: 'cpp'        },
+    { x: years, y: dataPoints.map(d => d.cppB),              name: `${bName} CPP`,        type: 'bar', marker: { color: CHART_COLORS.cppB },            _p: 'B', _src: 'cpp'        },
+    { x: years, y: dataPoints.map(d => d.oasA),              name: `${aName} OAS`,        type: 'bar', marker: { color: CHART_COLORS.oasA },            _p: 'A', _src: 'oas'        },
+    { x: years, y: dataPoints.map(d => d.oasB),              name: `${bName} OAS`,        type: 'bar', marker: { color: CHART_COLORS.oasB },            _p: 'B', _src: 'oas'        },
+    { x: years, y: dataPoints.map(d => d.rrifA),             name: `${aName} RRIF`,       type: 'bar', marker: { color: CHART_COLORS.rrifA },           _p: 'A', _src: 'rrif'       },
+    { x: years, y: dataPoints.map(d => d.rrifB),             name: `${bName} RRIF`,       type: 'bar', marker: { color: CHART_COLORS.rrifB },           _p: 'B', _src: 'rrif'       },
+    { x: years, y: dataPoints.map(d => d.tfsaWithdrawalA),   name: `${aName} TFSA`,       type: 'bar', marker: { color: CHART_COLORS.tfsaA },           _p: 'A', _src: 'tfsa'       },
+    { x: years, y: dataPoints.map(d => d.tfsaWithdrawalB),   name: `${bName} TFSA`,       type: 'bar', marker: { color: CHART_COLORS.tfsaB },           _p: 'B', _src: 'tfsa'       },
+    { x: years, y: dataPoints.map(d => d.nonRegWithdrawalA), name: `${aName} Non-Reg`,    type: 'bar', marker: { color: CHART_COLORS.nonRegA },         _p: 'A', _src: 'nonReg'     },
+    { x: years, y: dataPoints.map(d => d.nonRegWithdrawalB), name: `${bName} Non-Reg`,    type: 'bar', marker: { color: CHART_COLORS.nonRegB },         _p: 'B', _src: 'nonReg'     },
+    { x: years, y: dataPoints.map(d => d.otherIncomeA),      name: `${aName} Other`,      type: 'bar', marker: { color: CHART_COLORS.otherIncomeA },    _p: 'A', _src: 'other'      },
+    { x: years, y: dataPoints.map(d => d.otherIncomeB),      name: `${bName} Other`,      type: 'bar', marker: { color: CHART_COLORS.otherIncomeB },    _p: 'B', _src: 'other'      },
   ]
 
-  const taxData: Data[] = [
+  // Net income series (post-tax, by person)
+  const netIncomeSeries: Data[] = [
+    { x: years, y: dataPoints.map(d => d.netIncomeA), name: `${aName} Net`, type: 'bar', marker: { color: CHART_COLORS.employmentA }, _p: 'A' },
+    { x: years, y: dataPoints.map(d => d.netIncomeB), name: `${bName} Net`, type: 'bar', marker: { color: CHART_COLORS.employmentB }, _p: 'B' },
+  ]
+
+  const incomeData = withTotals(incomeMode === 'net'
+    ? netIncomeSeries.filter(s => incomePerson === 'both' || s._p === incomePerson)
+    : allIncomeSeries.filter(s =>
+        (incomePerson === 'both' || s._p === incomePerson) &&
+        enabledSources.has(s._src)
+      ))
+
+  const taxData: Data[] = withTotals([
     { x: years, y: dataPoints.map(d => d.taxA), name: `${aName} Tax`, type: 'bar', marker: { color: '#ef4444' } },
     { x: years, y: dataPoints.map(d => d.taxB), name: `${bName} Tax`, type: 'bar', marker: { color: '#f97316' } },
-    { x: years, y: dataPoints.map(d => d.effectiveTaxRateA * 100), name: `${aName} Effective Rate`, type: 'scatter', mode: 'markers', yaxis: 'y2', marker: { color: '#dc2626', size: 4, symbol: 'circle' } },
-    { x: years, y: dataPoints.map(d => d.effectiveTaxRateB * 100), name: `${bName} Effective Rate`, type: 'scatter', mode: 'markers', yaxis: 'y2', marker: { color: '#ea580c', size: 4, symbol: 'circle' } },
-  ]
+    { x: years, y: dataPoints.map(d => d.effectiveTaxRateA * 100), name: `${aName} Effective Rate`, type: 'scatter', mode: 'markers', yaxis: 'y2', marker: { color: '#dc2626', size: 4, symbol: 'circle' }, hovertemplate: '%{fullData.name}: %{y:.1f}%<extra></extra>' },
+    { x: years, y: dataPoints.map(d => d.effectiveTaxRateB * 100), name: `${bName} Effective Rate`, type: 'scatter', mode: 'markers', yaxis: 'y2', marker: { color: '#ea580c', size: 4, symbol: 'circle' }, hovertemplate: '%{fullData.name}: %{y:.1f}%<extra></extra>' },
+  ])
 
-  const portfolioData: Data[] = [
+  const portfolioData: Data[] = withTotals([
     { x: years, y: dataPoints.map(d => d.rrspA),   name: `${aName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifA } },
     { x: years, y: dataPoints.map(d => d.rrspB),   name: `${bName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifB } },
     { x: years, y: dataPoints.map(d => d.tfsaA),   name: `${aName} TFSA`,      type: 'bar', marker: { color: CHART_COLORS.tfsaA } },
@@ -485,7 +572,7 @@ export function DashboardTab() {
     { x: years, y: dataPoints.map(d => d.nonRegA), name: `${aName} Non-Reg`,   type: 'bar', marker: { color: CHART_COLORS.nonRegA } },
     { x: years, y: dataPoints.map(d => d.nonRegB), name: `${bName} Non-Reg`,   type: 'bar', marker: { color: CHART_COLORS.nonRegB } },
     { x: years, y: dataPoints.map(d => d.hisa),    name: 'HISA / Cash',        type: 'bar', marker: { color: '#94a3b8' } },
-  ]
+  ])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1266,35 +1353,114 @@ export function DashboardTab() {
 
 
       {/* ── Charts ────────────────────────────────────────────────────────── */}
-      <SectionCard title="Household Income by Source — Present-Day Dollars" width="full"
-        info="Stacked bars = annual gross income by source. Tick marks = net after tax (black) and spending target (red).">
+      <SectionCard title="Income" width="full"
+        info="Stacked bars = annual gross income by source. Tick marks = net after tax (black) and spending target (red). All values in today's dollars."
+        onReset={() => { setXAxisModeIncome('year'); setIncomeMode('gross'); setIncomePerson('both'); setEnabledSources(new Set(ALL_SOURCE_KEYS)) }}>
+        {/* ── Income filter bar ───────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+
+          {/* Person — first */}
+          {([['both', 'Household'], ['A', aName], ['B', bName]] as [IncomePerson, string][]).map(([v, label]) => (
+            <button key={v} onClick={() => setIncomePerson(v)}
+              className={`px-2.5 py-1 rounded border text-sm transition-colors ${
+                incomePerson === v
+                  ? 'text-white border-[#7B1515]'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+              }`}
+              style={incomePerson === v ? { backgroundColor: '#7B1515' } : {}}>
+              {label}
+            </button>
+          ))}
+
+          <div className="w-px h-5 bg-slate-200 shrink-0 mx-1" />
+
+          {/* Gross / Net */}
+          {(['gross', 'net'] as IncomeMode[]).map(m => (
+            <button key={m} onClick={() => setIncomeMode(m)}
+              className={`px-2.5 py-1 rounded border text-sm transition-colors ${
+                incomeMode === m
+                  ? 'text-white border-[#7B1515]'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+              }`}
+              style={incomeMode === m ? { backgroundColor: '#7B1515' } : {}}>
+              {m === 'gross' ? 'Gross' : 'Net'}
+            </button>
+          ))}
+
+          {/* Source chips — gross mode only */}
+          {incomeMode === 'gross' && (
+            <>
+              <div className="w-px h-5 bg-slate-200 shrink-0 mx-1" />
+              {SOURCE_DEFS.map(src => {
+                const active = enabledSources.has(src.key)
+                return (
+                  <button key={src.key}
+                    onClick={() => setEnabledSources(prev => {
+                      const next = new Set(prev)
+                      if (next.has(src.key)) next.delete(src.key)
+                      else next.add(src.key)
+                      return next
+                    })}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-sm transition-colors ${
+                      active
+                        ? 'text-white border-[#7B1515]'
+                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
+                    }`}
+                    style={active ? { backgroundColor: '#7B1515' } : {}}>
+                    <span className="w-2 h-2 rounded-sm shrink-0"
+                      style={{ backgroundColor: active ? 'rgba(255,255,255,0.65)' : src.color }} />
+                    {src.label}
+                  </button>
+                )
+              })}
+
+              <div className="w-px h-5 bg-slate-200 shrink-0 mx-1" />
+              <button onClick={() => setEnabledSources(new Set(ALL_SOURCE_KEYS))}
+                className="px-2.5 py-1 rounded border text-sm bg-white text-slate-500 border-slate-200 hover:border-slate-400 transition-colors">
+                All
+              </button>
+              <button onClick={() => setEnabledSources(new Set())}
+                className="px-2.5 py-1 rounded border text-sm bg-white text-slate-500 border-slate-200 hover:border-slate-400 transition-colors">
+                None
+              </button>
+            </>
+          )}
+
+        </div>
         <PlotlyChart
           data={incomeData}
-          layout={{ barmode: 'stack', yaxis: { title: { text: 'Annual Income ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxis } }}
+          layout={{ barmode: 'stack', yaxis: { title: { text: 'Annual Income ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxisIncome } }}
           style={{ height: 420 }}
         />
+        <XAxisSelector value={xAxisModeIncome} onChange={setXAxisModeIncome} aName={aName} bName={bName} />
+        <ChartLegend data={incomeData} />
       </SectionCard>
 
-      <SectionCard title="Tax Paid — Present-Day Dollars" width="full">
+      <SectionCard title="Tax Paid — Present-Day Dollars" width="full"
+        onReset={() => setXAxisModeTax('year')}>
         <PlotlyChart
           data={taxData}
           layout={{
             barmode: 'stack',
             yaxis:  { title: { text: 'Tax Paid ($)', font: { size: 11 } }, tickformat: ',.0f' },
             yaxis2: { title: { text: 'Effective Rate (%)', font: { size: 11 } }, overlaying: 'y', side: 'right', tickformat: '.1f', range: [0, 60] },
-            xaxis:  { ...xAxis },
+            xaxis:  { ...xAxisTax },
           }}
           style={{ height: 320 }}
         />
+        <XAxisSelector value={xAxisModeTax} onChange={setXAxisModeTax} aName={aName} bName={bName} />
+        <ChartLegend data={taxData} />
       </SectionCard>
 
-      <SectionCard title="Portfolio Balances — Present-Day Dollars" width="full">
+      <SectionCard title="Portfolio Balances — Present-Day Dollars" width="full"
+        onReset={() => setXAxisModePortfolio('year')}>
         <PlotlyChart
           data={portfolioData}
-          layout={{ barmode: 'stack', yaxis: { title: { text: 'Account Balance ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxis } }}
+          layout={{ barmode: 'stack', yaxis: { title: { text: 'Account Balance ($)', font: { size: 11 } }, tickformat: ',.0f' }, xaxis: { ...xAxisPortfolio } }}
           style={{ height: 320 }}
         />
-        <XAxisSelector value={xAxisMode} onChange={setXAxisMode} aName={aName} bName={bName} />
+        <XAxisSelector value={xAxisModePortfolio} onChange={setXAxisModePortfolio} aName={aName} bName={bName} />
+        <ChartLegend data={portfolioData} />
       </SectionCard>
 
       {/* ── Annual Summary Table ───────────────────────────────────────────── */}

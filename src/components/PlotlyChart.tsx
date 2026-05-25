@@ -43,11 +43,11 @@ export function PlotlyChart({ data, layout, config, className, style }: Props) {
         el,
         data,
         {
-          margin: { t: 20, r: 10, b: 60, l: 70 },
+          margin: { t: 20, r: 10, b: 36, l: 70 },
           paper_bgcolor: 'transparent',
           plot_bgcolor: '#f8fafc',
           font: { family: 'system-ui, sans-serif', size: 11, color: '#475569' },
-          legend: { orientation: 'h', y: -0.25, font: { size: 10 } },
+          showlegend: false,
           ...layout,
         },
         {
