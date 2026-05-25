@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { SectionCard } from '../components/SectionCard'
 import { SectionDivider } from '../components/SectionDivider'
@@ -8,11 +8,29 @@ import { PlotlyChart } from '../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelector'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
-import { exactAgeAt } from '../engine/dates'
-import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType } from '../engine/types'
+import { exactAgeAt, getYear, dateAtAge, onOrAfter } from '../engine/dates'
+import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint } from '../engine/types'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
+
+// ─── MetricDetailModal types ───────────────────────────────────────────────────
+
+type ModalCol = {
+  header: string
+  right?: boolean
+  bold?: boolean
+  render: (d: DataPoint) => React.ReactNode
+}
+
+type ModalDef = {
+  title: string
+  note?: string
+  columns: ModalCol[]
+  rows: DataPoint[]
+  highlightRow?: (d: DataPoint) => boolean
+  summary?: { label: string; value: string }[]
+}
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -162,20 +180,103 @@ function LongevitySlider({
   )
 }
 
-function MetricCard({ label, value, sub, frozen, betterWhenHigher = true }: {
+// ─── MetricDetailModal ────────────────────────────────────────────────────────
+
+function MetricDetailModal({ def, onClose }: { def: ModalDef; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+      onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[82vh] flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">{def.title}</h2>
+            {def.note && <p className="text-xs text-slate-400 mt-0.5">{def.note}</p>}
+          </div>
+          <button onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-lg leading-none">
+            ✕
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-auto flex-1">
+          <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0">
+              <tr className="bg-slate-100">
+                {def.columns.map((col, i) => (
+                  <th key={i}
+                    className={`px-2 py-1.5 font-medium text-slate-600 border border-slate-200 whitespace-nowrap
+                      ${col.right ? 'text-right' : 'text-left'} ${col.bold ? 'bg-slate-200' : ''}`}>
+                    {col.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {def.rows.map((d, i) => {
+                const hi = def.highlightRow?.(d) ?? false
+                return (
+                  <tr key={i} className={`border-b border-slate-100 ${hi ? 'bg-amber-50' : 'hover:bg-slate-50/50'}`}>
+                    {def.columns.map((col, j) => (
+                      <td key={j}
+                        className={`px-2 py-1 border border-slate-100 ${col.right ? 'text-right tabular-nums' : ''} ${col.bold ? 'font-medium' : ''}`}>
+                        {col.render(d)}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary footer */}
+        {def.summary && (
+          <div className="px-5 py-3 border-t border-slate-200 shrink-0 flex gap-6 flex-wrap bg-slate-50 rounded-b-xl">
+            {def.summary.map((s, i) => (
+              <div key={i}>
+                <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{s.label}</div>
+                <div className="text-sm font-semibold text-slate-700">{s.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── MetricCard ───────────────────────────────────────────────────────────────
+
+function MetricCard({ label, value, sub, frozen, betterWhenHigher = true, onClick }: {
   label: string
   value: string
   sub?: string
   frozen?: { value: string; sub?: string; numericDelta: number } | null
   betterWhenHigher?: boolean
+  onClick?: () => void
 }) {
   const isBetter = frozen != null && (betterWhenHigher ? frozen.numericDelta > 0 : frozen.numericDelta < 0)
   const isWorse  = frozen != null && (betterWhenHigher ? frozen.numericDelta < 0 : frozen.numericDelta > 0)
-  const arrow    = frozen != null && frozen.numericDelta !== 0 ? (isBetter ? '▲' : '▼') : null
+  const arrow    = frozen != null && frozen.numericDelta !== 0 ? (frozen.numericDelta > 0 ? '▲' : '▼') : null
   const arrowColor = isBetter ? 'text-green-500' : isWorse ? 'text-red-500' : 'text-slate-400'
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+    <div
+      className={`bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col
+        ${onClick ? 'cursor-pointer hover:border-slate-300 hover:shadow-md transition-shadow duration-100' : ''}`}
+      onClick={onClick}
+      title={onClick ? 'Click for detail' : undefined}
+    >
       {frozen != null ? (
         <div className="flex flex-1 divide-x divide-slate-200">
           <div className="flex-1 min-w-0 px-3 py-2.5">
@@ -268,6 +369,59 @@ export function DashboardTab() {
 
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
 
+  // ── Modal state ─────────────────────────────────────────────────────────────
+  const [modalDef, setModalDef] = useState<ModalDef | null>(null)
+
+  // Planning-end years for modal highlights
+  const endYearA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
+  const endYearB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+
+  // Helper: build CPP vs-65 baseline map (mirrors computeHeadlineMetrics logic)
+  function buildCppBaselineMap() {
+    const cpiR  = effectiveState.cpiRatePct / 100
+    const piR   = effectiveState.personalInflationRatePct / 100
+    const cy    = new Date().getFullYear()
+    const bCPPA = effectiveState.cppA.estimatedMonthlyAt65 * 12
+    const bCPPB = effectiveState.cppB.estimatedMonthlyAt65 * 12
+    const a65   = dateAtAge(effectiveState.personA.birthDate, 65)
+    const b65   = dateAtAge(effectiveState.personB.birthDate, 65)
+    const m     = new Map<number, number>()
+    for (const d of dataPoints) {
+      const pdF = Math.pow((1 + cpiR) / (1 + piR), d.year - cy)
+      const aA  = d.year <= endYearA, bA = d.year <= endYearB
+      const aG  = onOrAfter(d.date, a65), bG = onOrAfter(d.date, b65)
+      let base  = 0
+      if (aA && aG)             base += bCPPA * pdF
+      else if (!aA && bA && aG) base += bCPPA * 0.60 * pdF
+      if (bA && bG)             base += bCPPB * pdF
+      else if (!bA && aA && bG) base += bCPPB * 0.60 * pdF
+      m.set(d.year, base)
+    }
+    return m
+  }
+
+  // Helper: build OAS vs-65 baseline map
+  function buildOasBaselineMap() {
+    const cpiR  = effectiveState.cpiRatePct / 100
+    const piR   = effectiveState.personalInflationRatePct / 100
+    const cy    = new Date().getFullYear()
+    const bOASA = effectiveState.oasA.estimatedMonthlyAt65 * 12
+    const bOASB = effectiveState.oasB.estimatedMonthlyAt65 * 12
+    const a65   = dateAtAge(effectiveState.personA.birthDate, 65)
+    const b65   = dateAtAge(effectiveState.personB.birthDate, 65)
+    const m     = new Map<number, number>()
+    for (const d of dataPoints) {
+      const pdF = Math.pow((1 + cpiR) / (1 + piR), d.year - cy)
+      const aA  = d.year <= endYearA, bA = d.year <= endYearB
+      const aG  = onOrAfter(d.date, a65), bG = onOrAfter(d.date, b65)
+      let base  = 0
+      if (aA && aG) base += bOASA * pdF
+      if (bA && bG) base += bOASB * pdF
+      m.set(d.year, base)
+    }
+    return m
+  }
+
   if (dataPoints.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
@@ -293,7 +447,7 @@ export function DashboardTab() {
     return {
       value:        formatter(frozenVal),
       sub:          frozenSub,
-      numericDelta: betterWhenHigh ? current - frozenVal : frozenVal - current,
+      numericDelta: current - frozenVal,   // always raw delta; MetricCard owns the semantics
     }
   }
 
@@ -336,6 +490,7 @@ export function DashboardTab() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="space-y-4">
 
       {/* ── Scenario Card ─────────────────────────────────────────────────── */}
@@ -699,18 +854,93 @@ export function DashboardTab() {
             <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
               <MetricCard label="At Start"
                 value={fmt(metrics.portfolioAtStart)}
-                frozen={frozenFor(metrics.portfolioAtStart, frozenMetrics?.portfolioAtStart, fmt)} />
+                frozen={frozenFor(metrics.portfolioAtStart, frozenMetrics?.portfolioAtStart, fmt)}
+                onClick={() => setModalDef({
+                  title: 'Portfolio — Balance by Account',
+                  note: "Today's dollars, end of year.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `RRSP ${aName}`, right: true, render: d => fmt(d.rrspA) },
+                    { header: `RRSP ${bName}`, right: true, render: d => fmt(d.rrspB) },
+                    { header: `TFSA ${aName}`, right: true, render: d => fmt(d.tfsaA) },
+                    { header: `TFSA ${bName}`, right: true, render: d => fmt(d.tfsaB) },
+                    { header: `NR ${aName}`,   right: true, render: d => fmt(d.nonRegA) },
+                    { header: `NR ${bName}`,   right: true, render: d => fmt(d.nonRegB) },
+                    { header: 'HISA',           right: true, render: d => fmt(d.hisa) },
+                    { header: 'Total',          right: true, bold: true, render: d => fmt(d.totalPortfolio) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === dataPoints[0].year,
+                })} />
               <MetricCard label="Peak"
                 value={fmt(metrics.peakPortfolio)}
                 sub={`in ${metrics.peakPortfolioYear}`}
                 frozen={frozenFor(metrics.peakPortfolio, frozenMetrics?.peakPortfolio, fmt, true,
-                  frozenMetrics ? `in ${frozenMetrics.peakPortfolioYear}` : undefined)} />
+                  frozenMetrics ? `in ${frozenMetrics.peakPortfolioYear}` : undefined)}
+                onClick={() => setModalDef({
+                  title: 'Portfolio — Balance by Account',
+                  note: "Today's dollars, end of year. Highlighted row = peak portfolio.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `RRSP ${aName}`, right: true, render: d => fmt(d.rrspA) },
+                    { header: `RRSP ${bName}`, right: true, render: d => fmt(d.rrspB) },
+                    { header: `TFSA ${aName}`, right: true, render: d => fmt(d.tfsaA) },
+                    { header: `TFSA ${bName}`, right: true, render: d => fmt(d.tfsaB) },
+                    { header: `NR ${aName}`,   right: true, render: d => fmt(d.nonRegA) },
+                    { header: `NR ${bName}`,   right: true, render: d => fmt(d.nonRegB) },
+                    { header: 'HISA',           right: true, render: d => fmt(d.hisa) },
+                    { header: 'Total',          right: true, bold: true, render: d => fmt(d.totalPortfolio) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === metrics.peakPortfolioYear,
+                  summary: [{ label: 'Peak Portfolio', value: fmt(metrics.peakPortfolio) + ` in ${metrics.peakPortfolioYear}` }],
+                })} />
               <MetricCard label={`At ${aName}'s Death`}
                 value={fmt(metrics.portfolioAtDeathA)}
-                frozen={frozenFor(metrics.portfolioAtDeathA, frozenMetrics?.portfolioAtDeathA, fmt)} />
+                frozen={frozenFor(metrics.portfolioAtDeathA, frozenMetrics?.portfolioAtDeathA, fmt)}
+                onClick={() => setModalDef({
+                  title: `Portfolio — Balance by Account (${aName}'s Death Highlighted)`,
+                  note: "Today's dollars, end of year.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `RRSP ${aName}`, right: true, render: d => fmt(d.rrspA) },
+                    { header: `RRSP ${bName}`, right: true, render: d => fmt(d.rrspB) },
+                    { header: `TFSA ${aName}`, right: true, render: d => fmt(d.tfsaA) },
+                    { header: `TFSA ${bName}`, right: true, render: d => fmt(d.tfsaB) },
+                    { header: `NR ${aName}`,   right: true, render: d => fmt(d.nonRegA) },
+                    { header: `NR ${bName}`,   right: true, render: d => fmt(d.nonRegB) },
+                    { header: 'HISA',           right: true, render: d => fmt(d.hisa) },
+                    { header: 'Total',          right: true, bold: true, render: d => fmt(d.totalPortfolio) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === endYearA,
+                  summary: [{ label: `Portfolio at ${aName}'s Death (${endYearA})`, value: fmt(metrics.portfolioAtDeathA) }],
+                })} />
               <MetricCard label={`At ${bName}'s Death`}
                 value={fmt(metrics.portfolioAtDeathB)}
-                frozen={frozenFor(metrics.portfolioAtDeathB, frozenMetrics?.portfolioAtDeathB, fmt)} />
+                frozen={frozenFor(metrics.portfolioAtDeathB, frozenMetrics?.portfolioAtDeathB, fmt)}
+                onClick={() => setModalDef({
+                  title: `Portfolio — Balance by Account (${bName}'s Death Highlighted)`,
+                  note: "Today's dollars, end of year.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `RRSP ${aName}`, right: true, render: d => fmt(d.rrspA) },
+                    { header: `RRSP ${bName}`, right: true, render: d => fmt(d.rrspB) },
+                    { header: `TFSA ${aName}`, right: true, render: d => fmt(d.tfsaA) },
+                    { header: `TFSA ${bName}`, right: true, render: d => fmt(d.tfsaB) },
+                    { header: `NR ${aName}`,   right: true, render: d => fmt(d.nonRegA) },
+                    { header: `NR ${bName}`,   right: true, render: d => fmt(d.nonRegB) },
+                    { header: 'HISA',           right: true, render: d => fmt(d.hisa) },
+                    { header: 'Total',          right: true, bold: true, render: d => fmt(d.totalPortfolio) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === endYearB,
+                  summary: [{ label: `Portfolio at ${bName}'s Death (${endYearB})`, value: fmt(metrics.portfolioAtDeathB) }],
+                })} />
             </div>
           </div>
 
@@ -726,19 +956,74 @@ export function DashboardTab() {
                 sub={metrics.shortfallYears > 0 ? fmtPct(metrics.shortfallPct) : undefined}
                 frozen={frozenFor(metrics.shortfallYears, frozenMetrics?.shortfallYears,
                   v => v === 0 ? 'None' : `${v} yrs`, false,
-                  frozenMetrics && frozenMetrics.shortfallYears > 0 ? fmtPct(frozenMetrics.shortfallPct) : undefined)} />
+                  frozenMetrics && frozenMetrics.shortfallYears > 0 ? fmtPct(frozenMetrics.shortfallPct) : undefined)}
+                onClick={() => setModalDef({
+                  title: 'Spending — Cash Flow by Year',
+                  note: "Today's dollars. Shortfall years (cash flow < 0) are highlighted.",
+                  columns: [
+                    { header: 'Year',          render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'Net HH',        right: true, render: d => fmt(d.totalHouseholdNet) },
+                    { header: 'Spending',      right: true, render: d => fmt(d.householdSpending) },
+                    { header: 'Cash Flow',     right: true, bold: true, render: d => (
+                      <span className={d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(d.cashFlow)}</span>
+                    )},
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.cashFlow < -0.01,
+                  summary: [
+                    { label: 'Shortfall Years', value: `${metrics.shortfallYears} of ${metrics.totalYears}` },
+                    { label: 'Avg Annual Shortfall', value: metrics.avgAnnualShortfall < 1 ? 'None' : fmt(metrics.avgAnnualShortfall) },
+                  ],
+                })} />
               <MetricCard label="Shortfall — Annual Avg"
                 betterWhenHigher={false}
                 value={metrics.avgAnnualShortfall < 1 ? 'None' : fmt(metrics.avgAnnualShortfall)}
                 frozen={frozenFor(metrics.avgAnnualShortfall, frozenMetrics?.avgAnnualShortfall,
-                  v => v < 1 ? 'None' : fmt(v), false)} />
+                  v => v < 1 ? 'None' : fmt(v), false)}
+                onClick={() => setModalDef({
+                  title: 'Spending — Shortfall Years Only',
+                  note: "Today's dollars. Only years with a spending shortfall (cash flow < 0).",
+                  columns: [
+                    { header: 'Year',      render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'Net HH',    right: true, render: d => fmt(d.totalHouseholdNet) },
+                    { header: 'Spending',  right: true, render: d => fmt(d.householdSpending) },
+                    { header: 'Shortfall', right: true, bold: true, render: d => (
+                      <span className="text-red-600">{fmt(-d.cashFlow)}</span>
+                    )},
+                  ],
+                  rows: dataPoints.filter(d => d.cashFlow < -0.01),
+                  summary: [
+                    { label: 'Avg Annual Shortfall', value: metrics.avgAnnualShortfall < 1 ? 'None' : fmt(metrics.avgAnnualShortfall) },
+                    { label: 'Peak Shortfall', value: metrics.peakAnnualShortfall < 1 ? 'None' : fmt(metrics.peakAnnualShortfall) + ` in ${metrics.peakShortfallYear}` },
+                  ],
+                })} />
               <MetricCard label="Shortfall — Peak Year"
                 betterWhenHigher={false}
                 value={metrics.peakAnnualShortfall < 1 ? 'None' : fmt(metrics.peakAnnualShortfall)}
                 sub={metrics.peakShortfallYear > 0 ? `in ${metrics.peakShortfallYear}` : undefined}
                 frozen={frozenFor(metrics.peakAnnualShortfall, frozenMetrics?.peakAnnualShortfall,
                   v => v < 1 ? 'None' : fmt(v), false,
-                  frozenMetrics && frozenMetrics.peakShortfallYear > 0 ? `in ${frozenMetrics.peakShortfallYear}` : undefined)} />
+                  frozenMetrics && frozenMetrics.peakShortfallYear > 0 ? `in ${frozenMetrics.peakShortfallYear}` : undefined)}
+                onClick={() => setModalDef({
+                  title: 'Spending — Cash Flow by Year',
+                  note: "Today's dollars. Peak shortfall year highlighted.",
+                  columns: [
+                    { header: 'Year',      render: d => d.year },
+                    { header: `${aName} Age`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'Net HH',    right: true, render: d => fmt(d.totalHouseholdNet) },
+                    { header: 'Spending',  right: true, render: d => fmt(d.householdSpending) },
+                    { header: 'Cash Flow', right: true, bold: true, render: d => (
+                      <span className={d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(d.cashFlow)}</span>
+                    )},
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === metrics.peakShortfallYear,
+                  summary: [
+                    { label: 'Peak Annual Shortfall', value: metrics.peakAnnualShortfall < 1 ? 'None' : fmt(metrics.peakAnnualShortfall) + ` (${metrics.peakShortfallYear})` },
+                  ],
+                })} />
             </div>
           </div>
 
@@ -751,17 +1036,76 @@ export function DashboardTab() {
               <MetricCard label="Lifetime Total"
                 betterWhenHigher={false}
                 value={fmt(metrics.lifetimeTaxPaid)}
-                frozen={frozenFor(metrics.lifetimeTaxPaid, frozenMetrics?.lifetimeTaxPaid, fmt, false)} />
+                frozen={frozenFor(metrics.lifetimeTaxPaid, frozenMetrics?.lifetimeTaxPaid, fmt, false)}
+                onClick={() => setModalDef({
+                  title: 'Tax — Annual Breakdown',
+                  note: "Today's dollars. Includes federal + provincial + OAS clawback. Peak year highlighted.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Tax ${aName}`,  right: true, render: d => fmt(d.taxA) },
+                    { header: `Tax ${bName}`,  right: true, render: d => fmt(d.taxB) },
+                    { header: 'OAS Clawback',  right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0 ? fmt(d.oasClawbackA + d.oasClawbackB) : '—' },
+                    { header: 'Total Tax',     right: true, bold: true, render: d => fmt(d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === metrics.peakTaxYear,
+                  summary: [
+                    { label: 'Lifetime Tax Paid', value: fmt(metrics.lifetimeTaxPaid) },
+                    { label: 'Avg Effective Rate', value: fmtPct(metrics.avgEffectiveTaxRate) },
+                    { label: 'Peak Year', value: fmt(metrics.peakTaxAmount) + ` (${metrics.peakTaxYear})` },
+                  ],
+                })} />
               <MetricCard label="Avg Effective Rate"
                 betterWhenHigher={false}
                 value={fmtPct(metrics.avgEffectiveTaxRate)}
-                frozen={frozenFor(metrics.avgEffectiveTaxRate, frozenMetrics?.avgEffectiveTaxRate, fmtPct, false)} />
+                frozen={frozenFor(metrics.avgEffectiveTaxRate, frozenMetrics?.avgEffectiveTaxRate, fmtPct, false)}
+                onClick={() => setModalDef({
+                  title: 'Tax — Effective Rates by Year',
+                  note: "Today's dollars. Effective rate = total tax ÷ gross income.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Tax ${aName}`,  right: true, render: d => fmt(d.taxA) },
+                    { header: `Eff Rate A`,    right: true, render: d => fmtPct(d.effectiveTaxRateA) },
+                    { header: `Tax ${bName}`,  right: true, render: d => fmt(d.taxB) },
+                    { header: `Eff Rate B`,    right: true, render: d => fmtPct(d.effectiveTaxRateB) },
+                    { header: 'Avg Rate',      right: true, bold: true, render: d => {
+                      const totalG = d.grossIncomeA + d.grossIncomeB
+                      const totalT = d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB
+                      return fmtPct(totalG > 0 ? totalT / totalG : 0)
+                    }},
+                  ],
+                  rows: dataPoints,
+                  summary: [{ label: 'Lifetime Avg Effective Rate', value: fmtPct(metrics.avgEffectiveTaxRate) }],
+                })} />
               <MetricCard label="Peak Year"
                 betterWhenHigher={false}
                 value={fmt(metrics.peakTaxAmount)}
                 sub={`in ${metrics.peakTaxYear}`}
                 frozen={frozenFor(metrics.peakTaxAmount, frozenMetrics?.peakTaxAmount, fmt, false,
-                  frozenMetrics ? `in ${frozenMetrics.peakTaxYear}` : undefined)} />
+                  frozenMetrics ? `in ${frozenMetrics.peakTaxYear}` : undefined)}
+                onClick={() => setModalDef({
+                  title: 'Tax — Annual Breakdown',
+                  note: "Today's dollars. Peak year highlighted.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Tax ${aName}`,  right: true, render: d => fmt(d.taxA) },
+                    { header: `Tax ${bName}`,  right: true, render: d => fmt(d.taxB) },
+                    { header: 'OAS Clawback',  right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0 ? fmt(d.oasClawbackA + d.oasClawbackB) : '—' },
+                    { header: 'Total Tax',     right: true, bold: true, render: d => fmt(d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === metrics.peakTaxYear,
+                  summary: [{ label: 'Peak Tax Year', value: fmt(metrics.peakTaxAmount) + ` in ${metrics.peakTaxYear}` }],
+                })} />
             </div>
           </div>
 
@@ -773,10 +1117,46 @@ export function DashboardTab() {
             <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
               <MetricCard label="CPP — Total Collected"
                 value={fmt(metrics.totalCPPCollected)}
-                frozen={frozenFor(metrics.totalCPPCollected, frozenMetrics?.totalCPPCollected, fmt)} />
+                frozen={frozenFor(metrics.totalCPPCollected, frozenMetrics?.totalCPPCollected, fmt)}
+                onClick={() => setModalDef({
+                  title: 'CPP — Annual Breakdown',
+                  note: "Today's dollars. Includes survivor benefits (60% of deceased spouse's entitlement).",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `${bName} Age`,  right: true, render: d => d.personBAge.toFixed(1) },
+                    { header: `${aName} CPP`,  right: true, render: d => d.cppA > 0 ? fmt(d.cppA) : '—' },
+                    { header: `${bName} CPP`,  right: true, render: d => d.cppB > 0 ? fmt(d.cppB) : '—' },
+                    { header: 'Total CPP',     right: true, bold: true, render: d => fmt(d.cppA + d.cppB) },
+                  ],
+                  rows: dataPoints.filter(d => d.cppA + d.cppB > 0),
+                  summary: [{ label: 'Total CPP Collected', value: fmt(metrics.totalCPPCollected) }],
+                })} />
               <MetricCard label="OAS — Total Collected"
                 value={fmt(metrics.totalOASCollected)}
-                frozen={frozenFor(metrics.totalOASCollected, frozenMetrics?.totalOASCollected, fmt)} />
+                frozen={frozenFor(metrics.totalOASCollected, frozenMetrics?.totalOASCollected, fmt)}
+                onClick={() => setModalDef({
+                  title: 'OAS — Annual Breakdown',
+                  note: "Today's dollars. Gross OAS before clawback. Clawback rows highlighted.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `${bName} Age`,  right: true, render: d => d.personBAge.toFixed(1) },
+                    { header: `${aName} OAS`,  right: true, render: d => d.oasA > 0 ? fmt(d.oasA) : '—' },
+                    { header: `${bName} OAS`,  right: true, render: d => d.oasB > 0 ? fmt(d.oasB) : '—' },
+                    { header: 'Gross OAS',     right: true, bold: true, render: d => fmt(d.oasA + d.oasB) },
+                    { header: 'Clawback',      right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0
+                      ? <span className="text-red-600">{fmt(d.oasClawbackA + d.oasClawbackB)}</span> : '—' },
+                    { header: 'Net OAS',       right: true, render: d => fmt((d.oasA + d.oasB) - (d.oasClawbackA + d.oasClawbackB)) },
+                  ],
+                  rows: dataPoints.filter(d => d.oasA + d.oasB > 0),
+                  highlightRow: d => d.oasClawbackA + d.oasClawbackB > 0,
+                  summary: [
+                    { label: 'Total OAS (Gross)', value: fmt(metrics.totalOASCollected) },
+                    { label: 'Total Clawback',    value: fmt(metrics.totalOASClawback) },
+                    { label: 'Net OAS',           value: fmt(metrics.totalOASCollected - metrics.totalOASClawback) },
+                  ],
+                })} />
               <MetricCard label="OAS — Clawback"
                 betterWhenHigher={false}
                 value={metrics.oasClawbackYears === 0 ? 'None' : `${metrics.oasClawbackYears} yrs`}
@@ -784,17 +1164,99 @@ export function DashboardTab() {
                 frozen={frozenFor(metrics.oasClawbackYears, frozenMetrics?.oasClawbackYears,
                   v => v === 0 ? 'None' : `${v} yrs`, false,
                   frozenMetrics && frozenMetrics.oasClawbackYears > 0
-                    ? `${fmtPct(frozenMetrics.oasClawbackPct)} of OAS years` : undefined)} />
+                    ? `${fmtPct(frozenMetrics.oasClawbackPct)} of OAS years` : undefined)}
+                onClick={() => setModalDef({
+                  title: 'OAS — Clawback Detail',
+                  note: "Today's dollars. Clawback = 15% of income above threshold (~$90,997 in 2024, CPI-indexed). Rows with clawback highlighted.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `${bName} Age`,  right: true, render: d => d.personBAge.toFixed(1) },
+                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `OAS ${aName}`,  right: true, render: d => d.oasA > 0 ? fmt(d.oasA) : '—' },
+                    { header: `OAS ${bName}`,  right: true, render: d => d.oasB > 0 ? fmt(d.oasB) : '—' },
+                    { header: `Clawback ${aName}`, right: true, render: d => d.oasClawbackA > 0
+                      ? <span className="text-red-600">{fmt(d.oasClawbackA)}</span> : '—' },
+                    { header: `Clawback ${bName}`, right: true, render: d => d.oasClawbackB > 0
+                      ? <span className="text-red-600">{fmt(d.oasClawbackB)}</span> : '—' },
+                    { header: 'Net OAS',       right: true, bold: true, render: d => fmt((d.oasA + d.oasB) - (d.oasClawbackA + d.oasClawbackB)) },
+                  ],
+                  rows: dataPoints.filter(d => d.oasA + d.oasB > 0),
+                  highlightRow: d => d.oasClawbackA + d.oasClawbackB > 0,
+                  summary: [
+                    { label: 'Total OAS (Gross)', value: fmt(metrics.totalOASCollected) },
+                    { label: 'Total Clawback',    value: fmt(metrics.totalOASClawback) },
+                    { label: 'Net OAS',           value: fmt(metrics.totalOASCollected - metrics.totalOASClawback) },
+                    { label: 'Clawback Years',    value: `${metrics.oasClawbackYears} of ${dataPoints.filter(d => d.oasA + d.oasB > 0).length} OAS years` },
+                  ],
+                })} />
               <MetricCard label="CPP — vs Age 65 Start"
                 betterWhenHigher={true}
                 value={(metrics.cppVs65 >= 0 ? '+' : '') + fmt(metrics.cppVs65)}
                 frozen={frozenFor(metrics.cppVs65, frozenMetrics?.cppVs65,
-                  v => (v >= 0 ? '+' : '') + fmt(v))} />
+                  v => (v >= 0 ? '+' : '') + fmt(v))}
+                onClick={() => {
+                  const bMap = buildCppBaselineMap()
+                  const rows = dataPoints.filter(d => d.cppA + d.cppB > 0 || (bMap.get(d.year) ?? 0) > 0)
+                  const totBase = Array.from(bMap.values()).reduce((s, v) => s + v, 0)
+                  setModalDef({
+                    title: 'CPP — Actual vs Age-65 Baseline',
+                    note: "Today's dollars. Baseline = both collect CPP starting at their exact 65th birthday. Positive delta = your timing was better.",
+                    columns: [
+                      { header: 'Year',              render: d => d.year },
+                      { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                      { header: `${bName} Age`,  right: true, render: d => d.personBAge.toFixed(1) },
+                      { header: `${aName} CPP`,  right: true, render: d => d.cppA > 0 ? fmt(d.cppA) : '—' },
+                      { header: `${bName} CPP`,  right: true, render: d => d.cppB > 0 ? fmt(d.cppB) : '—' },
+                      { header: 'Actual Total',  right: true, bold: true, render: d => fmt(d.cppA + d.cppB) },
+                      { header: 'Baseline @65',  right: true, render: d => fmt(bMap.get(d.year) ?? 0) },
+                      { header: 'Delta / Year',  right: true, render: d => {
+                          const delta = d.cppA + d.cppB - (bMap.get(d.year) ?? 0)
+                          return <span className={delta >= 0 ? 'text-green-600' : 'text-red-600'}>{(delta >= 0 ? '+' : '') + fmt(delta)}</span>
+                        }},
+                    ],
+                    rows,
+                    summary: [
+                      { label: 'Actual Total',        value: fmt(metrics.totalCPPCollected) },
+                      { label: 'Baseline Total @65',  value: fmt(totBase) },
+                      { label: 'Net Timing Benefit',  value: (metrics.cppVs65 >= 0 ? '+' : '') + fmt(metrics.cppVs65) },
+                    ],
+                  })
+                }} />
               <MetricCard label="OAS — vs Age 65 Start"
                 betterWhenHigher={true}
                 value={(metrics.oasVs65 >= 0 ? '+' : '') + fmt(metrics.oasVs65)}
                 frozen={frozenFor(metrics.oasVs65, frozenMetrics?.oasVs65,
-                  v => (v >= 0 ? '+' : '') + fmt(v))} />
+                  v => (v >= 0 ? '+' : '') + fmt(v))}
+                onClick={() => {
+                  const bMap = buildOasBaselineMap()
+                  const rows = dataPoints.filter(d => d.oasA + d.oasB > 0 || (bMap.get(d.year) ?? 0) > 0)
+                  const totBase = Array.from(bMap.values()).reduce((s, v) => s + v, 0)
+                  setModalDef({
+                    title: 'OAS — Actual vs Age-65 Baseline',
+                    note: "Today's dollars. Gross OAS (before clawback). Baseline = both collect OAS starting at their exact 65th birthday.",
+                    columns: [
+                      { header: 'Year',              render: d => d.year },
+                      { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
+                      { header: `${bName} Age`,  right: true, render: d => d.personBAge.toFixed(1) },
+                      { header: `${aName} OAS`,  right: true, render: d => d.oasA > 0 ? fmt(d.oasA) : '—' },
+                      { header: `${bName} OAS`,  right: true, render: d => d.oasB > 0 ? fmt(d.oasB) : '—' },
+                      { header: 'Actual Total',  right: true, bold: true, render: d => fmt(d.oasA + d.oasB) },
+                      { header: 'Baseline @65',  right: true, render: d => fmt(bMap.get(d.year) ?? 0) },
+                      { header: 'Delta / Year',  right: true, render: d => {
+                          const delta = d.oasA + d.oasB - (bMap.get(d.year) ?? 0)
+                          return <span className={delta >= 0 ? 'text-green-600' : 'text-red-600'}>{(delta >= 0 ? '+' : '') + fmt(delta)}</span>
+                        }},
+                    ],
+                    rows,
+                    summary: [
+                      { label: 'Actual Total (Gross)', value: fmt(metrics.totalOASCollected) },
+                      { label: 'Baseline Total @65',   value: fmt(totBase) },
+                      { label: 'Net Timing Benefit',   value: (metrics.oasVs65 >= 0 ? '+' : '') + fmt(metrics.oasVs65) },
+                    ],
+                  })
+                }} />
             </div>
           </div>
 
@@ -883,5 +1345,9 @@ export function DashboardTab() {
       </SectionCard>
 
     </div>
+
+    {/* ── Metric Detail Modal ──────────────────────────────────────────────── */}
+    {modalDef && <MetricDetailModal def={modalDef} onClose={() => setModalDef(null)} />}
+    </>
   )
 }
