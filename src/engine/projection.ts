@@ -50,15 +50,26 @@ function tfsaContribNom(account: AppState['tfsaA'], year: number, alive: boolean
   return contribNom(account.annualContribution, account.contributionEndDate, account.contributionTiming, year, alive, inflFactor)
 }
 
+// Calendar-aware age: uses exact birthday boundaries to avoid 365.25 approximation errors.
+// This ensures that dateAtAge(birth, 65) → exactAge = 65.0 exactly, so cppFactor = 1.0 precisely.
+function calendarAge(birthDate: string, atDate: string): number {
+  const wholeYears = intAgeAt(birthDate, atDate)
+  const prevBirthday = new Date(dateAtAge(birthDate, wholeYears)).getTime()
+  const nextBirthday = new Date(dateAtAge(birthDate, wholeYears + 1)).getTime()
+  const at = new Date(atDate).getTime()
+  const fraction = (at - prevBirthday) / (nextBirthday - prevBirthday)
+  return wholeYears + fraction
+}
+
 function cppFactor(startDate: string, birthDate: string): number {
-  const age = exactAgeAt(birthDate, startDate)
+  const age = calendarAge(birthDate, startDate)
   const monthsFromAge65 = (age - 65) * 12
   if (monthsFromAge65 <= 0) return Math.max(0, 1 + 0.006 * monthsFromAge65)
   return 1 + 0.007 * monthsFromAge65
 }
 
 function oasFactor(startDate: string, birthDate: string): number {
-  const age = exactAgeAt(birthDate, startDate)
+  const age = calendarAge(birthDate, startDate)
   if (age <= 65) return 1.0
   return Math.min(1 + 0.006 * (age - 65) * 12, 1.36)
 }

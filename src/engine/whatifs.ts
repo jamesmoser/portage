@@ -1,7 +1,7 @@
 // What-if merge and headline metrics computation.
 
 import type { AppState, WhatIfs, HeadlineMetrics, DataPoint } from './types'
-import { dateAtAge, getYear } from './dates'
+import { dateAtAge, getYear, onOrAfter } from './dates'
 
 // ─── mergeWhatIfs ─────────────────────────────────────────────────────────────
 // Applies all enabled what-if overrides to the base plan and returns a modified
@@ -149,8 +149,23 @@ export function computeHeadlineMetrics(
   let baseCPP65 = 0, baseOAS65 = 0
   for (const d of dataPoints) {
     const pdFactor = Math.pow((1 + cpi) / (1 + pi), d.year - currentYear)
-    if (d.year <= endYearA && d.personAAge >= 65) { baseCPP65 += baseCPPA * pdFactor; baseOAS65 += baseOASA * pdFactor }
-    if (d.year <= endYearB && d.personBAge >= 65) { baseCPP65 += baseCPPB * pdFactor; baseOAS65 += baseOASB * pdFactor }
+    const aAlive = d.year <= endYearA
+    const bAlive = d.year <= endYearB
+    // Use exact date comparison to mirror the engine's onOrAfter(dateStr, startDate) logic.
+    // d.date is Jan 1 of the year; dateAtAge returns the exact Nth birthday.
+    const aAge65 = onOrAfter(d.date, dateAtAge(state.personA.birthDate, 65))
+    const bAge65 = onOrAfter(d.date, dateAtAge(state.personB.birthDate, 65))
+
+    // CPP: own collection while alive + 60% survivor benefit to the other person
+    // (mirrors the engine logic in projection.ts lines 187–194)
+    if (aAlive && aAge65)          baseCPP65 += baseCPPA        * pdFactor
+    else if (!aAlive && bAlive && aAge65) baseCPP65 += baseCPPA * 0.60 * pdFactor
+    if (bAlive && bAge65)          baseCPP65 += baseCPPB        * pdFactor
+    else if (!bAlive && aAlive && bAge65) baseCPP65 += baseCPPB * 0.60 * pdFactor
+
+    // OAS: own collection only (no survivor benefit in the model)
+    if (aAlive && aAge65) baseOAS65 += baseOASA * pdFactor
+    if (bAlive && bAge65) baseOAS65 += baseOASB * pdFactor
   }
   const cppVs65 = totalCPPCollected - baseCPP65
   const oasVs65 = totalOASCollected - baseOAS65
