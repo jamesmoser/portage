@@ -1,15 +1,17 @@
-// Annual projection engine — all output values in present-day (today's) dollars.
+// Monthly projection engine — income is accumulated month-by-month so that
+// mid-year starts and ends (retirement, pension, CPP/OAS eligibility, etc.)
+// are naturally pro-rated without per-source special cases.
+// Annual DataPoints are produced for display; account balances compound annually.
 //
 // Strategy:
 //   1. Walk year-by-year from today to the last planning end date.
-//   2. For each year, calculate nominal income from all active sources.
-//   3. Calculate taxes (with optional pension splitting).
-//   4. If net income < spending target, draw from accounts in configured order.
-//   5. Update account balances (growth, contributions, withdrawals).
-//   6. Deflate everything back to present-day dollars before storing.
+//   2. For each year, run a 12-month inner loop.
+//      Each month, check which income sources are active and add 1 month of income.
+//   3. After the monthly loop, run taxes on annual totals, apply drawdown,
+//      update account balances, and emit a DataPoint in present-day dollars.
 
 import type { AppState, DataPoint, ProjectionResult } from './types'
-import { jan1, getYear, exactAgeAt, intAgeAt, onOrAfter, before, dateAtAge } from './dates'
+import { jan1, getYear, exactAgeAt, intAgeAt, onOrAfter, before, dateAtAge, dateAtDecimalAge } from './dates'
 import { calculateTax, optimizePensionSplit, rrifMinFactor, type TaxInput } from './tax'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -20,7 +22,6 @@ function nominalReturnForAge(age: number, rates: AppState['returnRates']): numbe
   if (age < 70)  return rates.from65to70 / 100
   return rates.from70plus / 100
 }
-
 
 function grow(balance: number, rate: number): number {
   return balance * (1 + rate)
@@ -42,7 +43,7 @@ function contribNom(annualContribution: number, contributionEndDate: string, con
   const base = annualContribution * inflFactor
   if (contributionTiming === 'lump') return base
   if (year < endYear) return base
-  const endMonth = new Date(contributionEndDate).getMonth() + 1
+  const endMonth = parseInt(contributionEndDate.substring(5, 7), 10)
   return base * endMonth / 12
 }
 
@@ -51,7 +52,6 @@ function tfsaContribNom(account: AppState['tfsaA'], year: number, alive: boolean
 }
 
 // Calendar-aware age: uses exact birthday boundaries to avoid 365.25 approximation errors.
-// This ensures that dateAtAge(birth, 65) → exactAge = 65.0 exactly, so cppFactor = 1.0 precisely.
 function calendarAge(birthDate: string, atDate: string): number {
   const wholeYears = intAgeAt(birthDate, atDate)
   const prevBirthday = new Date(dateAtAge(birthDate, wholeYears)).getTime()
@@ -85,8 +85,11 @@ export function runProjection(state: AppState): ProjectionResult {
   const { taxSettings, withdrawalStrategy } = state
 
   const currentYear = new Date().getFullYear()
-  const endYearA = getYear(dateAtAge(state.personA.birthDate, state.personA.planningEndAge))
-  const endYearB = getYear(dateAtAge(state.personB.birthDate, state.personB.planningEndAge))
+  // Death date = exact date at planningEndAge (decimal). 88.0 = 88th birthday, 88.9 = near end of age 88.
+  const deathDateA = dateAtDecimalAge(state.personA.birthDate, state.personA.planningEndAge)
+  const deathDateB = dateAtDecimalAge(state.personB.birthDate, state.personB.planningEndAge)
+  const endYearA = getYear(deathDateA)
+  const endYearB = getYear(deathDateB)
   const endYear  = Math.max(endYearA, endYearB)
 
   if (endYear <= currentYear) {
@@ -95,15 +98,15 @@ export function runProjection(state: AppState): ProjectionResult {
   }
 
   // ── Mutable account balances (nominal) ───────────────────────────────────
-  let rrspA     = state.rrspA.balance
-  let rrspB     = state.rrspB.balance
-  let tfsaA     = state.tfsaA.balance
-  let tfsaB     = state.tfsaB.balance
-  let nonRegA   = state.nonRegA.balance
-  let nonRegB   = state.nonRegB.balance
+  let rrspA      = state.rrspA.balance
+  let rrspB      = state.rrspB.balance
+  let tfsaA      = state.tfsaA.balance
+  let tfsaB      = state.tfsaB.balance
+  let nonRegA    = state.nonRegA.balance
+  let nonRegB    = state.nonRegB.balance
   let nonRegAcbA = state.nonRegA.acb
   let nonRegAcbB = state.nonRegB.acb
-  let hisa      = state.cash.hisaBalance
+  let hisa       = state.cash.hisaBalance
 
   const cppFactorA = cppFactor(state.cppA.startDate, state.personA.birthDate)
   const cppFactorB = cppFactor(state.cppB.startDate, state.personB.birthDate)
@@ -113,124 +116,52 @@ export function runProjection(state: AppState): ProjectionResult {
   const baseYear = currentYear
 
   for (let year = currentYear; year <= endYear; year++) {
-    const dateStr     = jan1(year)
+    const dateStr      = jan1(year)
     const yearsFromNow = year - currentYear
-    const inflFactor  = Math.pow(1 + pi,  yearsFromNow)
+    const inflFactor   = Math.pow(1 + pi,  yearsFromNow)
     const cpiFactorForYear = Math.pow(1 + cpi, yearsFromNow)
 
+    // Ages at Jan 1 — used for tax credits, RRIF minimums, and DataPoint display.
     const personAAgeExact = exactAgeAt(state.personA.birthDate, dateStr)
     const personBAgeExact = exactAgeAt(state.personB.birthDate, dateStr)
     const personAAgeInt   = intAgeAt(state.personA.birthDate, dateStr)
     const personBAgeInt   = intAgeAt(state.personB.birthDate, dateStr)
 
-    const refAge     = state.ageReferencePerson === 'personB' ? personBAgeExact : personAAgeExact
-    const nomReturn  = nominalReturnForAge(refAge, state.returnRates)
+    const refAge    = state.ageReferencePerson === 'personB' ? personBAgeExact : personAAgeExact
+    const nomReturn = nominalReturnForAge(refAge, state.returnRates)
 
-    const retiredA = onOrAfter(dateStr, state.personA.retirementDate)
-    const retiredB = onOrAfter(dateStr, state.personB.retirementDate)
-    const aAlive   = year <= endYearA
-    const bAlive   = year <= endYearB
+    const aAlive = year <= endYearA
+    const bAlive = year <= endYearB
 
     // ── Asset rollover to surviving spouse at death ───────────────────────────
-    // All transfers use the spousal rollover election (no immediate tax):
-    //   RRSP/RRIF — successor annuitant: full balance, tax-free
-    //   TFSA      — exempt contribution: full balance, no room consumed
-    //   Non-reg   — spousal rollover at ACB: balance + embedded gain deferred
-    // Runs before RRIF minimums so combined balance drives first-year minimum.
+    // Runs at the start of the first year a person is no longer alive.
+    // All transfers use the spousal rollover election (no immediate tax).
     if (!aAlive && bAlive) {
-      if (rrspA   > 0) { rrspB    += rrspA;    rrspA    = 0 }
-      if (tfsaA   > 0) { tfsaB    += tfsaA;    tfsaA    = 0 }
-      if (nonRegA > 0) { nonRegB  += nonRegA;  nonRegA  = 0
+      if (rrspA   > 0) { rrspB   += rrspA;   rrspA   = 0 }
+      if (tfsaA   > 0) { tfsaB   += tfsaA;   tfsaA   = 0 }
+      if (nonRegA > 0) { nonRegB += nonRegA;  nonRegA = 0
                          nonRegAcbB += nonRegAcbA; nonRegAcbA = 0 }
     }
     if (!bAlive && aAlive) {
-      if (rrspB   > 0) { rrspA    += rrspB;    rrspB    = 0 }
-      if (tfsaB   > 0) { tfsaA    += tfsaB;    tfsaB    = 0 }
-      if (nonRegB > 0) { nonRegA  += nonRegB;  nonRegB  = 0
+      if (rrspB   > 0) { rrspA   += rrspB;   rrspB   = 0 }
+      if (tfsaB   > 0) { tfsaA   += tfsaB;   tfsaB   = 0 }
+      if (nonRegB > 0) { nonRegA += nonRegB;  nonRegB = 0
                          nonRegAcbA += nonRegAcbB; nonRegAcbB = 0 }
     }
 
-    // ── Employment income ────────────────────────────────────────────────────
-    const empGrowthA = Math.pow(1 + state.employmentA.growthRatePct / 100, yearsFromNow)
-    const empGrowthB = Math.pow(1 + state.employmentB.growthRatePct / 100, yearsFromNow)
-    const empA_nom = !retiredA && aAlive ? state.employmentA.annualAmount * empGrowthA : 0
-    const empB_nom = !retiredB && bAlive ? state.employmentB.annualAmount * empGrowthB : 0
-
-    // ── DB Pension A ─────────────────────────────────────────────────────────
-    const dbAActive = state.dbPensionA.enabled && aAlive && onOrAfter(dateStr, state.dbPensionA.startDate)
-    let dbBase_nom = 0, dbBridge_nom = 0
-    if (dbAActive) {
-      const yop = yearsFromNow - Math.max(0, getYear(state.dbPensionA.startDate) - currentYear)
-      const dbARate   = (state.dbPensionA.indexingRatePct != null ? state.dbPensionA.indexingRatePct : cpi * 100) / 100
-      const dbACapOn  = state.dbPensionA.cpiIndexingCapEnabled ?? (state.dbPensionA.cpiIndexingCap > 0)
-      const ir        = state.dbPensionA.cpiIndexed
-        ? (dbACapOn && state.dbPensionA.cpiIndexingCap > 0 ? Math.min(dbARate, state.dbPensionA.cpiIndexingCap / 100) : dbARate)
-        : 0
-      const cppIntRed = state.dbPensionA.cppIntegration && personAAgeInt >= 65
-        ? state.dbPensionA.cppIntegrationAmount * Math.pow(1 + ir, Math.max(0, year - getYear(state.personA.retirementDate)))
-        : 0
-      dbBase_nom = Math.max(0, state.dbPensionA.annualAmount - cppIntRed) * Math.pow(1 + ir, Math.max(0, yop))
-      if (before(dateStr, state.dbPensionA.bridgeBenefitEndDate) && state.dbPensionA.bridgeBenefitAmount > 0) {
-        dbBridge_nom = state.dbPensionA.bridgeBenefitAmount * Math.pow(1 + ir, Math.max(0, yop))
-      }
-    }
-
-    // ── DB Pension B ─────────────────────────────────────────────────────────
-    const dbBActive = state.dbPensionB.enabled && bAlive && onOrAfter(dateStr, state.dbPensionB.startDate)
-    let dbBaseB_nom = 0, dbBridgeB_nom = 0
-    if (dbBActive) {
-      const yop = yearsFromNow - Math.max(0, getYear(state.dbPensionB.startDate) - currentYear)
-      const dbBRate   = (state.dbPensionB.indexingRatePct != null ? state.dbPensionB.indexingRatePct : cpi * 100) / 100
-      const dbBCapOn  = state.dbPensionB.cpiIndexingCapEnabled ?? (state.dbPensionB.cpiIndexingCap > 0)
-      const ir        = state.dbPensionB.cpiIndexed
-        ? (dbBCapOn && state.dbPensionB.cpiIndexingCap > 0 ? Math.min(dbBRate, state.dbPensionB.cpiIndexingCap / 100) : dbBRate)
-        : 0
-      const cppIntRed = state.dbPensionB.cppIntegration && personBAgeInt >= 65
-        ? state.dbPensionB.cppIntegrationAmount * Math.pow(1 + ir, Math.max(0, year - getYear(state.personB.retirementDate)))
-        : 0
-      dbBaseB_nom = Math.max(0, state.dbPensionB.annualAmount - cppIntRed) * Math.pow(1 + ir, Math.max(0, yop))
-      if (before(dateStr, state.dbPensionB.bridgeBenefitEndDate) && state.dbPensionB.bridgeBenefitAmount > 0) {
-        dbBridgeB_nom = state.dbPensionB.bridgeBenefitAmount * Math.pow(1 + ir, Math.max(0, yop))
-      }
-    }
-
-    // ── CPP / OAS ────────────────────────────────────────────────────────────
-    const cppA_nom = (aAlive && onOrAfter(dateStr, state.cppA.startDate)
-        ? state.cppA.estimatedMonthlyAt65 * 12 * cppFactorA * cpiFactorForYear : 0)
-      + (!bAlive && aAlive && onOrAfter(dateStr, state.cppB.startDate)
-        ? state.cppB.estimatedMonthlyAt65 * 12 * cppFactorB * 0.60 * cpiFactorForYear : 0)
-    const cppB_nom = (bAlive && onOrAfter(dateStr, state.cppB.startDate)
-        ? state.cppB.estimatedMonthlyAt65 * 12 * cppFactorB * cpiFactorForYear : 0)
-      + (!aAlive && bAlive && onOrAfter(dateStr, state.cppA.startDate)
-        ? state.cppA.estimatedMonthlyAt65 * 12 * cppFactorA * 0.60 * cpiFactorForYear : 0)
-    const oasStartedA = aAlive && onOrAfter(dateStr, state.oasA.startDate)
-    const oasStartedB = bAlive && onOrAfter(dateStr, state.oasB.startDate)
-    const oasA_nom = oasStartedA
-      ? state.oasA.estimatedMonthlyAt65 * 12 * oasFactorA * cpiFactorForYear
-        + (state.oasA.gisEligible ? (state.oasA.gisMonthlyAmount ?? 0) * 12 * cpiFactorForYear : 0)
-      : 0
-    const oasB_nom = oasStartedB
-      ? state.oasB.estimatedMonthlyAt65 * 12 * oasFactorB * cpiFactorForYear
-        + (state.oasB.gisEligible ? (state.oasB.gisMonthlyAmount ?? 0) * 12 * cpiFactorForYear : 0)
-      : 0
-
-    // ── RRIF minimums ────────────────────────────────────────────────────────
+    // ── RRIF minimums (annual — based on Jan 1 balance and Jan 1 age) ────────
     const isRrifA = aAlive && onOrAfter(dateStr, state.rrspA.rrifConversionDate)
     const isRrifB = bAlive && onOrAfter(dateStr, state.rrspB.rrifConversionDate)
     const ageForRrifA = state.rrspA.useSpouseAgeForMinimums ? personBAgeExact : personAAgeExact
     const ageForRrifB = state.rrspB.useSpouseAgeForMinimums ? personAAgeExact : personBAgeExact
-    let rrifMinA = isRrifA ? rrspA * rrifMinFactor(ageForRrifA) : 0
-    let rrifMinB = isRrifB ? rrspB * rrifMinFactor(ageForRrifB) : 0
+    const rrifMinA = isRrifA ? rrspA * rrifMinFactor(ageForRrifA) : 0
+    const rrifMinB = isRrifB ? rrspB * rrifMinFactor(ageForRrifB) : 0
     const rrifAddA = isRrifA ? state.rrspA.additionalWithdrawalAboveMinimum * inflFactor : 0
     const rrifAddB = isRrifB ? state.rrspB.additionalWithdrawalAboveMinimum * inflFactor : 0
     let rrifA_nom = Math.min(rrifMinA + rrifAddA, rrspA)
     let rrifB_nom = Math.min(rrifMinB + rrifAddB, rrspB)
 
-    // ── RRSP/RRIF draws (pre-tax) ────────────────────────────────────────────
-    // Draws are set here so they flow through pension splitting and tax.
-    // 'none': zero everything — purely analytical, no account draws at all.
-    // 'spendGap': mandatory RRIF minimums only (set above); gap fill happens post-tax.
-    // 'fixedPct'/'fixedWithdrawal': proactive draws override the mandatory minimum.
+    // ── RRSP/RRIF draws (pre-tax, set before tax engine so they flow through splitting) ──
     if (withdrawalStrategy.drawdownStrategy === 'none') {
       rrifA_nom = 0
       rrifB_nom = 0
@@ -259,54 +190,182 @@ export function runProjection(state: AppState): ProjectionResult {
         if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
       }
     }
-    // 'spendGap': rrifA/B_nom stays at mandatory minimum + additionalWithdrawalAboveMinimum (set above)
+    // 'spendGap': rrifA/B_nom stays at mandatory minimum + additionalWithdrawalAboveMinimum
 
-    // ── Other income (unified — taxable items go into tax engine, non-taxable bypass it)
+    // ── Pre-compute annual DB pension amounts for this year ───────────────────
+    // These are the full-year indexed amounts; the monthly loop divides by 12
+    // and multiplies by the number of active months.
+
+    // DB Pension A
+    const dbAStartYear = getYear(state.dbPensionA.startDate)
+    const yopA         = Math.max(0, year - dbAStartYear)
+    const dbARateRaw   = (state.dbPensionA.indexingRatePct != null ? state.dbPensionA.indexingRatePct : cpi * 100) / 100
+    const dbACapOn     = state.dbPensionA.cpiIndexingCapEnabled ?? (state.dbPensionA.cpiIndexingCap > 0)
+    const irA          = state.dbPensionA.cpiIndexed
+      ? (dbACapOn && state.dbPensionA.cpiIndexingCap > 0 ? Math.min(dbARateRaw, state.dbPensionA.cpiIndexingCap / 100) : dbARateRaw)
+      : 0
+    const annualDbBaseA_nom   = state.dbPensionA.annualAmount * Math.pow(1 + irA, yopA)
+    const annualCppIntRedA    = state.dbPensionA.cppIntegration
+      ? state.dbPensionA.cppIntegrationAmount * Math.pow(1 + irA, Math.max(0, year - getYear(state.personA.retirementDate)))
+      : 0
+    const annualDbBridgeA_nom = state.dbPensionA.bridgeBenefitAmount > 0
+      ? state.dbPensionA.bridgeBenefitAmount * Math.pow(1 + irA, yopA)
+      : 0
+
+    // DB Pension B
+    const dbBStartYear = getYear(state.dbPensionB.startDate)
+    const yopB         = Math.max(0, year - dbBStartYear)
+    const dbBRateRaw   = (state.dbPensionB.indexingRatePct != null ? state.dbPensionB.indexingRatePct : cpi * 100) / 100
+    const dbBCapOn     = state.dbPensionB.cpiIndexingCapEnabled ?? (state.dbPensionB.cpiIndexingCap > 0)
+    const irB          = state.dbPensionB.cpiIndexed
+      ? (dbBCapOn && state.dbPensionB.cpiIndexingCap > 0 ? Math.min(dbBRateRaw, state.dbPensionB.cpiIndexingCap / 100) : dbBRateRaw)
+      : 0
+    const annualDbBaseB_nom   = state.dbPensionB.annualAmount * Math.pow(1 + irB, yopB)
+    const annualCppIntRedB    = state.dbPensionB.cppIntegration
+      ? state.dbPensionB.cppIntegrationAmount * Math.pow(1 + irB, Math.max(0, year - getYear(state.personB.retirementDate)))
+      : 0
+    const annualDbBridgeB_nom = state.dbPensionB.bridgeBenefitAmount > 0
+      ? state.dbPensionB.bridgeBenefitAmount * Math.pow(1 + irB, yopB)
+      : 0
+
+    // Pre-compute annual employment amounts (growth-adjusted for this year)
+    const empGrowthA    = Math.pow(1 + state.employmentA.growthRatePct / 100, yearsFromNow)
+    const empGrowthB    = Math.pow(1 + state.employmentB.growthRatePct / 100, yearsFromNow)
+    const annualEmpA_nom = state.employmentA.annualAmount * empGrowthA
+    const annualEmpB_nom = state.employmentB.annualAmount * empGrowthB
+
+    // ── Pre-compute spending phase data for this year ─────────────────────────
+    // Phases are date-checked monthly so mid-year transitions (e.g. survivor phase
+    // starting on the death birthday) are correctly captured.
+    const refBirth = state.ageReferencePerson === 'personB' ? state.personB.birthDate : state.personA.birthDate
+    const phaseCalcs = state.spendingPhases.map(p => {
+      const startDate = dateAtDecimalAge(refBirth, p.startAge)
+      const spendYrs  = Math.max(0, exactAgeAt(refBirth, dateStr) - p.startAge)
+      const annual    = p.annualAmount * inflFactor * Math.pow(1 + p.growthRatePct / 100, spendYrs)
+      return { startDate, monthly: annual / 12 }
+    })
+
+    // ── Monthly income + spending accumulation ────────────────────────────────
+    // mAAlive / mBAlive use the exact death date so income is pro-rated to the
+    // death month — no more binary full-year / zero-year cliff at year boundaries.
+    let empA_nom = 0, empB_nom = 0
+    let dbBase_nom = 0, dbBridge_nom = 0
+    let dbBaseB_nom = 0, dbBridgeB_nom = 0
+    let cppA_nom = 0, cppB_nom = 0
+    let oasA_nom = 0, oasB_nom = 0
     let otherTaxableA_nom = 0, otherTaxableB_nom = 0
-    let otherNonTaxA_nom = 0, otherNonTaxB_nom = 0
-    for (const item of state.otherIncome.otherItems) {
-      const alive = item.attributedTo === 'personA' ? aAlive
-                  : item.attributedTo === 'personB' ? bAlive
-                  : aAlive || bAlive
-      if (!alive) continue
-      if (!onOrAfter(dateStr, item.startDate) || !before(dateStr, item.endDate)) continue
-      const value = item.annualAmount * Math.pow(1 + item.growthRatePct / 100, yearsFromNow)
-      const toA = item.attributedTo === 'personA' ? value : item.attributedTo === 'joint' ? value / 2 : 0
-      const toB = item.attributedTo === 'personB' ? value : item.attributedTo === 'joint' ? value / 2 : 0
-      if (item.taxable) {
-        otherTaxableA_nom += toA
-        otherTaxableB_nom += toB
-      } else {
-        otherNonTaxA_nom += toA
-        otherNonTaxB_nom += toB
+    let otherNonTaxA_nom  = 0, otherNonTaxB_nom  = 0
+    let spending_nom = 0
+
+    for (let month = 1; month <= 12; month++) {
+      const monthDate = `${year}-${String(month).padStart(2, '0')}-01`
+
+      // Per-month alive: active in a month if the month start is on or before the death date.
+      const mAAlive = aAlive && monthDate <= deathDateA
+      const mBAlive = bAlive && monthDate <= deathDateB
+
+      // ── Spending phase ──────────────────────────────────────────────────────
+      // Find the last phase whose startDate has been reached this month.
+      if (phaseCalcs.length > 0) {
+        let activeIdx = 0
+        for (let i = 0; i < phaseCalcs.length; i++) {
+          if (monthDate >= phaseCalcs[i].startDate) activeIdx = i
+        }
+        spending_nom += phaseCalcs[activeIdx].monthly
+      }
+
+      // ── Employment ─────────────────────────────────────────────────────────
+      if (mAAlive && !onOrAfter(monthDate, state.personA.retirementDate)) {
+        empA_nom += annualEmpA_nom / 12
+      }
+      if (mBAlive && !onOrAfter(monthDate, state.personB.retirementDate)) {
+        empB_nom += annualEmpB_nom / 12
+      }
+
+      // ── DB Pension A ────────────────────────────────────────────────────────
+      if (state.dbPensionA.enabled && mAAlive && onOrAfter(monthDate, state.dbPensionA.startDate)) {
+        const mAgeA   = intAgeAt(state.personA.birthDate, monthDate)
+        const intRedM = (state.dbPensionA.cppIntegration && mAgeA >= 65) ? annualCppIntRedA / 12 : 0
+        dbBase_nom += Math.max(0, annualDbBaseA_nom / 12 - intRedM)
+        if (annualDbBridgeA_nom > 0 && before(monthDate, state.dbPensionA.bridgeBenefitEndDate)) {
+          dbBridge_nom += annualDbBridgeA_nom / 12
+        }
+      }
+
+      // ── DB Pension B ────────────────────────────────────────────────────────
+      if (state.dbPensionB.enabled && mBAlive && onOrAfter(monthDate, state.dbPensionB.startDate)) {
+        const mAgeB   = intAgeAt(state.personB.birthDate, monthDate)
+        const intRedM = (state.dbPensionB.cppIntegration && mAgeB >= 65) ? annualCppIntRedB / 12 : 0
+        dbBaseB_nom += Math.max(0, annualDbBaseB_nom / 12 - intRedM)
+        if (annualDbBridgeB_nom > 0 && before(monthDate, state.dbPensionB.bridgeBenefitEndDate)) {
+          dbBridgeB_nom += annualDbBridgeB_nom / 12
+        }
+      }
+
+      // ── CPP A ───────────────────────────────────────────────────────────────
+      if (mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
+        cppA_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * cpiFactorForYear
+        // Survivor CPP from B: active in any month B is dead and B's CPP had started.
+        if (!mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
+          cppA_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * 0.60 * cpiFactorForYear
+        }
+      }
+
+      // ── CPP B ───────────────────────────────────────────────────────────────
+      if (mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
+        cppB_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * cpiFactorForYear
+        if (!mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
+          cppB_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * 0.60 * cpiFactorForYear
+        }
+      }
+
+      // ── OAS A ───────────────────────────────────────────────────────────────
+      if (mAAlive && onOrAfter(monthDate, state.oasA.startDate)) {
+        oasA_nom += state.oasA.estimatedMonthlyAt65 * oasFactorA * cpiFactorForYear
+        if (state.oasA.gisEligible) {
+          oasA_nom += (state.oasA.gisMonthlyAmount ?? 0) * cpiFactorForYear
+        }
+      }
+
+      // ── OAS B ───────────────────────────────────────────────────────────────
+      if (mBAlive && onOrAfter(monthDate, state.oasB.startDate)) {
+        oasB_nom += state.oasB.estimatedMonthlyAt65 * oasFactorB * cpiFactorForYear
+        if (state.oasB.gisEligible) {
+          oasB_nom += (state.oasB.gisMonthlyAmount ?? 0) * cpiFactorForYear
+        }
+      }
+
+      // ── Other income ────────────────────────────────────────────────────────
+      for (const item of state.otherIncome.otherItems) {
+        const itemAlive = item.attributedTo === 'personA' ? mAAlive
+                        : item.attributedTo === 'personB' ? mBAlive
+                        : mAAlive || mBAlive
+        if (!itemAlive) continue
+        if (!onOrAfter(monthDate, item.startDate) || !before(monthDate, item.endDate)) continue
+        const monthlyValue = item.annualAmount * Math.pow(1 + item.growthRatePct / 100, yearsFromNow) / 12
+        const toA = item.attributedTo === 'personA' ? monthlyValue : item.attributedTo === 'joint' ? monthlyValue / 2 : 0
+        const toB = item.attributedTo === 'personB' ? monthlyValue : item.attributedTo === 'joint' ? monthlyValue / 2 : 0
+        if (item.taxable) {
+          otherTaxableA_nom += toA
+          otherTaxableB_nom += toB
+        } else {
+          otherNonTaxA_nom += toA
+          otherNonTaxB_nom += toB
+        }
       }
     }
 
-    // ── Non-reg portfolio income ──────────────────────────────────────────────
-    // Yields are annual income flows taxable each year regardless of sales.
-    // Capital gains arise only from deliberate harvesting or withdrawals (via ACB).
+    // ── Non-reg portfolio income (annual — yield on beginning-of-year balance) ─
     const nonRegRetA = state.nonRegA.returnRateOverrideEnabled ? state.nonRegA.returnRateOverridePct / 100 : nomReturn
     const nonRegRetB = state.nonRegB.returnRateOverrideEnabled ? state.nonRegB.returnRateOverridePct / 100 : nomReturn
     const nonRegDivEligA_nom  = nonRegA * (state.nonRegA.eligibleDivYieldPct  / 100)
     const nonRegDivEligB_nom  = nonRegB * (state.nonRegB.eligibleDivYieldPct  / 100)
     const nonRegForeignA_nom  = nonRegA * (state.nonRegA.foreignIncomeYieldPct / 100)
     const nonRegForeignB_nom  = nonRegB * (state.nonRegB.foreignIncomeYieldPct / 100)
-    const nonRegInterestA_nom = nonRegA * (state.nonRegA.interestYieldPct / 100)
-    const nonRegInterestB_nom = nonRegB * (state.nonRegB.interestYieldPct / 100)
-    // Capital gains on withdrawal are tracked via ACB but not yet fed back into annual tax
 
-
-    // ── Spending target ───────────────────────────────────────────────────────
-    let spendingPhase = state.spendingPhases[0]
-    for (const phase of state.spendingPhases) {
-      if (personAAgeExact >= phase.startAge) spendingPhase = phase
-    }
-    const spendYrs  = Math.max(0, personAAgeExact - (spendingPhase?.startAge ?? 0))
-    const spendBase = (spendingPhase?.annualAmount ?? 0) * inflFactor
-    let spending_nom = spendBase * Math.pow(1 + (spendingPhase?.growthRatePct ?? 0) / 100, spendYrs)
+    // ── Additional spending items (annual — one-time or recurring from a start age) ──
     for (const item of state.additionalSpending) {
-      const refBirth = state.ageReferencePerson === 'personB' ? state.personB.birthDate : state.personA.birthDate
-      const itemDate = dateAtAge(refBirth, item.startAge)
+      const itemDate = dateAtDecimalAge(refBirth, item.startAge)
       if (item.recurring) {
         if (jan1(year) >= itemDate) spending_nom += item.amount * inflFactor
       } else {
@@ -316,26 +375,26 @@ export function runProjection(state: AppState): ProjectionResult {
 
     // ── Tax with pension splitting ────────────────────────────────────────────
     const taxInputA: TaxInput = {
-      employmentIncome: empA_nom + otherTaxableA_nom,
-      pensionIncome:    dbBase_nom + dbBridge_nom + rrifA_nom,
-      cppIncome:        cppA_nom,
-      oasIncome:        oasA_nom,
-      eligibleDividends: nonRegDivEligA_nom,
+      employmentIncome:     empA_nom + otherTaxableA_nom,
+      pensionIncome:        dbBase_nom + dbBridge_nom + rrifA_nom,
+      cppIncome:            cppA_nom,
+      oasIncome:            oasA_nom,
+      eligibleDividends:    nonRegDivEligA_nom,
       nonEligibleDividends: 0,
-      foreignIncome: nonRegForeignA_nom,
+      foreignIncome:        nonRegForeignA_nom,
       capitalGainsRealized: 0,
-      age: personAAgeInt,
+      age:                  personAAgeInt,
     }
     const taxInputB: TaxInput = {
-      employmentIncome: empB_nom + otherTaxableB_nom,
-      pensionIncome:    dbBaseB_nom + dbBridgeB_nom + rrifB_nom,
-      cppIncome:        cppB_nom,
-      oasIncome:        oasB_nom,
-      eligibleDividends: nonRegDivEligB_nom,
+      employmentIncome:     empB_nom + otherTaxableB_nom,
+      pensionIncome:        dbBaseB_nom + dbBridgeB_nom + rrifB_nom,
+      cppIncome:            cppB_nom,
+      oasIncome:            oasB_nom,
+      eligibleDividends:    nonRegDivEligB_nom,
       nonEligibleDividends: 0,
-      foreignIncome: nonRegForeignB_nom,
+      foreignIncome:        nonRegForeignB_nom,
       capitalGainsRealized: 0,
-      age: personBAgeInt,
+      age:                  personBAgeInt,
     }
 
     const eligibleForSplitA = (aAlive ? dbBase_nom + dbBridge_nom : 0) +
@@ -364,12 +423,9 @@ export function runProjection(state: AppState): ProjectionResult {
     let gap_nom: number
 
     if (withdrawalStrategy.drawdownStrategy === 'none') {
-      // No account draws whatsoever — portfolios grow freely; shortfall reported but uncovered.
       gap_nom = Math.max(0, spending_nom - totalNetNom)
 
     } else if (withdrawalStrategy.drawdownStrategy === 'spendGap') {
-      // Draw only enough to cover the spending shortfall, in the configured withdrawal order.
-      // RRIF mandatory minimums (set above) are already included in totalNetNom via tax engine.
       gap_nom = Math.max(0, spending_nom - totalNetNom)
       const hisaDraw = Math.min(gap_nom, hisa)
       hisa    -= hisaDraw
@@ -405,7 +461,7 @@ export function runProjection(state: AppState): ProjectionResult {
       }
 
     } else {
-      // 'fixedPct' or 'fixedWithdrawal': proactive TFSA and Non-Reg draws (RRSP/RRIF already set above).
+      // fixedPct / fixedWithdrawal: proactive TFSA and Non-Reg draws (RRSP/RRIF already set above).
       if (withdrawalStrategy.drawdownStrategy === 'fixedPct') {
         const fp = withdrawalStrategy.drawdownFixedPct
         if (aAlive) {
@@ -454,25 +510,25 @@ export function runProjection(state: AppState): ProjectionResult {
     }
 
     // ── Grow accounts for next year ───────────────────────────────────────────
-    const rrspRetA  = state.rrspA.returnRateOverrideEnabled ? state.rrspA.returnRateOverridePct / 100 : nomReturn
-    const rrspRetB  = state.rrspB.returnRateOverrideEnabled ? state.rrspB.returnRateOverridePct / 100 : nomReturn
-    const tfsaRetA  = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
-    const tfsaRetB  = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
+    const rrspRetA = state.rrspA.returnRateOverrideEnabled ? state.rrspA.returnRateOverridePct / 100 : nomReturn
+    const rrspRetB = state.rrspB.returnRateOverrideEnabled ? state.rrspB.returnRateOverridePct / 100 : nomReturn
+    const tfsaRetA = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
+    const tfsaRetB = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
 
     const tfsaContribA = tfsaContribNom(state.tfsaA, year, aAlive, inflFactor)
     const tfsaContribB = tfsaContribNom(state.tfsaB, year, bAlive, inflFactor)
-
     const rrspContribA = rrspContribNom(state.rrspA, year, aAlive, isRrifA, inflFactor)
     const rrspContribB = rrspContribNom(state.rrspB, year, bAlive, isRrifB, inflFactor)
-    rrspA  = grow(Math.max(0, rrspA  + rrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
-    rrspB  = grow(Math.max(0, rrspB  + rrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
-    tfsaA  = grow(tfsaA  + tfsaContribA, tfsaRetA)
-    tfsaB  = grow(tfsaB  + tfsaContribB, tfsaRetB)
+
+    rrspA   = grow(Math.max(0, rrspA  + rrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
+    rrspB   = grow(Math.max(0, rrspB  + rrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
+    tfsaA   = grow(tfsaA  + tfsaContribA, tfsaRetA)
+    tfsaB   = grow(tfsaB  + tfsaContribB, tfsaRetB)
     nonRegA = grow(nonRegA + contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aAlive, inflFactor), nonRegRetA)
     nonRegB = grow(nonRegB + contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bAlive, inflFactor), nonRegRetB)
-    hisa   = grow(hisa, state.cash.hisaRatePct / 100)
+    hisa    = grow(hisa, state.cash.hisaRatePct / 100)
 
-    // ── Convert to present-day dollars ────────────────────────────────────────
+    // ── Convert to present-day dollars and emit DataPoint ────────────────────
     const pd = (n: number) => toPD(n, pi, yearsFromNow)
     const totalPortfolio = pd(rrspA + rrspB + tfsaA + tfsaB + nonRegA + nonRegB + hisa)
 

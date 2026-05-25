@@ -7,7 +7,7 @@ import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
-import { exactAgeAt, getYear, dateAtAge } from '../../engine/dates'
+import { exactAgeAt, getYear, dateAtAge, jan1 } from '../../engine/dates'
 import { DEFAULT_STATE } from '../../engine/defaults'
 import { rrifMinFactor } from '../../engine/tax'
 import { CHART_COLORS } from '../PaletteTab'
@@ -172,13 +172,13 @@ export function RRSPTab() {
     if (account.annualContribution > 0 && year <= endY) {
       const base = account.annualContribution * infl
       c += (account.contributionTiming === 'lump' || year < endY)
-        ? base : base * (new Date(account.contributionEndDate).getMonth() + 1) / 12
+        ? base : base * parseInt(account.contributionEndDate.substring(5, 7), 10) / 12
     }
     const endSY = getYear(account.spousalLastContributionDate)
     if (account.spousalAnnualContribution > 0 && year <= endSY) {
       const base = account.spousalAnnualContribution * infl
       c += (account.spousalContributionTiming === 'lump' || year < endSY)
-        ? base : base * (new Date(account.spousalLastContributionDate).getMonth() + 1) / 12
+        ? base : base * parseInt(account.spousalLastContributionDate.substring(5, 7), 10) / 12
     }
     return c
   }
@@ -186,8 +186,6 @@ export function RRSPTab() {
   const rrspAVals: number[] = [], rrspBVals: number[] = []
   let balA = rrspA.balance + rrspA.spousalBalance
   let balB = rrspB.balance + rrspB.spousalBalance
-  const rrifYearA = getYear(rrspA.rrifConversionDate)
-  const rrifYearB = getYear(rrspB.rrifConversionDate)
   for (const year of years) {
     const yp = year - currentYear
     const infl = Math.pow(1 + pi, yp)
@@ -199,7 +197,8 @@ export function RRSPTab() {
     const nomRet = (acct: RRSPAccount) => acct.returnRateOverrideEnabled ? acct.returnRateOverridePct / 100
       : age < 55 ? rates.upTo55 / 100 : age < 65 ? rates.from55to65 / 100
       : age < 70 ? rates.from65to70 / 100 : rates.from70plus / 100
-    const isRrifA = year >= rrifYearA, isRrifB = year >= rrifYearB
+    const isRrifA = jan1(year) >= rrspA.rrifConversionDate
+    const isRrifB = jan1(year) >= rrspB.rrifConversionDate
     const contribA = aAlive && !isRrifA ? rrspContrib(rrspA, year, infl) : 0
     const contribB = bAlive && !isRrifB ? rrspContrib(rrspB, year, infl) : 0
     const withA = isRrifA ? balA * rrifMinFactor(Math.floor(exactAgeAt(rrspA.useSpouseAgeForMinimums ? personB.birthDate : personA.birthDate, `${year}-01-01`))) + rrspA.additionalWithdrawalAboveMinimum * infl : 0

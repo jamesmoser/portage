@@ -8,7 +8,7 @@ import { ToggleInput } from '../../components/ToggleInput'
 import { PlotlyChart } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
 import { InfoPanel } from '../../components/InfoPanel'
-import { getYear, dateAtAge } from '../../engine/dates'
+import { getYear, dateAtAge, dateAtDecimalAge } from '../../engine/dates'
 import type { DBPension } from '../../engine/types'
 import { DEFAULT_STATE } from '../../engine/defaults'
 import { CHART_COLORS } from '../PaletteTab'
@@ -174,8 +174,8 @@ export function DBPensionTab() {
   const cpi = cpiRatePct / 100
   const currentYear = new Date().getFullYear()
 
-  const endYearA   = getYear(dateAtAge(personA.birthDate, personA.planningEndAge))
-  const endYearB   = getYear(dateAtAge(personB.birthDate, personB.planningEndAge))
+  const endYearA   = getYear(dateAtDecimalAge(personA.birthDate, personA.planningEndAge))
+  const endYearB   = getYear(dateAtDecimalAge(personB.birthDate, personB.planningEndAge))
   const maxEndYear = Math.max(endYearA, endYearB)
   const allYears   = Array.from({ length: maxEndYear - currentYear + 1 }, (_, i) => currentYear + i)
 
@@ -190,15 +190,34 @@ export function DBPensionTab() {
     return capOn && pension.cpiIndexingCap > 0 ? Math.min(rate, pension.cpiIndexingCap / 100) : rate
   }
 
+  // Count months in `year` where monthStart satisfies all active conditions.
+  // fromDate: source starts on or after this date (inclusive month-start check).
+  // untilDate: source ends before this date (exclusive). Pass null for no end.
+  // deathDate: person alive up to and including this date. Pass null for no death cap.
+  function monthFrac(year: number, fromDate: string | null, untilDate: string | null, death: string | null): number {
+    let n = 0
+    for (let m = 1; m <= 12; m++) {
+      const md = `${year}-${String(m).padStart(2, '0')}-01`
+      if (fromDate  && md < fromDate)  continue
+      if (untilDate && md >= untilDate) continue
+      if (death     && md > death)     continue
+      n++
+    }
+    return n / 12
+  }
+
   function buildEmploymentTrace(
     annualAmount: number, growthRatePct: number,
     retirementDate: string, color: string, label: string,
   ): Data {
     const retireYear = getYear(retirementDate)
     const g = growthRatePct / 100
-    const vals = allYears.map(y =>
-      y < retireYear ? pd(annualAmount * Math.pow(1 + g, y - currentYear), y) : 0
-    )
+    const vals = allYears.map(y => {
+      if (y > retireYear) return 0
+      const full = pd(annualAmount * Math.pow(1 + g, y - currentYear), y)
+      if (y < retireYear) return full
+      return full * monthFrac(y, null, retirementDate, null)
+    })
     return { x: allYears, y: vals, type: 'bar', name: label, marker: { color } }
   }
 
@@ -209,16 +228,19 @@ export function DBPensionTab() {
     if (!pension.enabled || pension.annualAmount === 0) return []
     const startYear  = getYear(pension.startDate)
     const bridgeEndY = getYear(pension.bridgeBenefitEndDate)
-    const endYear    = getYear(dateAtAge(birthDate, planEndAge))
+    const death      = dateAtDecimalAge(birthDate, planEndAge)
+    const endYear    = getYear(death)
     const ir         = pensionIndexRate(pension)
     const ltbVals: number[] = [], bridgeVals: number[] = []
     allYears.forEach(y => {
-      const active = y >= startYear && y <= endYear
-      const yop    = active ? Math.max(0, y - startYear) : 0
-      ltbVals.push(active ? pd(pension.annualAmount * Math.pow(1 + ir, yop), y) : 0)
+      if (y < startYear || y > endYear) { ltbVals.push(0); bridgeVals.push(0); return }
+      const yop      = Math.max(0, y - startYear)
+      const fullLtb  = pd(pension.annualAmount       * Math.pow(1 + ir, yop), y)
+      const fullBrg  = pd(pension.bridgeBenefitAmount * Math.pow(1 + ir, yop), y)
+      ltbVals.push(fullLtb * monthFrac(y, pension.startDate, null, death))
       bridgeVals.push(
-        active && y < bridgeEndY && pension.bridgeBenefitAmount > 0
-          ? pd(pension.bridgeBenefitAmount * Math.pow(1 + ir, yop), y)
+        pension.bridgeBenefitAmount > 0 && y <= bridgeEndY
+          ? fullBrg * monthFrac(y, pension.startDate, pension.bridgeBenefitEndDate, death)
           : 0
       )
     })

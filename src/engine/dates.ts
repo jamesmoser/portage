@@ -37,17 +37,28 @@ export function intAgeAt(birthDate: string, atDate: string): number {
   return age
 }
 
-/** ISO date string for the person's Nth birthday. */
+/** ISO date string for the person's Nth birthday (integer N only). */
 export function dateAtAge(birthDate: string, age: number): string {
   const birth = parseDate(birthDate)
   return formatDate(new Date(birth.getFullYear() + age, birth.getMonth(), birth.getDate()))
 }
 
 /**
- * ISO date string for the last day of a person's Nth year of life —
- * the day before their (N+1)th birthday.
- * "Plan to age 90" means alive through the entire 90th year, dying this date.
+ * ISO date string for a decimal age, interpolating between consecutive birthdays.
+ * 55.0 → exact 55th birthday. 55.5 → halfway between 55th and 56th birthday.
+ * This is the canonical way to convert any age (planning end, phase start, etc.) to a date.
  */
+export function dateAtDecimalAge(birthDate: string, age: number): string {
+  const whole = Math.floor(age)
+  const fraction = age - whole
+  if (fraction === 0) return dateAtAge(birthDate, whole)
+  const from = parseDate(dateAtAge(birthDate, whole))
+  const to   = parseDate(dateAtAge(birthDate, whole + 1))
+  const ms   = from.getTime() + fraction * (to.getTime() - from.getTime())
+  return formatDate(new Date(ms))
+}
+
+/** @deprecated Use dateAtDecimalAge(birth, planningEndAge) directly. */
 export function deathDate(birthDate: string, planningEndAge: number): string {
   const d = parseDate(dateAtAge(birthDate, planningEndAge + 1))
   d.setDate(d.getDate() - 1)

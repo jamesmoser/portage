@@ -11,15 +11,15 @@ import type { XAxisMode } from '../../components/XAxisSelector'
 import { runProjection } from '../../engine/projection'
 import type { AdditionalSpending, SpendingPhase } from '../../engine/types'
 import { DEFAULT_STATE } from '../../engine/defaults'
-import { exactAgeAt, deathDate, dateAtAge } from '../../engine/dates'
+import { exactAgeAt, dateAtDecimalAge } from '../../engine/dates'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
 function firstDeathAge(personA: { birthDate: string; planningEndAge: number }, personB: { birthDate: string; planningEndAge: number }, refPerson: { birthDate: string }): number {
-  const deathA = deathDate(personA.birthDate, personA.planningEndAge)
-  const deathB = deathDate(personB.birthDate, personB.planningEndAge)
+  const deathA = dateAtDecimalAge(personA.birthDate, personA.planningEndAge)
+  const deathB = dateAtDecimalAge(personB.birthDate, personB.planningEndAge)
   const firstDeath = deathA < deathB ? deathA : deathB
-  return Math.floor(exactAgeAt(refPerson.birthDate, firstDeath))
+  return Math.round(exactAgeAt(refPerson.birthDate, firstDeath) * 10) / 10
 }
 
 export function SpendingTab() {
@@ -67,8 +67,8 @@ export function SpendingTab() {
     update('additionalSpending', additionalSpending.filter(i => i.id !== id))
   }
 
-  const deathA = deathDate(personA.birthDate, personA.planningEndAge)
-  const deathB = deathDate(personB.birthDate, personB.planningEndAge)
+  const deathA = dateAtDecimalAge(personA.birthDate, personA.planningEndAge)
+  const deathB = dateAtDecimalAge(personB.birthDate, personB.planningEndAge)
   const firstToDisName = deathA <= deathB ? (personA.name || 'Person A') : (personB.name || 'Person B')
   const computedSurvivorAge = firstDeathAge(personA, personB, refPerson)
 
@@ -91,10 +91,10 @@ export function SpendingTab() {
         onReset={() => update('spendingPhases', DEFAULT_STATE.spendingPhases)}
         info={
           <div className="space-y-2">
-            <p>Define household spending for each life phase in today's dollars. The engine applies the phase whose start age ({refName}'s age) has been reached.</p>
+            <p>Define household spending for each life phase in today's dollars. The engine applies the phase whose start age ({refName}'s age) has been reached, switching mid-year on the exact birthday.</p>
             <p>Common framework: Go-Go (active travel), Slow-Go (home-focused), No-Go (care costs), Survivor (one person remaining).</p>
-            <p>Start ages are converted to the reference person's birthday on that date. The Survivor phase can be linked to the first death automatically.</p>
-            <p><strong>Real Growth Rate:</strong> how fast spending grows above inflation. At 0%, spending maintains constant purchasing power — the chart shows a flat line in today's dollars, but the plan requires increasing nominal dollars each year to keep pace with inflation. A positive rate means real spending grows (e.g. 1% = lifestyle creep).</p>
+            <p>Start ages use the decimal convention: 55.0 = {refName}'s 55th birthday, 55.5 = six months later. The Survivor phase can be linked to the first death automatically — the start age is computed from the death date.</p>
+            <p><strong>Real Growth Rate:</strong> how fast spending grows above inflation within the phase. At 0%, spending maintains constant purchasing power. Negative = spending declines in real terms (typical as activity slows). Positive = lifestyle creep.</p>
           </div>
         }>
 
@@ -124,9 +124,9 @@ export function SpendingTab() {
                   label={`Starts (${refName}'s Age)`}
                   value={linked ? computedSurvivorAge : phase.startAge}
                   onChange={v => updatePhase(phase.id, { startAge: v })}
-                  min={40} max={100} step={1} decimals={0} size="sm"
+                  min={40} max={100} step={0.5} decimals={1} size="sm"
                   disabled={linked}
-                  tooltip={linked ? "Automatically set to reference person's age at first death" : ''}
+                  tooltip={linked ? "Automatically set to reference person's age at first death" : '55.0 = 55th birthday · 55.5 = 6 months after 55th birthday'}
                 />
                 <NumberInput
                   label="Annual Spending"
@@ -194,8 +194,8 @@ export function SpendingTab() {
                 label={`${refName}'s Age`}
                 value={item.startAge}
                 onChange={v => updateItem(item.id, { startAge: v })}
-                min={40} max={110} step={1} decimals={0} size="sm"
-                tooltip={`Converts to ${refName}'s birthday at this age: ${dateAtAge(refPerson.birthDate, item.startAge)}`}
+                min={40} max={110} step={0.5} decimals={1} size="sm"
+                tooltip={`Converts to: ${dateAtDecimalAge(refPerson.birthDate, item.startAge)}`}
               />
               <ToggleInput
                 label={item.recurring ? 'Recurring' : 'One-time'}

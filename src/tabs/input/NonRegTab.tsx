@@ -144,7 +144,7 @@ export function NonRegTab() {
     if (year > endYear) return 0
     const base = account.annualContribution * infl
     return (account.contributionTiming === 'lump' || year < endYear)
-      ? base : base * (new Date(account.contributionEndDate).getMonth() + 1) / 12
+      ? base : base * parseInt(account.contributionEndDate.substring(5, 7), 10) / 12
   }
 
   const nonRegAVals: number[] = [], nonRegBVals: number[] = []

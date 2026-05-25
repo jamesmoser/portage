@@ -29,8 +29,8 @@ function PersonCard({
         <div className="space-y-2">
           <p>All dates in the plan are stored and calculated as exact calendar dates — ages are a display convenience only.</p>
           <p><strong>Retirement Date</strong> is the first full day of retirement. Income ceases the day before.</p>
-          <p><strong>Age at Death</strong> means this person is assumed to be alive throughout their entire Nth year of life, dying the day before their (N+1)th birthday. For example, "Age at Death: 90" sets the death date to the day before their 91st birthday — not their 90th birthday.</p>
-          <p>When an age is entered anywhere in the plan, it is converted to a date using this person's birth date as the reference point.</p>
+          <p><strong>Age at Death</strong> accepts one decimal place. The value maps directly to a date: 88.0 is the exact 88th birthday, 88.5 is halfway between the 88th and 89th birthdays, 88.9 is near the end of age 88. Income and spending are pro-rated to the month of death.</p>
+          <p>When an age is entered anywhere in the plan, it converts to a date using this person's birth date: 55.0 → their 55th birthday, 55.5 → six months after their 55th birthday, and so on.</p>
         </div>
       }>
       <div className="grid grid-cols-2 gap-3">
@@ -64,8 +64,8 @@ function PersonCard({
           tooltip="First full day of retirement" />
         <NumberInput label="Age at Death" value={person.planningEndAge}
           onChange={v => onChange({ ...person, planningEndAge: v })}
-          suffix="years" min={60} max={110} size="sm"
-          tooltip="Use a conservative (longer) estimate to stress-test longevity risk" />
+          suffix="years" min={60} max={110} step={0.5} decimals={1} size="sm"
+          tooltip="88.0 = dies on 88th birthday · 88.9 = near end of age 88. Use a conservative (longer) estimate to stress-test longevity risk." />
       </div>
 
       {/* Stats row */}
@@ -80,7 +80,7 @@ function PersonCard({
                 value: yearsToRetire <= 0 ? 'Retired' : yearsToRetire.toFixed(1),
                 highlight: yearsToRetire <= 0,
               },
-              { label: 'Years in Plan',        value: (person.planningEndAge - retAge).toFixed(1) },
+              { label: 'Years in Retirement',  value: (person.planningEndAge - retAge).toFixed(1) },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className="text-sm text-slate-500">{s.label}</div>
@@ -118,9 +118,9 @@ export function HouseholdTab() {
         onReset={() => update('ageReferencePerson', DEFAULT_STATE.ageReferencePerson)}
         info={
           <div className="space-y-2">
-            <p>The age reference person determines how age-based thresholds are applied throughout the plan — for example, portfolio return rate tiers, spending phase transitions, and healthcare escalation.</p>
-            <p>When you enter an age (e.g. "phase starts at 70"), the engine converts it to a date using the reference person's birth date: the event occurs on their 70th birthday.</p>
-            <p>The exception is <strong>Age at Death</strong>, which is converted to the day <em>before</em> their next birthday — so "age 90" means they are alive through their entire 90th year.</p>
+            <p>The age reference person determines how age-based thresholds are applied throughout the plan — for example, portfolio return rate tiers, spending phase transitions, and one-time spending items.</p>
+            <p>All ages in the plan use a consistent decimal convention: 55.0 is the exact 55th birthday of the relevant person, 55.5 is six months later, and so on. There are no exceptions — Age at Death, spending phase starts, and one-time item ages all follow the same rule.</p>
+            <p>Ages that reference this person (e.g. spending phase start ages, one-time spending) convert using the <em>reference person's</em> birth date. Ages specific to an individual (Age at Death, CPP start) always use that person's own birth date.</p>
             <p>Typically set to the older spouse, so age-tiered return rates reflect the household's shifting risk profile over time.</p>
           </div>
         }>
