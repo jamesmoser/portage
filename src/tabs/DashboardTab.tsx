@@ -45,6 +45,13 @@ type TableCol = {
   value: (d: DataPoint) => number
   format?: (v: number, d: DataPoint) => string
   className?: string
+  person?: 'A' | 'B'
+}
+
+function hexTint(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
+  if (!m) return 'transparent'
+  return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${alpha})`
 }
 
 const WITHDRAWAL_ORDER_OPTIONS: { value: string; label: string }[] = [
@@ -460,6 +467,7 @@ export function DashboardTab() {
   const [expandedTableGroups, setExpandedTableGroups] = useState<Set<TableGroupKey>>(new Set())
   const toggleTableGroup = (key: TableGroupKey) =>
     setExpandedTableGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
+  const [showPersonTint, setShowPersonTint] = useState(true)
 
   // ── Modal state ─────────────────────────────────────────────────────────────
   const [modalDef, setModalDef] = useState<ModalDef | null>(null)
@@ -615,58 +623,64 @@ export function DashboardTab() {
   const a = aName, b = bName   // short aliases for compact column label strings
 
   const yearTableCols: TableCol[] = yearOpen ? [
-    { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                          className: 'font-medium text-slate-700 text-left' },
-    { label: `Age — ${a}`, value: d => d.personAAge, format: (v, d) => d.year > endYearA ? `(${v.toFixed(1)})` : v.toFixed(1),            className: 'text-slate-600' },
-    { label: `Age — ${b}`, value: d => d.personBAge, format: (v, d) => d.year > endYearB ? `(${v.toFixed(1)})` : v.toFixed(1),            className: 'text-slate-600' },
+    { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                className: 'font-medium text-slate-700 text-left' },
+    { label: `Age — ${a}`, value: d => d.personAAge, format: (v, d) => d.year > endYearA ? `(${v.toFixed(1)})` : v.toFixed(1), className: 'text-slate-600', person: 'A' },
+    { label: `Age — ${b}`, value: d => d.personBAge, format: (v, d) => d.year > endYearB ? `(${v.toFixed(1)})` : v.toFixed(1), className: 'text-slate-600', person: 'B' },
   ] : [
-    { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                          className: 'font-medium text-slate-700 text-left' },
+    { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                className: 'font-medium text-slate-700 text-left' },
   ]
 
   const incomeTableCols: TableCol[] = incomeOpen ? [
-    { label: `Emp — ${a}`,    value: d => d.employmentA },
-    { label: `Emp — ${b}`,    value: d => d.employmentB },
-    { label: `DB — ${a}`,     value: d => d.dbPensionBase },
-    { label: `Bridge — ${a}`, value: d => d.dbBridge },
-    { label: `DB — ${b}`,     value: d => d.dbPensionBaseB },
-    { label: `Bridge — ${b}`, value: d => d.dbBridgeB },
-    { label: `CPP — ${a}`,    value: d => d.cppA },
-    { label: `CPP — ${b}`,    value: d => d.cppB },
-    { label: `OAS — ${a}`,    value: d => d.oasA },
-    { label: `OAS — ${b}`,    value: d => d.oasB },
-    { label: `RRIF — ${a}`,   value: d => d.rrifA },
-    { label: `RRIF — ${b}`,   value: d => d.rrifB },
-    { label: `TFSA — ${a}`,   value: d => d.tfsaWithdrawalA },
-    { label: `TFSA — ${b}`,   value: d => d.tfsaWithdrawalB },
-    { label: `NR — ${a}`,     value: d => d.nonRegWithdrawalA },
-    { label: `NR — ${b}`,     value: d => d.nonRegWithdrawalB },
-    { label: `Other — ${a}`,  value: d => d.otherIncomeA },
-    { label: `Other — ${b}`,  value: d => d.otherIncomeB },
+    { label: `Emp — ${a}`,    value: d => d.employmentA,       person: 'A' },
+    { label: `Emp — ${b}`,    value: d => d.employmentB,       person: 'B' },
+    { label: `DB — ${a}`,     value: d => d.dbPensionBase,     person: 'A' },
+    { label: `Bridge — ${a}`, value: d => d.dbBridge,          person: 'A' },
+    { label: `DB — ${b}`,     value: d => d.dbPensionBaseB,    person: 'B' },
+    { label: `Bridge — ${b}`, value: d => d.dbBridgeB,         person: 'B' },
+    { label: `CPP — ${a}`,    value: d => d.cppA,              person: 'A' },
+    { label: `CPP — ${b}`,    value: d => d.cppB,              person: 'B' },
+    { label: `OAS — ${a}`,    value: d => d.oasA,              person: 'A' },
+    { label: `OAS — ${b}`,    value: d => d.oasB,              person: 'B' },
+    { label: `RRIF — ${a}`,   value: d => d.rrifA,             person: 'A' },
+    { label: `RRIF — ${b}`,   value: d => d.rrifB,             person: 'B' },
+    { label: `TFSA — ${a}`,   value: d => d.tfsaWithdrawalA,   person: 'A' },
+    { label: `TFSA — ${b}`,   value: d => d.tfsaWithdrawalB,   person: 'B' },
+    { label: `NR — ${a}`,     value: d => d.nonRegWithdrawalA, person: 'A' },
+    { label: `NR — ${b}`,     value: d => d.nonRegWithdrawalB, person: 'B' },
+    { label: `Other — ${a}`,  value: d => d.otherIncomeA,      person: 'A' },
+    { label: `Other — ${b}`,  value: d => d.otherIncomeB,      person: 'B' },
   ] : [
-    { label: `Gross — ${a}`, value: d => d.grossIncomeA },
-    { label: `Gross — ${b}`, value: d => d.grossIncomeB },
+    { label: `Gross — ${a}`, value: d => d.grossIncomeA, person: 'A' },
+    { label: `Gross — ${b}`, value: d => d.grossIncomeB, person: 'B' },
   ]
 
   const taxTableCols: TableCol[] = taxOpen ? [
-    { label: `Tax — ${a}`,      value: d => d.taxA },
-    { label: `Tax — ${b}`,      value: d => d.taxB },
-    { label: `Clawback — ${a}`, value: d => d.oasClawbackA },
-    { label: `Clawback — ${b}`, value: d => d.oasClawbackB },
+    { label: `Tax — ${a}`,      value: d => d.taxA,          person: 'A' },
+    { label: `Tax — ${b}`,      value: d => d.taxB,          person: 'B' },
+    { label: `Clawback — ${a}`, value: d => d.oasClawbackA,  person: 'A' },
+    { label: `Clawback — ${b}`, value: d => d.oasClawbackB,  person: 'B' },
   ] : [
-    { label: `Tax — ${a}`, value: d => d.taxA },
-    { label: `Tax — ${b}`, value: d => d.taxB },
+    { label: `Tax — ${a}`, value: d => d.taxA, person: 'A' },
+    { label: `Tax — ${b}`, value: d => d.taxB, person: 'B' },
   ]
 
   const portfolioTableCols: TableCol[] = portfolioOpen ? [
-    { label: `RRSP — ${a}`, value: d => d.rrspA },
-    { label: `RRSP — ${b}`, value: d => d.rrspB },
-    { label: `TFSA — ${a}`, value: d => d.tfsaA },
-    { label: `TFSA — ${b}`, value: d => d.tfsaB },
-    { label: `NR — ${a}`,   value: d => d.nonRegA },
-    { label: `NR — ${b}`,   value: d => d.nonRegB },
+    { label: `RRSP — ${a}`, value: d => d.rrspA,   person: 'A' },
+    { label: `RRSP — ${b}`, value: d => d.rrspB,   person: 'B' },
+    { label: `TFSA — ${a}`, value: d => d.tfsaA,   person: 'A' },
+    { label: `TFSA — ${b}`, value: d => d.tfsaB,   person: 'B' },
+    { label: `NR — ${a}`,   value: d => d.nonRegA,  person: 'A' },
+    { label: `NR — ${b}`,   value: d => d.nonRegB,  person: 'B' },
     { label: 'HISA',         value: d => d.hisa },
   ] : [
     { label: 'Total', value: d => d.totalPortfolio },
   ]
+
+  const colTint = (col: TableCol, rowIdx: number) => {
+    if (!showPersonTint || !col.person) return {}
+    const hex = col.person === 'A' ? personA.color : personB.color
+    return { backgroundColor: hexTint(hex, rowIdx % 2 === 0 ? 0.10 : 0.14) }
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1609,7 +1623,20 @@ export function DashboardTab() {
       </SectionCard>
 
       {/* ── Annual Summary Table ───────────────────────────────────────────── */}
-      <SectionCard title="Annual Summary Table" width="full">
+      <SectionCard title="Annual Summary Table" width="full"
+        headerRight={
+          <button
+            onClick={() => setShowPersonTint(v => !v)}
+            title={showPersonTint ? 'Hide person colours' : 'Show person colours'}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs transition-colors ${
+              showPersonTint ? 'text-white border-[#7B1515]' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
+            }`}
+            style={showPersonTint ? { backgroundColor: '#7B1515' } : {}}
+          >
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: showPersonTint ? 'rgba(255,255,255,0.65)' : hexTint(personA.color, 1) }} />
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: showPersonTint ? 'rgba(255,255,255,0.65)' : hexTint(personB.color, 1) }} />
+          </button>
+        }>
         <div className="overflow-x-auto">
           <table className="text-xs border-collapse">
             <thead>
@@ -1663,15 +1690,15 @@ export function DashboardTab() {
               {dataPoints.map((d, i) => (
                 <tr key={d.year} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                   {yearTableCols.map(col => (
-                    <td key={col.label} className={`px-2 py-1 border border-slate-100 ${col.className ?? 'text-right'}`}>
+                    <td key={col.label} className={`px-2 py-1 border border-slate-100 ${col.className ?? 'text-right'}`} style={colTint(col, i)}>
                       {col.format ? col.format(col.value(d), d) : fmtT(col.value(d))}
                     </td>
                   ))}
                   {incomeTableCols.map(col => (
-                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right">{fmtT(col.value(d))}</td>
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
                   ))}
                   {taxTableCols.map(col => (
-                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right text-red-600">{fmtT(col.value(d))}</td>
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right text-red-600" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
                   ))}
                   <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt(d.totalHouseholdNet)}</td>
                   <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.householdSpending)}</td>
@@ -1679,7 +1706,7 @@ export function DashboardTab() {
                     {fmt(d.cashFlow)}
                   </td>
                   {portfolioTableCols.map(col => (
-                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right">{fmtT(col.value(d))}</td>
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
                   ))}
                 </tr>
               ))}
