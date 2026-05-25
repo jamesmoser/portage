@@ -1263,14 +1263,7 @@ export function DashboardTab() {
         </div>
       </SectionCard>
 
-      {/* ── Projection warnings ────────────────────────────────────────────── */}
-      {warnings.length > 0 && (
-        <div className="p-3 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800 space-y-1">
-          <p className="font-semibold">Projection warnings:</p>
-          {warnings.slice(0, 5).map((w, i) => <p key={i}>• {w}</p>)}
-          {warnings.length > 5 && <p>…and {warnings.length - 5} more</p>}
-        </div>
-      )}
+
 
       {/* ── Charts ────────────────────────────────────────────────────────── */}
       <SectionCard title="Household Income by Source — Present-Day Dollars" width="full"
