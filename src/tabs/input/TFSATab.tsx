@@ -29,6 +29,10 @@ function TFSASection({ label, account, birthDate, planningEndAge, retirementDate
   const infoModal = (
     <div className="space-y-3 text-sm">
       <div>
+        <p className="font-semibold mb-1">Contributions and Cash Flow</p>
+        <p>Annual TFSA contributions are <strong>not</strong> included in your spending profile — they are added on top as a separate cash outflow. Your spending phases should reflect lifestyle costs only. The Spending Breakdown chart on the Dashboard shows contributions as a distinct segment. This correctly models the RRSP meltdown strategy: extra RRSP withdrawals fund both lifestyle spending and TFSA contributions, with the net cash flow reflecting the true movement of money.</p>
+      </div>
+      <div>
         <p className="font-semibold mb-1">Tax-Free Savings Account</p>
         <p>All growth inside a TFSA is tax-free, and withdrawals are never added to taxable income. This means TFSA withdrawals have no impact on income-tested benefits such as OAS, GIS, or the Age Amount — making them the most tax-efficient source of retirement income.</p>
       </div>

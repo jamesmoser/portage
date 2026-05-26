@@ -410,15 +410,22 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
 
     // ── Additional spending items (annual — one-time or recurring from a start age) ──
     // Pro-rate by alive months so the final year of the plan isn't inflated.
+    // Items injected by what-if modifiers (id prefix 'whatif-') are tracked separately.
     const aliveMonthFrac = aliveMonths / 12
+    let unexpectedSpend_nom = 0
     for (const item of state.additionalSpending) {
       const itemDate = dateAtDecimalAge(refBirth, item.startAge)
-      if (item.recurring) {
-        if (jan1(year) >= itemDate) spending_nom += item.amount * inflFactor * aliveMonthFrac
+      const active = item.recurring ? jan1(year) >= itemDate : getYear(itemDate) === year
+      if (!active) continue
+      const amt = item.amount * inflFactor * aliveMonthFrac
+      if (item.id.startsWith('whatif-')) {
+        unexpectedSpend_nom += amt
       } else {
-        if (getYear(itemDate) === year) spending_nom += item.amount * inflFactor * aliveMonthFrac
+        spending_nom += amt
       }
     }
+    const spendingLifestyle_nom = spending_nom  // phases + regular additional, before contributions
+    spending_nom += unexpectedSpend_nom
 
     // ── Tax with pension splitting ────────────────────────────────────────────
     const taxInputA: TaxInput = {
@@ -468,6 +475,19 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const nonRegYieldB = bAlive ? nonRegDivEligB_nom + nonRegForeignB_nom : 0
     const totalNetNom = (aAlive ? taxA.netAfterTax - nonRegYieldA + otherNonTaxA_nom : 0)
                       + (bAlive ? taxB.netAfterTax - nonRegYieldB + otherNonTaxB_nom : 0)
+
+    // ── Contributions — computed here so they can be added to spending_nom ──────
+    // Contributions are real cash outflows (money leaving the household and going
+    // into investment accounts). Including them in spending gives an accurate
+    // cash flow: income - lifestyle spending - contributions = true surplus/deficit.
+    const tfsaContribA  = tfsaContribNom(state.tfsaA,  year, aAlive, inflFactor)
+    const tfsaContribB  = tfsaContribNom(state.tfsaB,  year, bAlive, inflFactor)
+    const rrspContribA  = rrspContribNom(state.rrspA,  year, aAlive, isRrifA, inflFactor)
+    const rrspContribB  = rrspContribNom(state.rrspB,  year, bAlive, isRrifB, inflFactor)
+    const nonRegContribA = contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aAlive, inflFactor)
+    const nonRegContribB = contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bAlive, inflFactor)
+    const totalContribs_nom = rrspContribA + rrspContribB + tfsaContribA + tfsaContribB + nonRegContribA + nonRegContribB
+    spending_nom += totalContribs_nom
 
     // ── Gap fill / account draws ──────────────────────────────────────────────
     let tfsaWithdrawA = 0, tfsaWithdrawB = 0
@@ -568,17 +588,12 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const tfsaRetA = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
     const tfsaRetB = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
 
-    const tfsaContribA = tfsaContribNom(state.tfsaA, year, aAlive, inflFactor)
-    const tfsaContribB = tfsaContribNom(state.tfsaB, year, bAlive, inflFactor)
-    const rrspContribA = rrspContribNom(state.rrspA, year, aAlive, isRrifA, inflFactor)
-    const rrspContribB = rrspContribNom(state.rrspB, year, bAlive, isRrifB, inflFactor)
-
     rrspA   = grow(Math.max(0, rrspA  + rrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
     rrspB   = grow(Math.max(0, rrspB  + rrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
     tfsaA   = grow(tfsaA  + tfsaContribA, tfsaRetA)
     tfsaB   = grow(tfsaB  + tfsaContribB, tfsaRetB)
-    nonRegA = grow(nonRegA + contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aAlive, inflFactor), nonRegRetA)
-    nonRegB = grow(nonRegB + contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bAlive, inflFactor), nonRegRetB)
+    nonRegA = grow(nonRegA + nonRegContribA, nonRegRetA)
+    nonRegB = grow(nonRegB + nonRegContribB, nonRegRetB)
     hisa    = grow(hisa, state.cash.hisaRatePct / 100)
 
     // ── Convert to present-day dollars and emit DataPoint ────────────────────
@@ -624,8 +639,11 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       effectiveTaxRateA: aAlive ? taxA.effectiveRate : 0,
       effectiveTaxRateB: bAlive ? taxB.effectiveRate : 0,
 
-      householdSpending: pd(spending_nom),
-      cashFlow:          pd(totalNetNom + proactiveExtra - spending_nom),
+      householdSpending:  pd(spending_nom),
+      spendingLifestyle:  pd(spendingLifestyle_nom),
+      contributions:      pd(totalContribs_nom),
+      spendingUnexpected: pd(unexpectedSpend_nom),
+      cashFlow:           pd(totalNetNom + proactiveExtra - spending_nom),
 
       rrspA:  pd(rrspA),
       rrspB:  pd(rrspB),

@@ -548,6 +548,7 @@ export function DashboardTab() {
 
   const [xAxisModeIncome,    setXAxisModeIncome]    = useState<XAxisMode>('year')
   const [xAxisModeTax,       setXAxisModeTax]       = useState<XAxisMode>('year')
+  const [xAxisModeSpending,  setXAxisModeSpending]  = useState<XAxisMode>('year')
   const [xAxisModePortfolio, setXAxisModePortfolio] = useState<XAxisMode>('year')
 
   type IncomeMode   = 'gross' | 'net'
@@ -665,6 +666,7 @@ export function DashboardTab() {
   const years = dataPoints.map(d => d.year)
   const xAxisIncome    = buildXAxis(years, xAxisModeIncome,    effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
   const xAxisTax       = buildXAxis(years, xAxisModeTax,       effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
+  const xAxisSpending  = buildXAxis(years, xAxisModeSpending,  effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
   const xAxisPortfolio = buildXAxis(years, xAxisModePortfolio, effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
 
   // ── Frozen metric helpers ─────────────────────────────────────────────────
@@ -728,6 +730,12 @@ export function DashboardTab() {
   const taxData: Data[] = withTotals(
     allTaxSeries.filter(s => taxPerson === 'both' || s._p === taxPerson)
   )
+
+  const spendingData: Data[] = withTotals([
+    { x: years, y: dataPoints.map(d => d.spendingLifestyle),  name: 'Lifestyle',         type: 'bar', marker: { color: '#64748b' } },
+    { x: years, y: dataPoints.map(d => d.contributions),      name: 'Contributions',     type: 'bar', marker: { color: '#3b82f6' } },
+    { x: years, y: dataPoints.map(d => d.spendingUnexpected), name: 'Unexpected Expense',type: 'bar', marker: { color: '#f59e0b' } },
+  ])
 
   const allPortfolioSeries: Data[] = [
     { x: years, y: dataPoints.map(d => d.rrspA),   name: `${aName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifA }, _p: 'A', _acct: 'rrif'   },
@@ -1976,6 +1984,22 @@ export function DashboardTab() {
         />
         <XAxisSelector value={xAxisModeTax} onChange={setXAxisModeTax} aName={aName} bName={bName} />
         <ChartLegend data={taxData} />
+      </SectionCard>
+
+      <SectionCard title="Spending Breakdown" width="full"
+        onReset={() => setXAxisModeSpending('year')}
+        info="Annual household spending in today's dollars, split into three components. Lifestyle = spending phases and planned additional spending. Contributions = RRSP, TFSA, and non-registered contributions (both people) — these are real cash outflows, not included in the spending profile. Unexpected Expense = one-shot modifier only.">
+        <PlotlyChart
+          data={spendingData}
+          layout={{
+            barmode: 'stack',
+            yaxis: { title: { text: 'Spending ($)', font: { size: 11 } }, tickformat: ',.0f' },
+            xaxis: { ...xAxisSpending },
+          }}
+          style={{ height: 320 }}
+        />
+        <XAxisSelector value={xAxisModeSpending} onChange={setXAxisModeSpending} aName={aName} bName={bName} />
+        <ChartLegend data={spendingData} />
       </SectionCard>
 
       <SectionCard title="Portfolio Balances" width="full"

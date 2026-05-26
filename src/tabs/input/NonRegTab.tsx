@@ -29,6 +29,10 @@ function NonRegSection({ label, account, birthDate, planningEndAge, retirementDa
   const infoModal = (
     <div className="space-y-3 text-sm">
       <div>
+        <p className="font-semibold mb-1">Contributions and Cash Flow</p>
+        <p>Annual non-registered contributions are <strong>not</strong> included in your spending profile — they are added on top as a separate cash outflow. Your spending phases should reflect lifestyle costs only. The Spending Breakdown chart on the Dashboard shows contributions as a distinct segment alongside lifestyle spending.</p>
+      </div>
+      <div>
         <p className="font-semibold mb-1">Non-Registered Account</p>
         <p>A non-registered account has no contribution limits and no tax shelter. Growth is partially taxable each year through dividends and interest, and capital gains are realized when you sell or withdraw. This makes it the least tax-efficient account, but it's also the most flexible — no limits on contributions, withdrawals, or investment type.</p>
       </div>

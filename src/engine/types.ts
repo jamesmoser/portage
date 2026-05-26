@@ -432,8 +432,11 @@ export interface DataPoint {
   effectiveTaxRateB: number
 
   // Spending (present-day dollars)
-  householdSpending: number
-  cashFlow: number            // totalHouseholdNet - householdSpending
+  householdSpending:  number   // total: lifestyle + contributions + unexpected expense
+  spendingLifestyle:  number   // spending phases + regular additional spending items only
+  contributions:      number   // total RRSP + TFSA + non-reg contributions (both people)
+  spendingUnexpected: number   // what-if unexpected expense only
+  cashFlow: number             // totalHouseholdNet - householdSpending
 
   // Account balances end-of-year (present-day dollars)
   rrspA: number

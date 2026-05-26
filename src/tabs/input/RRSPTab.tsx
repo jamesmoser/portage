@@ -37,6 +37,10 @@ function RRSPSection({ label, account, birthDate, retirementDate, spouseName, on
   const infoModal = (
     <div className="space-y-3 text-sm">
       <div>
+        <p className="font-semibold mb-1">Contributions and Cash Flow</p>
+        <p>Annual RRSP contributions are <strong>not</strong> included in your spending profile — they are added on top as a separate cash outflow. This means your spending phases should reflect lifestyle costs only. The Spending Breakdown chart on the Dashboard shows contributions as a distinct segment alongside lifestyle spending.</p>
+      </div>
+      <div>
         <p className="font-semibold mb-1">Spousal RRSP</p>
         <p>You are the contributor — withdrawals use your contribution room. {spouseName} is the annuitant and reports withdrawals as their income, which is useful if they will be in a lower bracket in retirement. The <strong>3-year attribution rule</strong> applies: withdrawals within 3 calendar years of your last contribution are attributed back to you for tax purposes, not {spouseName}.</p>
       </div>
