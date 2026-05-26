@@ -1094,11 +1094,7 @@ export function DashboardTab() {
                           onChange={v => setMarketProfile({ profileType: v as MarketProfileType })}
                           options={MARKET_PROFILE_OPTIONS}
                         />
-                      ) : (
-                        <span className="text-xs text-slate-400">
-                          Base: <span className="font-medium text-slate-500">Step tiers</span>
-                        </span>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* Sub-controls — only when enabled */}
