@@ -274,6 +274,7 @@ export interface WhatIf<T> {
 export interface WhatIfs {
   returnRateOffset:  WhatIf<number>              // ±% added to all return rate tiers
   inflationRate:     WhatIf<number>              // personal inflation rate override
+  cpiRate:           WhatIf<number>              // CPI rate override (indexes tax brackets, CPP/OAS, DB pension)
   longevityA:        WhatIf<number>              // planning end age override
   longevityB:        WhatIf<number>
   cppStartAgeA:      WhatIf<number>              // CPP start age (60–70)

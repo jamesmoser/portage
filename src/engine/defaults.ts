@@ -74,6 +74,7 @@ const retireB = dateAtAge(birthB, 53)
 export const DEFAULT_WHATIFS: WhatIfs = {
   returnRateOffset:  { enabled: false, value: 0 },
   inflationRate:     { enabled: false, value: 3.0 },
+  cpiRate:           { enabled: false, value: 2.0 },
   longevityA:        { enabled: false, value: 92 },
   longevityB:        { enabled: false, value: 95 },
   cppStartAgeA:      { enabled: false, value: 65 },

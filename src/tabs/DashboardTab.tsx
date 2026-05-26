@@ -429,7 +429,7 @@ export function DashboardTab() {
     updateWhatIf, resetWhatIfs, freezeMetrics, clearFreeze,
     saveScenario, loadScenario, deleteScenario,
     personA, personB, cppA, cppB, oasA, oasB,
-    returnRates, personalInflationRatePct, withdrawalStrategy,
+    returnRates, personalInflationRatePct, cpiRatePct, withdrawalStrategy,
     ageReferencePerson,
   } = state
 
@@ -1137,16 +1137,25 @@ export function DashboardTab() {
                   </div>
                 )
               })()}
-              <WhatIfRow
+            </WhatIfSection>
+
+            <WhatIfSection title="Inflation">
+              <WhatIfSlider
+                label="Personal Inflation"
+                min={0} max={10} step={0.25} baseValue={personalInflationRatePct}
+                value={whatIfs.inflationRate.enabled ? whatIfs.inflationRate.value : personalInflationRatePct}
                 enabled={whatIfs.inflationRate.enabled}
-                onToggle={v => updateWhatIf('inflationRate', { enabled: v, value: v ? personalInflationRatePct : whatIfs.inflationRate.value })}
-                label="Personal Inflation Rate"
-                baseLabel={`${personalInflationRatePct}%`}
-              >
-                <NumberInput label="" value={whatIfs.inflationRate.value}
-                  onChange={v => updateWhatIf('inflationRate', { value: v })}
-                  suffix="% / year" min={0} max={20} step={0.25} decimals={2} size="sm" />
-              </WhatIfRow>
+                onChange={(v, active) => updateWhatIf('inflationRate', { enabled: active, value: v })}
+                valueSuffix="%"
+              />
+              <WhatIfSlider
+                label="CPI Rate"
+                min={0} max={10} step={0.25} baseValue={cpiRatePct}
+                value={whatIfs.cpiRate?.enabled ? whatIfs.cpiRate.value : cpiRatePct}
+                enabled={whatIfs.cpiRate?.enabled ?? false}
+                onChange={(v, active) => updateWhatIf('cpiRate', { enabled: active, value: v })}
+                valueSuffix="%"
+              />
             </WhatIfSection>
 
             <WhatIfSection title="Longevity">

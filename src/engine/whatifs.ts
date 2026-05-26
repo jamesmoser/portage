@@ -26,6 +26,10 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     s = { ...s, personalInflationRatePct: wi.inflationRate.value }
   }
 
+  if (wi.cpiRate?.enabled) {
+    s = { ...s, cpiRatePct: wi.cpiRate.value }
+  }
+
   if (wi.longevityA.enabled) {
     s = { ...s, personA: { ...s.personA, planningEndAge: wi.longevityA.value } }
   }
