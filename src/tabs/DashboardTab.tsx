@@ -1113,14 +1113,14 @@ export function DashboardTab() {
                           valueSuffix="x"
                         />
                         {isCyclical && (
-                          <div className="flex items-center gap-3 px-3 py-2 border-t border-slate-100">
-                            <span className="text-sm text-slate-600 w-52 shrink-0">Cycle Period</span>
-                            <NumberInput
-                              label="" value={mValue.cyclePeriodYears}
-                              onChange={v => setMarketProfile({ cyclePeriodYears: v })}
-                              min={2} max={30} step={1} decimals={0} size="sm" suffix="years"
-                            />
-                          </div>
+                          <WhatIfSlider
+                            label="Cycle Period"
+                            min={1} max={20} step={1} baseValue={10}
+                            value={mValue.cyclePeriodYears}
+                            enabled={mValue.cyclePeriodYears !== 10}
+                            onChange={v => setMarketProfile({ cyclePeriodYears: v })}
+                            valueSuffix="yr"
+                          />
                         )}
                         {mValue.profileType === 'noise' && (
                           <div className="px-3 py-2 border-t border-slate-100">
