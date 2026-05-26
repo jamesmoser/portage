@@ -29,22 +29,28 @@ export function generateRateSchedule(
 
   const peak = Math.max(baseRates.upTo55, baseRates.from55to65, baseRates.from65to70, baseRates.from70plus)
   const low  = Math.min(baseRates.upTo55, baseRates.from55to65, baseRates.from65to70, baseRates.from70plus)
-  const mid  = (peak + low) / 2
   const amp  = (peak - low) / 2
   const n    = Math.max(1, endYear - startYear + 1)
   const rand = seededRand(noiseSeed)
 
+  // Compute mid as the time-weighted average of the base step schedule so that
+  // all shaped profiles have the same expected average return as the base plan.
+  // This isolates sequencing as the only variable when comparing profiles.
+  function stepRate(i: number): number {
+    const age = exactAgeAt(refBirthDate, jan1(startYear + i))
+    if (age < 55)       return baseRates.upTo55
+    else if (age < 65)  return baseRates.from55to65
+    else if (age < 70)  return baseRates.from65to70
+    else                return baseRates.from70plus
+  }
+  const mid = Array.from({ length: n }, (_, i) => stepRate(i)).reduce((a, b) => a + b, 0) / n
+
   return Array.from({ length: n }, (_, i) => {
     let pct: number
     switch (profileType) {
-      case 'step': {
-        const age = exactAgeAt(refBirthDate, jan1(startYear + i))
-        if (age < 55)       pct = baseRates.upTo55
-        else if (age < 65)  pct = baseRates.from55to65
-        else if (age < 70)  pct = baseRates.from65to70
-        else                pct = baseRates.from70plus
+      case 'step':
+        pct = stepRate(i)
         break
-      }
       case 'frontLoaded':
         pct = n > 1 ? peak - (peak - low) * i / (n - 1) : mid
         break
@@ -64,7 +70,7 @@ export function generateRateSchedule(
     }
     // Beta scales deviations around mid (amplitude control).
     // beta=1: unchanged. beta=2: double swing. beta=0: flat line at mid.
-    // Outlook shifts the entire curve up/down.
+    // Outlook shifts the entire curve up/down after beta scaling.
     return (mid + (pct - mid) * beta + outlookOffset) / 100
   })
 }
