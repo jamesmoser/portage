@@ -146,26 +146,60 @@ export function computeHeadlineMetrics(
   const baseOASA = state.oasA.estimatedMonthlyAt65 * 12
   const baseOASB = state.oasB.estimatedMonthlyAt65 * 12
 
+  const a65 = dateAtAge(state.personA.birthDate, 65)
+  const b65 = dateAtAge(state.personB.birthDate, 65)
+  const dA  = dateAtAge(state.personA.birthDate, state.personA.planningEndAge)
+  const dB  = dateAtAge(state.personB.birthDate, state.personB.planningEndAge)
+
+  // Count months in a year where '${year}-MM-01' falls in [startDate, endDate].
+  // Mirrors the engine's monthly loop: income flows when monthDate >= startDate && <= endDate.
+  function activeFrac(year: number, startDate: string, endDate: string): number {
+    let count = 0
+    for (let m = 1; m <= 12; m++) {
+      const md = `${year}-${String(m).padStart(2, '0')}-01`
+      if (md >= startDate && md <= endDate) count++
+    }
+    return count / 12
+  }
+  // Count months in a year where '${year}-MM-01' <= date (no lower bound).
+  // Used to compute the post-death survivor fraction within the death year itself.
+  function monthFracUpTo(year: number, date: string): number {
+    let count = 0
+    for (let m = 1; m <= 12; m++) {
+      if (`${year}-${String(m).padStart(2, '0')}-01` <= date) count++
+    }
+    return count / 12
+  }
+
   let baseCPP65 = 0, baseOAS65 = 0
   for (const d of dataPoints) {
     const pdFactor = Math.pow((1 + cpi) / (1 + pi), d.year - currentYear)
     const aAlive = d.year <= endYearA
     const bAlive = d.year <= endYearB
-    // Use exact date comparison to mirror the engine's onOrAfter(dateStr, startDate) logic.
-    // d.date is Jan 1 of the year; dateAtAge returns the exact Nth birthday.
-    const aAge65 = onOrAfter(d.date, dateAtAge(state.personA.birthDate, 65))
-    const bAge65 = onOrAfter(d.date, dateAtAge(state.personB.birthDate, 65))
 
-    // CPP: own collection while alive + 60% survivor benefit to the other person
-    // (mirrors the engine logic in projection.ts lines 187–194)
-    if (aAlive && aAge65)          baseCPP65 += baseCPPA        * pdFactor
-    else if (!aAlive && bAlive && aAge65) baseCPP65 += baseCPPA * 0.60 * pdFactor
-    if (bAlive && bAge65)          baseCPP65 += baseCPPB        * pdFactor
-    else if (!bAlive && aAlive && bAge65) baseCPP65 += baseCPPB * 0.60 * pdFactor
+    // A's own CPP at 65, pro-rated for start year and death year
+    if (aAlive) baseCPP65 += baseCPPA * activeFrac(d.year, a65, dA) * pdFactor
+    // B's survivor CPP from A: full years after A's death
+    if (!aAlive && bAlive) baseCPP65 += baseCPPA * 0.60 * activeFrac(d.year, a65, dB) * pdFactor
+    // B's survivor CPP from A: partial months within A's death year (post-death months)
+    if (d.year === endYearA && bAlive) {
+      const survFrac = monthFracUpTo(d.year, dB) - monthFracUpTo(d.year, dA)
+      if (survFrac > 0) baseCPP65 += baseCPPA * 0.60 * survFrac * pdFactor
+    }
 
-    // OAS: own collection only (no survivor benefit in the model)
-    if (aAlive && aAge65) baseOAS65 += baseOASA * pdFactor
-    if (bAlive && bAge65) baseOAS65 += baseOASB * pdFactor
+    // B's own CPP at 65, pro-rated
+    if (bAlive) baseCPP65 += baseCPPB * activeFrac(d.year, b65, dB) * pdFactor
+    // A's survivor CPP from B: full years after B's death
+    if (!bAlive && aAlive) baseCPP65 += baseCPPB * 0.60 * activeFrac(d.year, b65, dA) * pdFactor
+    // A's survivor CPP from B: partial months within B's death year (post-death months)
+    if (d.year === endYearB && aAlive) {
+      const survFrac = monthFracUpTo(d.year, dA) - monthFracUpTo(d.year, dB)
+      if (survFrac > 0) baseCPP65 += baseCPPB * 0.60 * survFrac * pdFactor
+    }
+
+    // OAS: own collection only, pro-rated for start and death years
+    if (aAlive) baseOAS65 += baseOASA * activeFrac(d.year, a65, dA) * pdFactor
+    if (bAlive) baseOAS65 += baseOASB * activeFrac(d.year, b65, dB) * pdFactor
   }
   const cppVs65 = totalCPPCollected - baseCPP65
   const oasVs65 = totalOASCollected - baseOAS65

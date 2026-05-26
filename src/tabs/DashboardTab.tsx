@@ -8,7 +8,7 @@ import { PlotlyChart, withTotals } from '../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelector'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
-import { exactAgeAt, getYear, dateAtAge, onOrAfter } from '../engine/dates'
+import { exactAgeAt, getYear, dateAtAge } from '../engine/dates'
 import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint } from '../engine/types'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,9 +35,14 @@ type ModalDef = {
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 const _fmtObj = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
-const fmt    = (v: number) => _fmtObj.format(v)
-const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
-const fmtT   = (v: number) => Math.abs(v) < 0.5 ? '—' : fmt(v)   // dash for zero in table cells
+const fmt      = (v: number) => _fmtObj.format(v)
+const fmtPct   = (v: number) => `${(v * 100).toFixed(1)}%`
+const fmtT     = (v: number) => Math.abs(v) < 0.5 ? '—' : fmt(v)   // dash for zero in table cells
+// Values between -1 and +1 are treated as exactly $0 to avoid rounding noise.
+const NEAR_ZERO = 1
+const fmtSigned = (v: number) => Math.abs(v) < NEAR_ZERO ? fmt(0) : (v >= 0 ? '+' : '') + fmt(v)
+const fmtFlow   = (v: number) => Math.abs(v) < NEAR_ZERO ? fmt(0) : fmt(v)
+const flowColor = (v: number) => v < -NEAR_ZERO ? 'text-red-600' : v > NEAR_ZERO ? 'text-green-700' : ''
 
 type TableGroupKey = 'year' | 'income' | 'tax' | 'portfolio'
 type TableCol = {
@@ -332,9 +337,10 @@ function MetricCard({ label, value, sub, frozen, betterWhenHigher = true, onClic
   betterWhenHigher?: boolean
   onClick?: () => void
 }) {
-  const isBetter = frozen != null && (betterWhenHigher ? frozen.numericDelta > 0 : frozen.numericDelta < 0)
-  const isWorse  = frozen != null && (betterWhenHigher ? frozen.numericDelta < 0 : frozen.numericDelta > 0)
-  const arrow    = frozen != null && frozen.numericDelta !== 0 ? (frozen.numericDelta > 0 ? '▲' : '▼') : null
+  const sig      = frozen != null && Math.abs(frozen.numericDelta) >= NEAR_ZERO
+  const isBetter = sig && (betterWhenHigher ? frozen!.numericDelta > 0 : frozen!.numericDelta < 0)
+  const isWorse  = sig && (betterWhenHigher ? frozen!.numericDelta < 0 : frozen!.numericDelta > 0)
+  const arrow    = sig ? (frozen!.numericDelta > 0 ? '▲' : '▼') : null
   const arrowColor = isBetter ? 'text-green-500' : isWorse ? 'text-red-500' : 'text-slate-400'
 
   return (
@@ -458,6 +464,27 @@ export function DashboardTab() {
   const endYearA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
   const endYearB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
 
+  // Count months in a year where '${year}-MM-01' falls in [startDate, endDate].
+  // Mirrors the engine's monthly loop: income flows when monthDate >= startDate && <= endDate.
+  // This correctly pro-rates both the first year (start mid-year) and the death year.
+  function activeFrac(year: number, startDate: string, endDate: string): number {
+    let count = 0
+    for (let m = 1; m <= 12; m++) {
+      const md = `${year}-${String(m).padStart(2, '0')}-01`
+      if (md >= startDate && md <= endDate) count++
+    }
+    return count / 12
+  }
+  // Count months in a year where '${year}-MM-01' <= date (no lower bound).
+  // Used to compute the post-death survivor fraction within the death year itself.
+  function monthFracUpTo(year: number, date: string): number {
+    let count = 0
+    for (let m = 1; m <= 12; m++) {
+      if (`${year}-${String(m).padStart(2, '0')}-01` <= date) count++
+    }
+    return count / 12
+  }
+
   // Helper: build CPP vs-65 baseline map (mirrors computeHeadlineMetrics logic)
   function buildCppBaselineMap() {
     const cpiR  = effectiveState.cpiRatePct / 100
@@ -467,19 +494,32 @@ export function DashboardTab() {
     const bCPPB = effectiveState.cppB.estimatedMonthlyAt65 * 12
     const a65   = dateAtAge(effectiveState.personA.birthDate, 65)
     const b65   = dateAtAge(effectiveState.personB.birthDate, 65)
-    const m     = new Map<number, number>()
+    const dA    = dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge)
+    const dB    = dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge)
+    const map   = new Map<number, number>()
     for (const d of dataPoints) {
       const pdF = Math.pow((1 + cpiR) / (1 + piR), d.year - cy)
       const aA  = d.year <= endYearA, bA = d.year <= endYearB
-      const aG  = onOrAfter(d.date, a65), bG = onOrAfter(d.date, b65)
       let base  = 0
-      if (aA && aG)             base += bCPPA * pdF
-      else if (!aA && bA && aG) base += bCPPA * 0.60 * pdF
-      if (bA && bG)             base += bCPPB * pdF
-      else if (!bA && aA && bG) base += bCPPB * 0.60 * pdF
-      m.set(d.year, base)
+      if (aA)        base += bCPPA        * activeFrac(d.year, a65, dA) * pdF
+      // B's survivor from A: full years after A's death
+      if (!aA && bA) base += bCPPA * 0.60 * activeFrac(d.year, a65, dB) * pdF
+      // B's survivor from A: post-death months within A's death year
+      if (d.year === endYearA && bA) {
+        const survFrac = monthFracUpTo(d.year, dB) - monthFracUpTo(d.year, dA)
+        if (survFrac > 0) base += bCPPA * 0.60 * survFrac * pdF
+      }
+      if (bA)        base += bCPPB        * activeFrac(d.year, b65, dB) * pdF
+      // A's survivor from B: full years after B's death
+      if (!bA && aA) base += bCPPB * 0.60 * activeFrac(d.year, b65, dA) * pdF
+      // A's survivor from B: post-death months within B's death year
+      if (d.year === endYearB && aA) {
+        const survFrac = monthFracUpTo(d.year, dA) - monthFracUpTo(d.year, dB)
+        if (survFrac > 0) base += bCPPB * 0.60 * survFrac * pdF
+      }
+      map.set(d.year, base)
     }
-    return m
+    return map
   }
 
   // Helper: build OAS vs-65 baseline map
@@ -491,17 +531,18 @@ export function DashboardTab() {
     const bOASB = effectiveState.oasB.estimatedMonthlyAt65 * 12
     const a65   = dateAtAge(effectiveState.personA.birthDate, 65)
     const b65   = dateAtAge(effectiveState.personB.birthDate, 65)
-    const m     = new Map<number, number>()
+    const dA    = dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge)
+    const dB    = dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge)
+    const map   = new Map<number, number>()
     for (const d of dataPoints) {
       const pdF = Math.pow((1 + cpiR) / (1 + piR), d.year - cy)
       const aA  = d.year <= endYearA, bA = d.year <= endYearB
-      const aG  = onOrAfter(d.date, a65), bG = onOrAfter(d.date, b65)
       let base  = 0
-      if (aA && aG) base += bOASA * pdF
-      if (bA && bG) base += bOASB * pdF
-      m.set(d.year, base)
+      if (aA) base += bOASA * activeFrac(d.year, a65, dA) * pdF
+      if (bA) base += bOASB * activeFrac(d.year, b65, dB) * pdF
+      map.set(d.year, base)
     }
-    return m
+    return map
   }
 
   if (dataPoints.length === 0) {
@@ -1145,7 +1186,7 @@ export function DashboardTab() {
                     { header: 'Net HH',        right: true, render: d => fmt(d.totalHouseholdNet) },
                     { header: 'Spending',      right: true, render: d => fmt(d.householdSpending) },
                     { header: 'Cash Flow',     right: true, bold: true, render: d => (
-                      <span className={d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(d.cashFlow)}</span>
+                      <span className={flowColor(d.cashFlow)}>{fmtFlow(d.cashFlow)}</span>
                     )},
                   ],
                   rows: dataPoints,
@@ -1224,10 +1265,11 @@ export function DashboardTab() {
                     { header: `Age — ${aName}`,  right: true, render: d => d.personAAge.toFixed(1) },
                     { header: `Taxable — ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
                     { header: `Taxable — ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
-                    { header: `Tax — ${aName}`,  right: true, render: d => fmt(d.taxA) },
-                    { header: `Tax — ${bName}`,  right: true, render: d => fmt(d.taxB) },
-                    { header: 'OAS Clawback',  right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0 ? fmt(d.oasClawbackA + d.oasClawbackB) : '—' },
-                    { header: 'Total Tax',     right: true, bold: true, render: d => fmt(d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB) },
+                    { header: `Tax — ${aName}`,      right: true, render: d => fmt(d.taxA) },
+                    { header: `Tax — ${bName}`,      right: true, render: d => fmt(d.taxB) },
+                    { header: `Clawback — ${aName}`, right: true, render: d => d.oasClawbackA > 0 ? <span className="text-red-600">{fmt(d.oasClawbackA)}</span> : '—' },
+                    { header: `Clawback — ${bName}`, right: true, render: d => d.oasClawbackB > 0 ? <span className="text-red-600">{fmt(d.oasClawbackB)}</span> : '—' },
+                    { header: 'Total Tax',           right: true, bold: true, render: d => fmt(d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB) },
                   ],
                   rows: dataPoints,
                   highlightRow: d => d.year === metrics.peakTaxYear,
@@ -1276,10 +1318,11 @@ export function DashboardTab() {
                     { header: `Age — ${aName}`,  right: true, render: d => d.personAAge.toFixed(1) },
                     { header: `Taxable — ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
                     { header: `Taxable — ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
-                    { header: `Tax — ${aName}`,  right: true, render: d => fmt(d.taxA) },
-                    { header: `Tax — ${bName}`,  right: true, render: d => fmt(d.taxB) },
-                    { header: 'OAS Clawback',  right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0 ? fmt(d.oasClawbackA + d.oasClawbackB) : '—' },
-                    { header: 'Total Tax',     right: true, bold: true, render: d => fmt(d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB) },
+                    { header: `Tax — ${aName}`,      right: true, render: d => fmt(d.taxA) },
+                    { header: `Tax — ${bName}`,      right: true, render: d => fmt(d.taxB) },
+                    { header: `Clawback — ${aName}`, right: true, render: d => d.oasClawbackA > 0 ? <span className="text-red-600">{fmt(d.oasClawbackA)}</span> : '—' },
+                    { header: `Clawback — ${bName}`, right: true, render: d => d.oasClawbackB > 0 ? <span className="text-red-600">{fmt(d.oasClawbackB)}</span> : '—' },
+                    { header: 'Total Tax',           right: true, bold: true, render: d => fmt(d.taxA + d.taxB + d.oasClawbackA + d.oasClawbackB) },
                   ],
                   rows: dataPoints,
                   highlightRow: d => d.year === metrics.peakTaxYear,
@@ -1372,9 +1415,8 @@ export function DashboardTab() {
                 })} />
               <MetricCard label="CPP — vs Age 65 Start"
                 betterWhenHigher={true}
-                value={(metrics.cppVs65 >= 0 ? '+' : '') + fmt(metrics.cppVs65)}
-                frozen={frozenFor(metrics.cppVs65, frozenMetrics?.cppVs65,
-                  v => (v >= 0 ? '+' : '') + fmt(v))}
+                value={fmtSigned(metrics.cppVs65)}
+                frozen={frozenFor(metrics.cppVs65, frozenMetrics?.cppVs65, fmtSigned)}
                 onClick={() => {
                   const bMap = buildCppBaselineMap()
                   const rows = dataPoints.filter(d => d.cppA + d.cppB > 0 || (bMap.get(d.year) ?? 0) > 0)
@@ -1392,22 +1434,21 @@ export function DashboardTab() {
                       { header: 'Baseline @65',  right: true, render: d => fmt(bMap.get(d.year) ?? 0) },
                       { header: 'Delta / Year',  right: true, render: d => {
                           const delta = d.cppA + d.cppB - (bMap.get(d.year) ?? 0)
-                          return <span className={delta >= 0 ? 'text-green-600' : 'text-red-600'}>{(delta >= 0 ? '+' : '') + fmt(delta)}</span>
+                          return <span className={flowColor(delta)}>{fmtSigned(delta)}</span>
                         }},
                     ],
                     rows,
                     summary: [
                       { label: 'Actual Total',        value: fmt(metrics.totalCPPCollected) },
                       { label: 'Baseline Total @65',  value: fmt(totBase) },
-                      { label: 'Net Timing Benefit',  value: (metrics.cppVs65 >= 0 ? '+' : '') + fmt(metrics.cppVs65) },
+                      { label: 'Net Timing Benefit',  value: fmtSigned(metrics.cppVs65) },
                     ],
                   })
                 }} />
               <MetricCard label="OAS — vs Age 65 Start"
                 betterWhenHigher={true}
-                value={(metrics.oasVs65 >= 0 ? '+' : '') + fmt(metrics.oasVs65)}
-                frozen={frozenFor(metrics.oasVs65, frozenMetrics?.oasVs65,
-                  v => (v >= 0 ? '+' : '') + fmt(v))}
+                value={fmtSigned(metrics.oasVs65)}
+                frozen={frozenFor(metrics.oasVs65, frozenMetrics?.oasVs65, fmtSigned)}
                 onClick={() => {
                   const bMap = buildOasBaselineMap()
                   const rows = dataPoints.filter(d => d.oasA + d.oasB > 0 || (bMap.get(d.year) ?? 0) > 0)
@@ -1425,14 +1466,14 @@ export function DashboardTab() {
                       { header: 'Baseline @65',  right: true, render: d => fmt(bMap.get(d.year) ?? 0) },
                       { header: 'Delta / Year',  right: true, render: d => {
                           const delta = d.oasA + d.oasB - (bMap.get(d.year) ?? 0)
-                          return <span className={delta >= 0 ? 'text-green-600' : 'text-red-600'}>{(delta >= 0 ? '+' : '') + fmt(delta)}</span>
+                          return <span className={flowColor(delta)}>{fmtSigned(delta)}</span>
                         }},
                     ],
                     rows,
                     summary: [
                       { label: 'Actual Total (Gross)', value: fmt(metrics.totalOASCollected) },
                       { label: 'Baseline Total @65',   value: fmt(totBase) },
-                      { label: 'Net Timing Benefit',   value: (metrics.oasVs65 >= 0 ? '+' : '') + fmt(metrics.oasVs65) },
+                      { label: 'Net Timing Benefit',   value: fmtSigned(metrics.oasVs65) },
                     ],
                   })
                 }} />
@@ -1714,8 +1755,8 @@ export function DashboardTab() {
                   ))}
                   <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt(d.totalHouseholdNet)}</td>
                   <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.householdSpending)}</td>
-                  <td className={`px-2 py-1 border border-slate-100 text-right font-medium ${d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                    {fmt(d.cashFlow)}
+                  <td className={`px-2 py-1 border border-slate-100 text-right font-medium ${flowColor(d.cashFlow)}`}>
+                    {fmtFlow(d.cashFlow)}
                   </td>
                   {portfolioTableCols.map(col => (
                     <td key={col.label} className="px-2 py-1 border border-slate-100 text-right" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
