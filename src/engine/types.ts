@@ -376,6 +376,8 @@ export interface DataPoint {
   tfsaWithdrawalB: number
   nonRegWithdrawalA: number
   nonRegWithdrawalB: number
+  nonRegYieldA: number
+  nonRegYieldB: number
   otherIncomeA: number
   otherIncomeB: number
 

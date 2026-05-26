@@ -420,8 +420,14 @@ export function runProjection(state: AppState): ProjectionResult {
     }
     void splitPct
 
-    const totalNetNom = (aAlive ? taxA.netAfterTax + otherNonTaxA_nom : 0)
-                      + (bAlive ? taxB.netAfterTax + otherNonTaxB_nom : 0)
+    // Non-reg yield (dividends, foreign income) stays in the account — it is NOT received as
+    // spendable cash.  The T-slip tax liability is real and must be paid from actual income or
+    // account draws, but the yield itself is not an inflow.  Remove it from the cash net so the
+    // gap calculation correctly treats the tax as a cost without crediting phantom income.
+    const nonRegYieldA = aAlive ? nonRegDivEligA_nom + nonRegForeignA_nom : 0
+    const nonRegYieldB = bAlive ? nonRegDivEligB_nom + nonRegForeignB_nom : 0
+    const totalNetNom = (aAlive ? taxA.netAfterTax - nonRegYieldA + otherNonTaxA_nom : 0)
+                      + (bAlive ? taxB.netAfterTax - nonRegYieldB + otherNonTaxB_nom : 0)
 
     // ── Gap fill / account draws ──────────────────────────────────────────────
     let tfsaWithdrawA = 0, tfsaWithdrawB = 0
@@ -561,6 +567,8 @@ export function runProjection(state: AppState): ProjectionResult {
       tfsaWithdrawalB:   pd(tfsaWithdrawB),
       nonRegWithdrawalA: pd(nonRegWithdrawA),
       nonRegWithdrawalB: pd(nonRegWithdrawB),
+      nonRegYieldA: pd(nonRegDivEligA_nom + nonRegForeignA_nom),
+      nonRegYieldB: pd(nonRegDivEligB_nom + nonRegForeignB_nom),
       otherIncomeA: pd(otherTaxableA_nom + otherNonTaxA_nom),
       otherIncomeB: pd(otherTaxableB_nom + otherNonTaxB_nom),
 
@@ -570,8 +578,8 @@ export function runProjection(state: AppState): ProjectionResult {
       taxB:         pd(bAlive ? taxB.totalTax    : 0),
       oasClawbackA: pd(aAlive ? taxA.oasClawback : 0),
       oasClawbackB: pd(bAlive ? taxB.oasClawback : 0),
-      netIncomeA:   pd(aAlive ? taxA.netAfterTax : 0),
-      netIncomeB:   pd(bAlive ? taxB.netAfterTax : 0),
+      netIncomeA:   pd(aAlive ? taxA.netAfterTax - nonRegYieldA : 0),
+      netIncomeB:   pd(bAlive ? taxB.netAfterTax - nonRegYieldB : 0),
       totalHouseholdNet: pd(totalNetNom + proactiveExtra),
       effectiveTaxRateA: aAlive ? taxA.effectiveRate : 0,
       effectiveTaxRateB: bAlive ? taxB.effectiveRate : 0,

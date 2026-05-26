@@ -46,6 +46,7 @@ type TableCol = {
   format?: (v: number, d: DataPoint) => string
   className?: string
   person?: 'A' | 'B'
+  tSlipOnly?: boolean   // T-slip income: taxable but not received as cash (e.g. non-reg yield)
 }
 
 function hexTint(hex: string, alpha: number): string {
@@ -626,13 +627,15 @@ export function DashboardTab() {
     { label: `RRIF — ${b}`,   value: d => d.rrifB,             person: 'B' },
     { label: `TFSA — ${a}`,   value: d => d.tfsaWithdrawalA,   person: 'A' },
     { label: `TFSA — ${b}`,   value: d => d.tfsaWithdrawalB,   person: 'B' },
-    { label: `NR — ${a}`,     value: d => d.nonRegWithdrawalA, person: 'A' },
-    { label: `NR — ${b}`,     value: d => d.nonRegWithdrawalB, person: 'B' },
-    { label: `Other — ${a}`,  value: d => d.otherIncomeA,      person: 'A' },
-    { label: `Other — ${b}`,  value: d => d.otherIncomeB,      person: 'B' },
+    { label: `NR — ${a}`,       value: d => d.nonRegWithdrawalA, person: 'A' },
+    { label: `NR — ${b}`,       value: d => d.nonRegWithdrawalB, person: 'B' },
+    { label: `NR Yield † — ${a}`, value: d => d.nonRegYieldA,      person: 'A', tSlipOnly: true },
+    { label: `NR Yield † — ${b}`, value: d => d.nonRegYieldB,      person: 'B', tSlipOnly: true },
+    { label: `Other — ${a}`,    value: d => d.otherIncomeA,      person: 'A' },
+    { label: `Other — ${b}`,    value: d => d.otherIncomeB,      person: 'B' },
   ] : [
-    { label: `Gross — ${a}`, value: d => d.grossIncomeA, person: 'A' },
-    { label: `Gross — ${b}`, value: d => d.grossIncomeB, person: 'B' },
+    { label: `Taxable — ${a}`, value: d => d.grossIncomeA, person: 'A' },
+    { label: `Taxable — ${b}`, value: d => d.grossIncomeB, person: 'B' },
   ]
 
   const taxTableCols: TableCol[] = taxOpen ? [
@@ -1219,8 +1222,8 @@ export function DashboardTab() {
                   columns: [
                     { header: 'Year',              render: d => d.year },
                     { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
-                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
-                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Taxable ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Taxable ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
                     { header: `Tax ${aName}`,  right: true, render: d => fmt(d.taxA) },
                     { header: `Tax ${bName}`,  right: true, render: d => fmt(d.taxB) },
                     { header: 'OAS Clawback',  right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0 ? fmt(d.oasClawbackA + d.oasClawbackB) : '—' },
@@ -1244,8 +1247,8 @@ export function DashboardTab() {
                   columns: [
                     { header: 'Year',              render: d => d.year },
                     { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
-                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
-                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Taxable ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Taxable ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
                     { header: `Tax ${aName}`,  right: true, render: d => fmt(d.taxA) },
                     { header: `Eff Rate A`,    right: true, render: d => fmtPct(d.effectiveTaxRateA) },
                     { header: `Tax ${bName}`,  right: true, render: d => fmt(d.taxB) },
@@ -1271,8 +1274,8 @@ export function DashboardTab() {
                   columns: [
                     { header: 'Year',              render: d => d.year },
                     { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
-                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
-                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Taxable ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Taxable ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
                     { header: `Tax ${aName}`,  right: true, render: d => fmt(d.taxA) },
                     { header: `Tax ${bName}`,  right: true, render: d => fmt(d.taxB) },
                     { header: 'OAS Clawback',  right: true, render: d => d.oasClawbackA + d.oasClawbackB > 0 ? fmt(d.oasClawbackA + d.oasClawbackB) : '—' },
@@ -1348,8 +1351,8 @@ export function DashboardTab() {
                     { header: 'Year',              render: d => d.year },
                     { header: `${aName} Age`,  right: true, render: d => d.personAAge.toFixed(1) },
                     { header: `${bName} Age`,  right: true, render: d => d.personBAge.toFixed(1) },
-                    { header: `Gross ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
-                    { header: `Gross ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
+                    { header: `Taxable ${aName}`,right: true, render: d => fmt(d.grossIncomeA) },
+                    { header: `Taxable ${bName}`,right: true, render: d => fmt(d.grossIncomeB) },
                     { header: `OAS ${aName}`,  right: true, render: d => d.oasA > 0 ? fmt(d.oasA) : '—' },
                     { header: `OAS ${bName}`,  right: true, render: d => d.oasB > 0 ? fmt(d.oasB) : '—' },
                     { header: `Clawback ${aName}`, right: true, render: d => d.oasClawbackA > 0
@@ -1605,6 +1608,34 @@ export function DashboardTab() {
 
       {/* ── Annual Summary Table ───────────────────────────────────────────── */}
       <SectionCard title="Annual Summary Table" width="full"
+        info={
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="font-semibold mb-1">Income Columns</p>
+              <p>The collapsed Income view shows each person's <strong>taxable income</strong> — the total reported on their tax return. This includes employment income, DB pension, CPP, OAS, RRIF withdrawals, non-registered withdrawals (capital gains portion), and any other taxable income. TFSA withdrawals are tax-free and not included here; they appear as their own columns when the Income section is expanded.</p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Non-Reg Yield † (T-slip income)</p>
+              <p>Eligible dividends and foreign income from a non-registered account are issued as T-slips each year and are taxable — but the distributions are reinvested rather than paid out as cash. These columns are shown in <em>italic/grey</em> to indicate they create a tax liability without contributing to spendable income. The yield stays inside the account and is already reflected in the portfolio balance.</p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Tax Columns</p>
+              <p>Shows combined federal and Ontario income tax for each person, plus OAS clawback where applicable. Tax is calculated on the full taxable income base including non-reg yield, even though that yield is not received as cash.</p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Net Household Income</p>
+              <p><strong>Net HH</strong> is the actual cash the household receives: after-tax income from all taxable sources, plus TFSA withdrawals and non-taxable other income, minus the non-reg yield (which stays in the account). This is the number compared against Spending to determine the annual surplus or shortfall.</p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Cash Flow</p>
+              <p><strong>Cash Flow = Net HH − Spending.</strong> A positive value means the household has a surplus that flows into savings; a negative value means spending exceeds income and the gap is covered by portfolio withdrawals or HISA. Persistent shortfalls will deplete the portfolio.</p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">All figures in today's dollars</p>
+              <p>Every value in this table is expressed in present-day purchasing power — future nominal amounts are deflated by the personal inflation rate. This makes year-over-year comparisons meaningful and directly comparable to today's budget.</p>
+            </div>
+          </div>
+        }
         headerRight={
           <button
             onClick={() => setShowPersonTint(v => !v)}
@@ -1657,7 +1688,7 @@ export function DashboardTab() {
                   <th key={col.label} className={`px-2 py-1 font-bold border border-red-900 whitespace-nowrap ${col.className?.includes('text-left') ? 'text-left' : 'text-right'}`}>{col.label}</th>
                 ))}
                 {incomeTableCols.map(col => (
-                  <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
+                  <th key={col.label} className={`px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap${col.tSlipOnly ? ' italic opacity-70' : ''}`}>{col.label}</th>
                 ))}
                 {taxTableCols.map(col => (
                   <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
@@ -1676,7 +1707,7 @@ export function DashboardTab() {
                     </td>
                   ))}
                   {incomeTableCols.map(col => (
-                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
+                    <td key={col.label} className={`px-2 py-1 border border-slate-100 text-right${col.tSlipOnly ? ' italic text-slate-400' : ''}`} style={colTint(col, i)}>{fmtT(col.value(d))}</td>
                   ))}
                   {taxTableCols.map(col => (
                     <td key={col.label} className="px-2 py-1 border border-slate-100 text-right text-red-600" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
@@ -1694,6 +1725,11 @@ export function DashboardTab() {
             </tbody>
           </table>
         </div>
+        {incomeOpen && (
+          <p className="mt-2 text-xs text-slate-400 italic">
+            † T-slip income — taxable but not received as cash; distributions stay in the non-registered account and are reflected in its balance.
+          </p>
+        )}
       </SectionCard>
 
     </div>
