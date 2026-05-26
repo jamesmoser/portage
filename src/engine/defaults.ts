@@ -3,6 +3,7 @@
 
 import type { AppState, TaxSettings, WhatIfs } from './types'
 import { todayStr, dateAtAge } from './dates'
+import { DEFAULT_MARKET_PROFILE } from './rateProfiles'
 
 const today = todayStr()
 
@@ -89,6 +90,7 @@ export const DEFAULT_WHATIFS: WhatIfs = {
       fixedWithdrawal: { rrspAmount: 0, tfsaAmount: 0, nonRegAmount: 0 },
     },
   },
+  marketProfile: { enabled: false, value: DEFAULT_MARKET_PROFILE },
 }
 
 export const DEFAULT_STATE: AppState = {

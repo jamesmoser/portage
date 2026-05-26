@@ -76,7 +76,7 @@ function oasFactor(startDate: string, birthDate: string): number {
 
 // ─── Main projection ──────────────────────────────────────────────────────────
 
-export function runProjection(state: AppState): ProjectionResult {
+export function runProjection(state: AppState, rateSchedule?: number[]): ProjectionResult {
   const warnings: string[] = []
   const dataPoints: DataPoint[] = []
 
@@ -135,7 +135,7 @@ export function runProjection(state: AppState): ProjectionResult {
     const personBAgeInt   = intAgeAt(state.personB.birthDate, dateStr)
 
     const refAge    = state.ageReferencePerson === 'personB' ? personBAgeExact : personAAgeExact
-    const nomReturn = nominalReturnForAge(refAge, state.returnRates)
+    const nomReturn = rateSchedule?.[year - currentYear] ?? nominalReturnForAge(refAge, state.returnRates)
 
     const aAlive = year <= endYearA
     const bAlive = year <= endYearB

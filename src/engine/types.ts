@@ -246,6 +246,24 @@ export interface WithdrawalStrategy {
   drawdownFixedWithdrawal: FixedWithdrawalConfig
 }
 
+// ─── Market Profile ───────────────────────────────────────────────────────────
+
+export type MarketProfileType =
+  | 'step'           // base plan tiers (default)
+  | 'frontLoaded'    // starts at peak, falls linearly to low
+  | 'backLoaded'     // starts at low, rises linearly to peak
+  | 'cyclicalCrest'  // cosine wave — starts at peak
+  | 'cyclicalTrough' // inverted cosine — starts at trough
+  | 'noise'          // seeded uniform random between peak and low
+
+export interface MarketProfileConfig {
+  profileType:       MarketProfileType
+  outlookOffset:     number   // ±% shift applied to all rates (e.g. +2 shifts curve up 2 pp)
+  beta:              number   // amplitude multiplier: 1 = no change, 2 = double swing, 0.5 = half swing
+  cyclePeriodYears:  number   // cycle length in years (cyclical profiles only)
+  noiseSeed:         number   // PRNG seed (noise profile only; re-roll changes this)
+}
+
 // ─── What-if Overrides ────────────────────────────────────────────────────────
 
 export interface WhatIf<T> {
@@ -254,17 +272,18 @@ export interface WhatIf<T> {
 }
 
 export interface WhatIfs {
-  returnRateOffset:  WhatIf<number>          // ±% added to all return rate tiers
-  inflationRate:     WhatIf<number>          // personal inflation rate override
-  longevityA:        WhatIf<number>          // planning end age override
+  returnRateOffset:  WhatIf<number>              // ±% added to all return rate tiers
+  inflationRate:     WhatIf<number>              // personal inflation rate override
+  longevityA:        WhatIf<number>              // planning end age override
   longevityB:        WhatIf<number>
-  cppStartAgeA:      WhatIf<number>          // CPP start age (60–70)
+  cppStartAgeA:      WhatIf<number>              // CPP start age (60–70)
   cppStartAgeB:      WhatIf<number>
-  oasStartAgeA:      WhatIf<number>          // OAS start age (65–70)
+  oasStartAgeA:      WhatIf<number>              // OAS start age (65–70)
   oasStartAgeB:      WhatIf<number>
   withdrawalOrder:   WhatIf<WithdrawalOrder>
   pensionSplit:      WhatIf<{ mode: PensionSplitMode; pct: number }>
   drawdownStrategy:  WhatIf<DrawdownStrategyConfig>
+  marketProfile:     WhatIf<MarketProfileConfig>
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────

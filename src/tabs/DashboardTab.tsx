@@ -9,7 +9,8 @@ import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelecto
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt, getYear, dateAtAge } from '../engine/dates'
-import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint } from '../engine/types'
+import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType } from '../engine/types'
+import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
@@ -117,6 +118,25 @@ const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
   fixedPct:         'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
 }
 
+const MARKET_PROFILE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'step',           label: 'Base' },
+  { value: 'frontLoaded',    label: 'Front-Loaded' },
+  { value: 'backLoaded',     label: 'Back-Loaded' },
+  { value: 'cyclicalCrest',  label: 'Cyclical Crest' },
+  { value: 'cyclicalTrough', label: 'Cyclical Trough' },
+  { value: 'noise',          label: 'Noise' },
+]
+
+// Minimal layout for the market shape preview chart — no axes, no labels.
+const MARKET_CHART_LAYOUT = {
+  margin: { t: 4, r: 6, b: 4, l: 6 },
+  paper_bgcolor: 'transparent',
+  plot_bgcolor: '#f8fafc',
+  xaxis: { visible: false, fixedrange: true },
+  yaxis: { visible: false, fixedrange: true },
+  showlegend: false,
+}
+
 // ─── ChartLegend ──────────────────────────────────────────────────────────────
 
 function ChartLegend({ data }: { data: Data[] }) {
@@ -199,7 +219,7 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
 // The current value is always red; when it coincides with a fixed stop that stop
 // turns red and no separate floating label is rendered.
 function WhatIfSlider({
-  label, min, max, step = 1, baseValue, value, enabled, onChange,
+  label, min, max, step = 1, baseValue, value, enabled, onChange, valueSuffix = '',
 }: {
   label: string
   min: number
@@ -209,6 +229,7 @@ function WhatIfSlider({
   value: number
   enabled: boolean
   onChange: (value: number, enabled: boolean) => void
+  valueSuffix?: string
 }) {
   const val     = Math.max(min, Math.min(max, value))
   const fillPct = ((val - min) / (max - min)) * 100
@@ -249,24 +270,24 @@ function WhatIfSlider({
       <div className="relative mt-1 h-4">
         <span className={`absolute text-[10px] leading-none -translate-x-1/2 whitespace-nowrap ${onMin ? 'font-semibold' : ''}`}
           style={{ left: thumbLeft(min), color: onMin ? '#7B1515' : '#94a3b8' }}>
-          {min}
+          {min}{valueSuffix}
         </span>
         <span className={`absolute text-[10px] leading-none -translate-x-1/2 whitespace-nowrap ${onMax ? 'font-semibold' : ''}`}
           style={{ left: thumbLeft(max), color: onMax ? '#7B1515' : '#94a3b8' }}>
-          {max}
+          {max}{valueSuffix}
         </span>
         {/* Base label — omit when base coincides with an endpoint to avoid duplicates */}
         {baseValue !== min && baseValue !== max && (
           <span className={`absolute text-[10px] leading-none -translate-x-1/2 whitespace-nowrap ${onBase ? 'font-semibold' : ''}`}
             style={{ left: thumbLeft(baseValue), color: onBase ? '#7B1515' : '#94a3b8' }}>
-            {baseValue}
+            {baseValue}{valueSuffix}
           </span>
         )}
         {/* Floating value label — only shown when val is not on a fixed stop */}
         {!onFixed && (
           <span className="absolute text-[10px] font-semibold leading-none -translate-x-1/2 whitespace-nowrap"
             style={{ left: thumbLeft(val), color: '#7B1515' }}>
-            {val}
+            {val}{valueSuffix}
           </span>
         )}
       </div>
@@ -438,7 +459,65 @@ export function DashboardTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, whatIfs],
   )
-  const { dataPoints, warnings } = useMemo(() => runProjection(effectiveState), [effectiveState])
+
+  // Rate schedule for the projection engine — generated when market profile is enabled.
+  const rateSchedule = useMemo(() => {
+    if (!whatIfs.marketProfile?.enabled) return undefined
+    const currentYear = new Date().getFullYear()
+    const eA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
+    const eB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+    const refBirth = effectiveState.ageReferencePerson === 'personB'
+      ? effectiveState.personB.birthDate
+      : effectiveState.personA.birthDate
+    return generateRateSchedule(
+      effectiveState.returnRates,
+      whatIfs.marketProfile.value,
+      currentYear,
+      Math.max(eA, eB),
+      refBirth,
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whatIfs.marketProfile, effectiveState])
+
+  // Rate profile shape preview — always visible in the Market section (50-year horizon).
+  const { marketChartSeries, marketStats } = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    const previewEnd  = currentYear + 49
+    const refBirth = effectiveState.ageReferencePerson === 'personB'
+      ? effectiveState.personB.birthDate
+      : effectiveState.personA.birthDate
+    const mv = whatIfs.marketProfile?.value ?? DEFAULT_MARKET_PROFILE
+    const baseSchedule = generateRateSchedule(
+      effectiveState.returnRates,
+      { ...DEFAULT_MARKET_PROFILE, profileType: 'step' },
+      currentYear, previewEnd, refBirth,
+    ).map(r => r * 100)
+    const currentSchedule = generateRateSchedule(
+      effectiveState.returnRates,
+      mv,
+      currentYear, previewEnd, refBirth,
+    ).map(r => r * 100)
+    const years = Array.from({ length: 50 }, (_, i) => currentYear + i)
+    const high = Math.max(...currentSchedule)
+    const low  = Math.min(...currentSchedule)
+    const avg  = currentSchedule.reduce((a, b) => a + b, 0) / currentSchedule.length
+    return {
+      marketChartSeries: [
+        { type: 'scatter', mode: 'lines', x: years, y: baseSchedule,
+          line: { color: '#cbd5e1', width: 1.5, dash: 'dot' }, hoverinfo: 'none' },
+        { type: 'scatter', mode: 'lines', x: years, y: currentSchedule,
+          line: { color: '#7B1515', width: 2 }, hoverinfo: 'none' },
+      ],
+      marketStats: { high, low, avg },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whatIfs.marketProfile, effectiveState.returnRates, effectiveState.ageReferencePerson,
+      effectiveState.personA.birthDate, effectiveState.personB.birthDate])
+
+  const { dataPoints, warnings } = useMemo(
+    () => runProjection(effectiveState, rateSchedule),
+    [effectiveState, rateSchedule],
+  )
   const metrics = useMemo(
     () => computeHeadlineMetrics(dataPoints, ageReferencePerson, effectiveState as AppState),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -940,22 +1019,124 @@ export function DashboardTab() {
       </SectionCard>
 
       {/* ── Base Plan Modifications Card ──────────────────────────────────── */}
-      <SectionCard title="Base Plan Modifications" width="full">
+      <SectionCard title="Base Plan Modifications" width="full" info={<>
+        <p className="font-semibold text-slate-700 mb-2">Market — Return Profiles</p>
+        <p className="mb-2">The return profile shapes how annual portfolio returns vary over the projection horizon. Peak and low are the max and min of your base plan tiers; mid is their average.</p>
+        <ul className="space-y-1.5 mb-3">
+          <li><span className="font-medium">Base</span> — Uses your four age-based return rate tiers exactly as entered.</li>
+          <li><span className="font-medium">Front-Loaded</span> — Returns start at peak and fall linearly to low. Models front-heavy outperformance early in retirement.</li>
+          <li><span className="font-medium">Back-Loaded</span> — Returns start at low and rise linearly to peak. Models a slow-growth early period followed by stronger returns.</li>
+          <li><span className="font-medium">Cyclical Crest</span> — Cosine wave starting at peak. One full cycle spans the configured period.</li>
+          <li><span className="font-medium">Cyclical Trough</span> — Inverted cosine starting at trough. Useful for stress-testing a down-cycle at the start of retirement.</li>
+          <li><span className="font-medium">Noise</span> — Seeded uniform random between low and peak each year. Re-roll generates a new random sequence.</li>
+        </ul>
+        <p className="font-semibold text-slate-700 mb-1">Outlook</p>
+        <p className="mb-2">Shifts the entire curve up or down by a fixed number of percentage points. Applied after beta scaling.</p>
+        <p className="font-semibold text-slate-700 mb-1">Beta</p>
+        <p>Scales the amplitude of the curve around the midpoint. β=1: unchanged. β=2: swings twice as wide (same average, higher peaks, lower troughs). β=0: flat line at mid.</p>
+      </>}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-3">
 
             <WhatIfSection title="Market">
-              <WhatIfRow
-                enabled={whatIfs.returnRateOffset.enabled}
-                onToggle={v => updateWhatIf('returnRateOffset', { enabled: v, value: v ? whatIfs.returnRateOffset.value : 0 })}
-                label="Return Rate Offset"
-                baseLabel={ratesLabel}
-              >
-                <NumberInput label="" value={whatIfs.returnRateOffset.value}
-                  onChange={v => updateWhatIf('returnRateOffset', { value: v })}
-                  suffix="%" min={-15} max={15} step={0.5} decimals={1} size="sm" />
-                <span className="text-xs text-slate-500">applied to all tiers</span>
-              </WhatIfRow>
+              {/* ── Rate profile shape preview + controls ─────────────────── */}
+              {(() => {
+                const mEnabled = whatIfs.marketProfile?.enabled ?? false
+                const mValue   = whatIfs.marketProfile?.value ?? DEFAULT_MARKET_PROFILE
+                const setMarketProfile = (partial: Partial<typeof mValue>) =>
+                  updateWhatIf('marketProfile', { value: { ...mValue, ...partial } })
+                const isCyclical = mValue.profileType === 'cyclicalCrest' || mValue.profileType === 'cyclicalTrough'
+                return (
+                  <div>
+                    {/* Shape preview chart + stats — always visible */}
+                    <div className="flex items-stretch px-3 pt-2.5 pb-0.5 gap-2">
+                      <div className="flex-1 min-w-0">
+                        <PlotlyChart
+                          data={marketChartSeries}
+                          layout={MARKET_CHART_LAYOUT}
+                          style={{ height: '72px' }}
+                        />
+                      </div>
+                      <div className="flex flex-col justify-around text-right py-1 shrink-0">
+                        {([['High', marketStats.high], ['Avg', marketStats.avg], ['Low', marketStats.low]] as [string, number][]).map(([lbl, val]) => (
+                          <div key={lbl}>
+                            <div className="text-[9px] text-slate-400 leading-none uppercase tracking-wide">{lbl}</div>
+                            <div className="text-xs font-semibold leading-tight" style={{ color: '#7B1515' }}>{val.toFixed(1)}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Profile selector + enable toggle */}
+                    <div className="flex items-center gap-3 px-3 py-2.5 border-t border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={mEnabled}
+                        onChange={e => updateWhatIf('marketProfile', { enabled: e.target.checked })}
+                        className="w-4 h-4 rounded shrink-0 cursor-pointer"
+                        style={{ accentColor: '#7B1515' }}
+                      />
+                      <span className={`text-sm w-52 shrink-0 ${mEnabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
+                        Return Profile
+                      </span>
+                      {mEnabled ? (
+                        <SelectInput
+                          label=""
+                          value={mValue.profileType}
+                          onChange={v => setMarketProfile({ profileType: v as MarketProfileType })}
+                          options={MARKET_PROFILE_OPTIONS}
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          Base: <span className="font-medium text-slate-500">Step tiers</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Sub-controls — only when enabled */}
+                    {mEnabled && (
+                      <div className="border-t border-slate-100">
+                        <WhatIfSlider
+                          label="Outlook"
+                          min={-10} max={10} step={0.5} baseValue={0}
+                          value={mValue.outlookOffset}
+                          enabled={mValue.outlookOffset !== 0}
+                          onChange={v => setMarketProfile({ outlookOffset: v })}
+                          valueSuffix="%"
+                        />
+                        <WhatIfSlider
+                          label="Beta"
+                          min={0.1} max={10} step={0.1} baseValue={1}
+                          value={mValue.beta}
+                          enabled={mValue.beta !== 1}
+                          onChange={v => setMarketProfile({ beta: v })}
+                          valueSuffix="x"
+                        />
+                        {isCyclical && (
+                          <div className="flex items-center gap-3 px-3 py-2 border-t border-slate-100">
+                            <span className="text-sm text-slate-600 w-52 shrink-0">Cycle Period</span>
+                            <NumberInput
+                              label="" value={mValue.cyclePeriodYears}
+                              onChange={v => setMarketProfile({ cyclePeriodYears: v })}
+                              min={2} max={30} step={1} decimals={0} size="sm" suffix="years"
+                            />
+                          </div>
+                        )}
+                        {mValue.profileType === 'noise' && (
+                          <div className="px-3 py-2 border-t border-slate-100">
+                            <button
+                              className="btn-primary"
+                              onClick={() => setMarketProfile({ noiseSeed: Math.floor(Math.random() * 99999) })}
+                            >
+                              Re-roll
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
               <WhatIfRow
                 enabled={whatIfs.inflationRate.enabled}
                 onToggle={v => updateWhatIf('inflationRate', { enabled: v, value: v ? personalInflationRatePct : whatIfs.inflationRate.value })}
