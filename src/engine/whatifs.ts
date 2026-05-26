@@ -1,7 +1,26 @@
 // What-if merge and headline metrics computation.
 
 import type { AppState, WhatIfs, HeadlineMetrics, DataPoint } from './types'
-import { dateAtAge, getYear, onOrAfter } from './dates'
+import { dateAtAge, dateAtDecimalAge, deathDate, getYear, onOrAfter, parseDate, formatDate } from './dates'
+
+// Snap an ISO date to the first of the nearest month.
+function snapToMonthStart(dateStr: string): string {
+  const d = parseDate(dateStr)
+  if (d.getDate() >= 15) {
+    return formatDate(new Date(d.getFullYear(), d.getMonth() + 1, 1))
+  }
+  return formatDate(new Date(d.getFullYear(), d.getMonth(), 1))
+}
+
+// Shift an ISO date string by deltaMs milliseconds.
+function shiftDateMs(dateStr: string, deltaMs: number): string {
+  return formatDate(new Date(parseDate(dateStr).getTime() + deltaMs))
+}
+
+// Return the earlier of two ISO date strings.
+function minDate(a: string, b: string): string {
+  return a <= b ? a : b
+}
 
 // ─── mergeWhatIfs ─────────────────────────────────────────────────────────────
 // Applies all enabled what-if overrides to the base plan and returns a modified
@@ -84,6 +103,54 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     }
   }
 
+  // ── Retirement date — Person A ──────────────────────────────────────────────
+  if (wi.retirementA?.enabled) {
+    const cfg       = wi.retirementA.value
+    const newDate   = snapToMonthStart(dateAtDecimalAge(s.personA.birthDate, cfg.retirementAge))
+    const deltaMs   = parseDate(newDate).getTime() - parseDate(s.personA.retirementDate).getTime()
+    const deadlineA = deathDate(s.personA.birthDate, s.personA.planningEndAge)
+    s = { ...s, personA: { ...s.personA, retirementDate: newDate } }
+    if (cfg.cascadePension && s.dbPensionA.enabled) {
+      s = { ...s, dbPensionA: { ...s.dbPensionA, startDate: newDate } }
+    }
+    if (cfg.cascadeRrsp) {
+      s = { ...s, rrspA: { ...s.rrspA,
+        contributionEndDate:         minDate(shiftDateMs(s.rrspA.contributionEndDate,         deltaMs), deadlineA),
+        spousalLastContributionDate: minDate(shiftDateMs(s.rrspA.spousalLastContributionDate, deltaMs), deadlineA),
+      }}
+    }
+    if (cfg.cascadeTfsa) {
+      s = { ...s, tfsaA: { ...s.tfsaA, contributionEndDate: minDate(shiftDateMs(s.tfsaA.contributionEndDate, deltaMs), deadlineA) } }
+    }
+    if (cfg.cascadeNonReg) {
+      s = { ...s, nonRegA: { ...s.nonRegA, contributionEndDate: minDate(shiftDateMs(s.nonRegA.contributionEndDate, deltaMs), deadlineA) } }
+    }
+  }
+
+  // ── Retirement date — Person B ──────────────────────────────────────────────
+  if (wi.retirementB?.enabled) {
+    const cfg       = wi.retirementB.value
+    const newDate   = snapToMonthStart(dateAtDecimalAge(s.personB.birthDate, cfg.retirementAge))
+    const deltaMs   = parseDate(newDate).getTime() - parseDate(s.personB.retirementDate).getTime()
+    const deadlineB = deathDate(s.personB.birthDate, s.personB.planningEndAge)
+    s = { ...s, personB: { ...s.personB, retirementDate: newDate } }
+    if (cfg.cascadePension && s.dbPensionB.enabled) {
+      s = { ...s, dbPensionB: { ...s.dbPensionB, startDate: newDate } }
+    }
+    if (cfg.cascadeRrsp) {
+      s = { ...s, rrspB: { ...s.rrspB,
+        contributionEndDate:         minDate(shiftDateMs(s.rrspB.contributionEndDate,         deltaMs), deadlineB),
+        spousalLastContributionDate: minDate(shiftDateMs(s.rrspB.spousalLastContributionDate, deltaMs), deadlineB),
+      }}
+    }
+    if (cfg.cascadeTfsa) {
+      s = { ...s, tfsaB: { ...s.tfsaB, contributionEndDate: minDate(shiftDateMs(s.tfsaB.contributionEndDate, deltaMs), deadlineB) } }
+    }
+    if (cfg.cascadeNonReg) {
+      s = { ...s, nonRegB: { ...s.nonRegB, contributionEndDate: minDate(shiftDateMs(s.nonRegB.contributionEndDate, deltaMs), deadlineB) } }
+    }
+  }
+
   return s
 }
 
@@ -101,6 +168,7 @@ export function computeHeadlineMetrics(
 
   const zero: HeadlineMetrics = {
     portfolioAtStart: 0, peakPortfolio: 0, peakPortfolioYear: currentYear,
+    portfolioAtRetirementA: 0, portfolioAtRetirementB: 0,
     portfolioAtDeathA: 0, portfolioAtDeathB: 0,
     shortfallYears: 0, totalYears: 0, shortfallPct: 0,
     avgAnnualShortfall: 0, peakAnnualShortfall: 0, peakShortfallYear: 0,
@@ -115,6 +183,12 @@ export function computeHeadlineMetrics(
   const endYearB = getYear(dateAtAge(state.personB.birthDate, state.personB.planningEndAge))
   const pointAtDeathA = dataPoints.find(d => d.year === endYearA) ?? dataPoints[dataPoints.length - 1]
   const pointAtDeathB = dataPoints.find(d => d.year === endYearB) ?? dataPoints[dataPoints.length - 1]
+
+  // Retirement years for each person
+  const retirementYearA = getYear(state.personA.retirementDate)
+  const retirementYearB = getYear(state.personB.retirementDate)
+  const pointAtRetirementA = dataPoints.find(d => d.year === retirementYearA) ?? dataPoints[0]
+  const pointAtRetirementB = dataPoints.find(d => d.year === retirementYearB) ?? dataPoints[0]
 
   // Portfolio
   const peakPoint = dataPoints.reduce((a, b) => b.totalPortfolio > a.totalPortfolio ? b : a)
@@ -209,11 +283,13 @@ export function computeHeadlineMetrics(
   const oasVs65 = totalOASCollected - baseOAS65
 
   return {
-    portfolioAtStart:    dataPoints[0].totalPortfolio,
-    peakPortfolio:       peakPoint.totalPortfolio,
-    peakPortfolioYear:   peakPoint.year,
-    portfolioAtDeathA:   pointAtDeathA.totalPortfolio,
-    portfolioAtDeathB:   pointAtDeathB.totalPortfolio,
+    portfolioAtStart:       dataPoints[0].totalPortfolio,
+    peakPortfolio:          peakPoint.totalPortfolio,
+    peakPortfolioYear:      peakPoint.year,
+    portfolioAtRetirementA: pointAtRetirementA.totalPortfolio,
+    portfolioAtRetirementB: pointAtRetirementB.totalPortfolio,
+    portfolioAtDeathA:      pointAtDeathA.totalPortfolio,
+    portfolioAtDeathB:      pointAtDeathB.totalPortfolio,
 
     shortfallYears,
     totalYears,

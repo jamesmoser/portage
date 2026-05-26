@@ -2,14 +2,16 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { SectionCard } from '../components/SectionCard'
 import { SectionDivider } from '../components/SectionDivider'
+import { InfoPanel } from '../components/InfoPanel'
 import { NumberInput } from '../components/NumberInput'
 import { SelectInput } from '../components/SelectInput'
+import { ToggleInput } from '../components/ToggleInput'
 import { PlotlyChart, withTotals } from '../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelector'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
-import { exactAgeAt, getYear, dateAtAge } from '../engine/dates'
-import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType } from '../engine/types'
+import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge } from '../engine/dates'
+import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig } from '../engine/types'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,7 +221,7 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
 // The current value is always red; when it coincides with a fixed stop that stop
 // turns red and no separate floating label is rendered.
 function WhatIfSlider({
-  label, min, max, step = 1, baseValue, value, enabled, onChange, valueSuffix = '',
+  label, min, max, step = 1, baseValue, value, enabled, onChange, valueSuffix = '', labelRight,
 }: {
   label: string
   min: number
@@ -230,6 +232,7 @@ function WhatIfSlider({
   enabled: boolean
   onChange: (value: number, enabled: boolean) => void
   valueSuffix?: string
+  labelRight?: React.ReactNode
 }) {
   const val     = Math.max(min, Math.min(max, value))
   const fillPct = ((val - min) / (max - min)) * 100
@@ -251,8 +254,9 @@ function WhatIfSlider({
 
   return (
     <div className="px-3 py-3">
-      <div className="mb-2">
+      <div className="mb-2 flex items-baseline justify-between">
         <span className="text-sm text-slate-600">{label}</span>
+        {labelRight}
       </div>
 
       <input
@@ -564,6 +568,9 @@ export function DashboardTab() {
   // Planning-end years for modal highlights
   const endYearA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
   const endYearB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+  // Retirement years for modal highlights
+  const retirementYearA = getYear(effectiveState.personA.retirementDate)
+  const retirementYearB = getYear(effectiveState.personB.retirementDate)
 
   // Count months in a year where '${year}-MM-01' falls in [startDate, endDate].
   // Mirrors the engine's monthly loop: income flows when monthDate >= startDate && <= endDate.
@@ -1158,6 +1165,70 @@ export function DashboardTab() {
               />
             </WhatIfSection>
 
+            <WhatIfSection title="Retirement">
+              {([
+                { key: 'retirementA' as const, person: personA, currentAge: currentAgeA, dbEnabled: state.dbPensionA.enabled, name: aName, rrsp: state.rrspA, tfsa: state.tfsaA, nonReg: state.nonRegA },
+                { key: 'retirementB' as const, person: personB, currentAge: currentAgeB, dbEnabled: state.dbPensionB.enabled, name: bName, rrsp: state.rrspB, tfsa: state.tfsaB, nonReg: state.nonRegB },
+              ]).map(({ key, person, currentAge, dbEnabled, name, rrsp, tfsa, nonReg }) => {
+                const wi    = whatIfs[key]
+                const cfg   = wi?.value ?? { retirementAge: exactAgeAt(person.birthDate, person.retirementDate), cascadePension: true, cascadeRrsp: true, cascadeTfsa: true, cascadeNonReg: true } as RetirementWhatIfConfig
+                const baseAge        = exactAgeAt(person.birthDate, person.retirementDate)
+                const baseAgeRounded = Math.round(baseAge * 2) / 2
+                const sliderMin = Math.max(Math.ceil(currentAge * 2) / 2, 0)
+                const sliderMax = person.planningEndAge
+                const sliderVal = wi?.enabled ? cfg.retirementAge : baseAgeRounded
+                const setCfg = (partial: Partial<RetirementWhatIfConfig>) =>
+                  updateWhatIf(key, { value: { ...cfg, ...partial } })
+                // Display the effective retirement date for context
+                const effectiveDate = dateAtDecimalAge(person.birthDate, sliderVal)
+                const dateLbl = new Date(effectiveDate).toLocaleDateString('en-CA', { year: 'numeric', month: 'short' })
+                return (
+                  <div key={key} className="border-t border-slate-100 first:border-t-0">
+                    <WhatIfSlider
+                      label={`${name}'s Retirement Age`}
+                      min={sliderMin} max={sliderMax} step={0.5} baseValue={baseAgeRounded}
+                      value={sliderVal}
+                      enabled={wi?.enabled ?? false}
+                      onChange={(v, active) => updateWhatIf(key, { enabled: active, value: { ...cfg, retirementAge: v } })}
+                      labelRight={
+                        <span className="text-xs" style={{ color: (wi?.enabled ?? false) ? '#7B1515' : '#94a3b8' }}>
+                          {dateLbl}
+                        </span>
+                      }
+                    />
+                    {(wi?.enabled) && (
+                      <div className="px-3 pb-3 space-y-2">
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <span className="text-xs font-medium text-slate-500 shrink-0">Cascade:</span>
+                          <ToggleInput label="DB Pension" value={cfg.cascadePension} onChange={v => setCfg({ cascadePension: v })} />
+                          <ToggleInput label="RRSP"       value={cfg.cascadeRrsp}    onChange={v => setCfg({ cascadeRrsp: v })} />
+                          <ToggleInput label="TFSA"       value={cfg.cascadeTfsa}    onChange={v => setCfg({ cascadeTfsa: v })} />
+                          <ToggleInput label="Non-Reg"    value={cfg.cascadeNonReg}  onChange={v => setCfg({ cascadeNonReg: v })} />
+                        </div>
+                        {cfg.cascadePension && dbEnabled && (
+                          <InfoPanel>
+                            The pension start date shifts to match the new retirement date, but the LTB, bridge amount, and bridge end date are <strong>not</strong> recalculated. In reality, a different retirement date changes your years of service and therefore your entitlement — update the pension tab with revised figures for an accurate projection.
+                          </InfoPanel>
+                        )}
+                        {cfg.cascadePension && !dbEnabled && (
+                          <InfoPanel>No DB pension is enabled for {name} — this toggle has no effect.</InfoPanel>
+                        )}
+                        {cfg.cascadeRrsp && rrsp.annualContribution === 0 && rrsp.spousalAnnualContribution === 0 && (
+                          <InfoPanel>No RRSP contributions are defined for {name} — this toggle has no effect.</InfoPanel>
+                        )}
+                        {cfg.cascadeTfsa && tfsa.annualContribution === 0 && (
+                          <InfoPanel>No TFSA contributions are defined for {name} — this toggle has no effect.</InfoPanel>
+                        )}
+                        {cfg.cascadeNonReg && nonReg.annualContribution === 0 && (
+                          <InfoPanel>No non-registered contributions are defined for {name} — this toggle has no effect.</InfoPanel>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </WhatIfSection>
+
             <WhatIfSection title="Longevity">
               <WhatIfSlider
                 label={`${aName}'s Age at Death`}
@@ -1296,6 +1367,52 @@ export function DashboardTab() {
                   ],
                   rows: dataPoints,
                   highlightRow: d => d.year === dataPoints[0].year,
+                })} />
+              <MetricCard label={`At ${aName}'s Retirement`}
+                value={fmt(metrics.portfolioAtRetirementA)}
+                sub={`in ${retirementYearA}`}
+                frozen={frozenFor(metrics.portfolioAtRetirementA, frozenMetrics?.portfolioAtRetirementA, fmt)}
+                onClick={() => setModalDef({
+                  title: `Portfolio — Balance by Account (${aName}'s Retirement Highlighted)`,
+                  note: "Today's dollars, end of year.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `Age — ${aName}`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `RRSP — ${aName}`, right: true, render: d => fmt(d.rrspA) },
+                    { header: `RRSP — ${bName}`, right: true, render: d => fmt(d.rrspB) },
+                    { header: `TFSA — ${aName}`, right: true, render: d => fmt(d.tfsaA) },
+                    { header: `TFSA — ${bName}`, right: true, render: d => fmt(d.tfsaB) },
+                    { header: `NR — ${aName}`,   right: true, render: d => fmt(d.nonRegA) },
+                    { header: `NR — ${bName}`,   right: true, render: d => fmt(d.nonRegB) },
+                    { header: 'HISA',           right: true, render: d => fmt(d.hisa) },
+                    { header: 'Total',          right: true, bold: true, render: d => fmt(d.totalPortfolio) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === retirementYearA,
+                  summary: [{ label: `Portfolio at ${aName}'s Retirement (${retirementYearA})`, value: fmt(metrics.portfolioAtRetirementA) }],
+                })} />
+              <MetricCard label={`At ${bName}'s Retirement`}
+                value={fmt(metrics.portfolioAtRetirementB)}
+                sub={`in ${retirementYearB}`}
+                frozen={frozenFor(metrics.portfolioAtRetirementB, frozenMetrics?.portfolioAtRetirementB, fmt)}
+                onClick={() => setModalDef({
+                  title: `Portfolio — Balance by Account (${bName}'s Retirement Highlighted)`,
+                  note: "Today's dollars, end of year.",
+                  columns: [
+                    { header: 'Year',              render: d => d.year },
+                    { header: `Age — ${aName}`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: `RRSP — ${aName}`, right: true, render: d => fmt(d.rrspA) },
+                    { header: `RRSP — ${bName}`, right: true, render: d => fmt(d.rrspB) },
+                    { header: `TFSA — ${aName}`, right: true, render: d => fmt(d.tfsaA) },
+                    { header: `TFSA — ${bName}`, right: true, render: d => fmt(d.tfsaB) },
+                    { header: `NR — ${aName}`,   right: true, render: d => fmt(d.nonRegA) },
+                    { header: `NR — ${bName}`,   right: true, render: d => fmt(d.nonRegB) },
+                    { header: 'HISA',           right: true, render: d => fmt(d.hisa) },
+                    { header: 'Total',          right: true, bold: true, render: d => fmt(d.totalPortfolio) },
+                  ],
+                  rows: dataPoints,
+                  highlightRow: d => d.year === retirementYearB,
+                  summary: [{ label: `Portfolio at ${bName}'s Retirement (${retirementYearB})`, value: fmt(metrics.portfolioAtRetirementB) }],
                 })} />
               <MetricCard label="Peak"
                 value={fmt(metrics.peakPortfolio)}

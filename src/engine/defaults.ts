@@ -92,6 +92,14 @@ export const DEFAULT_WHATIFS: WhatIfs = {
     },
   },
   marketProfile: { enabled: false, value: DEFAULT_MARKET_PROFILE },
+  retirementA: {
+    enabled: false,
+    value: { retirementAge: 55, cascadePension: true, cascadeRrsp: true, cascadeTfsa: true, cascadeNonReg: true },
+  },
+  retirementB: {
+    enabled: false,
+    value: { retirementAge: 53, cascadePension: true, cascadeRrsp: true, cascadeTfsa: true, cascadeNonReg: true },
+  },
 }
 
 export const DEFAULT_STATE: AppState = {

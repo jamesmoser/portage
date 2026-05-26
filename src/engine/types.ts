@@ -264,6 +264,16 @@ export interface MarketProfileConfig {
   noiseSeed:         number   // PRNG seed (noise profile only; re-roll changes this)
 }
 
+// ─── Retirement What-if ───────────────────────────────────────────────────────
+
+export interface RetirementWhatIfConfig {
+  retirementAge:  number   // decimal age; snapped to nearest month when converting to date
+  cascadePension: boolean  // shift dbPension startDate 1:1
+  cascadeRrsp:    boolean  // shift RRSP contributionEndDate + spousalLastContributionDate by delta
+  cascadeTfsa:    boolean  // shift TFSA contributionEndDate by delta
+  cascadeNonReg:  boolean  // shift NonReg contributionEndDate by delta
+}
+
 // ─── What-if Overrides ────────────────────────────────────────────────────────
 
 export interface WhatIf<T> {
@@ -285,6 +295,8 @@ export interface WhatIfs {
   pensionSplit:      WhatIf<{ mode: PensionSplitMode; pct: number }>
   drawdownStrategy:  WhatIf<DrawdownStrategyConfig>
   marketProfile:     WhatIf<MarketProfileConfig>
+  retirementA:       WhatIf<RetirementWhatIfConfig>
+  retirementB:       WhatIf<RetirementWhatIfConfig>
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────
@@ -294,6 +306,8 @@ export interface HeadlineMetrics {
   portfolioAtStart:    number
   peakPortfolio:       number
   peakPortfolioYear:   number
+  portfolioAtRetirementA: number // total portfolio in personA's retirement year
+  portfolioAtRetirementB: number // total portfolio in personB's retirement year
   portfolioAtDeathA:   number   // total portfolio in year personA reaches planningEndAge
   portfolioAtDeathB:   number   // total portfolio in final year (personB planning end)
 
