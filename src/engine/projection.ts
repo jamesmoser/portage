@@ -108,6 +108,13 @@ export function runProjection(state: AppState): ProjectionResult {
   let nonRegAcbB = state.nonRegB.acb
   let hisa       = state.cash.hisaBalance
 
+  // Effective non-reg yield rates — blended on spousal rollover so the transferred
+  // portfolio continues to generate the correct T-slip income for the survivor.
+  let nonRegDivYieldA_eff     = state.nonRegA.eligibleDivYieldPct
+  let nonRegForeignYieldA_eff = state.nonRegA.foreignIncomeYieldPct
+  let nonRegDivYieldB_eff     = state.nonRegB.eligibleDivYieldPct
+  let nonRegForeignYieldB_eff = state.nonRegB.foreignIncomeYieldPct
+
   const cppFactorA = cppFactor(state.cppA.startDate, state.personA.birthDate)
   const cppFactorB = cppFactor(state.cppB.startDate, state.personB.birthDate)
   const oasFactorA = oasFactor(state.oasA.startDate, state.personA.birthDate)
@@ -139,14 +146,28 @@ export function runProjection(state: AppState): ProjectionResult {
     if (!aAlive && bAlive) {
       if (rrspA   > 0) { rrspB   += rrspA;   rrspA   = 0 }
       if (tfsaA   > 0) { tfsaB   += tfsaA;   tfsaA   = 0 }
-      if (nonRegA > 0) { nonRegB += nonRegA;  nonRegA = 0
-                         nonRegAcbB += nonRegAcbA; nonRegAcbA = 0 }
+      if (nonRegA > 0) {
+        // Blend yield rates before merging — survivor's account takes on a weighted mix
+        // of A's and B's original rates proportional to their balances at time of transfer.
+        const tot = nonRegB + nonRegA
+        const wA = nonRegA / tot, wB = nonRegB / tot
+        nonRegDivYieldB_eff     = wB * nonRegDivYieldB_eff     + wA * nonRegDivYieldA_eff
+        nonRegForeignYieldB_eff = wB * nonRegForeignYieldB_eff + wA * nonRegForeignYieldA_eff
+        nonRegB += nonRegA;  nonRegA = 0
+        nonRegAcbB += nonRegAcbA; nonRegAcbA = 0
+      }
     }
     if (!bAlive && aAlive) {
       if (rrspB   > 0) { rrspA   += rrspB;   rrspB   = 0 }
       if (tfsaB   > 0) { tfsaA   += tfsaB;   tfsaB   = 0 }
-      if (nonRegB > 0) { nonRegA += nonRegB;  nonRegB = 0
-                         nonRegAcbA += nonRegAcbB; nonRegAcbB = 0 }
+      if (nonRegB > 0) {
+        const tot = nonRegA + nonRegB
+        const wB = nonRegB / tot, wA = nonRegA / tot
+        nonRegDivYieldA_eff     = wA * nonRegDivYieldA_eff     + wB * nonRegDivYieldB_eff
+        nonRegForeignYieldA_eff = wA * nonRegForeignYieldA_eff + wB * nonRegForeignYieldB_eff
+        nonRegA += nonRegB;  nonRegB = 0
+        nonRegAcbA += nonRegAcbB; nonRegAcbB = 0
+      }
     }
 
     // ── RRIF minimums (annual — based on Jan 1 balance and Jan 1 age) ────────
@@ -307,21 +328,38 @@ export function runProjection(state: AppState): ProjectionResult {
         }
       }
 
+      // ── DB Pension survivor benefits ─────────────────────────────────────────
+      // After A dies, B receives A's base pension × survivor benefit %.
+      // Bridge does not survive — only the indexed base.
+      if (state.dbPensionA.enabled && !mAAlive && mBAlive
+          && state.dbPensionA.survivorBenefitPct > 0
+          && onOrAfter(monthDate, state.dbPensionA.startDate)) {
+        dbBaseB_nom += (annualDbBaseA_nom * state.dbPensionA.survivorBenefitPct) / 12
+      }
+      // After B dies, A receives B's base pension × survivor benefit %.
+      if (state.dbPensionB.enabled && !mBAlive && mAAlive
+          && state.dbPensionB.survivorBenefitPct > 0
+          && onOrAfter(monthDate, state.dbPensionB.startDate)) {
+        dbBase_nom += (annualDbBaseB_nom * state.dbPensionB.survivorBenefitPct) / 12
+      }
+
       // ── CPP A ───────────────────────────────────────────────────────────────
       if (mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
         cppA_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * cpiFactorForYear
-        // Survivor CPP from B: active in any month B is dead and B's CPP had started.
-        if (!mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
-          cppA_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * 0.60 * cpiFactorForYear
-        }
+      }
+      // Survivor CPP: A receives 60% of B's pension in any month B is dead and B's CPP had started.
+      // Independent of A's own CPP start date — survivor benefit is a separate CRA entitlement.
+      if (mAAlive && !mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
+        cppA_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * 0.60 * cpiFactorForYear
       }
 
       // ── CPP B ───────────────────────────────────────────────────────────────
       if (mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
         cppB_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * cpiFactorForYear
-        if (!mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
-          cppB_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * 0.60 * cpiFactorForYear
-        }
+      }
+      // Survivor CPP: B receives 60% of A's pension in any month A is dead and A's CPP had started.
+      if (mBAlive && !mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
+        cppB_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * 0.60 * cpiFactorForYear
       }
 
       // ── OAS A ───────────────────────────────────────────────────────────────
@@ -363,10 +401,12 @@ export function runProjection(state: AppState): ProjectionResult {
     // ── Non-reg portfolio income (annual — yield on beginning-of-year balance) ─
     const nonRegRetA = state.nonRegA.returnRateOverrideEnabled ? state.nonRegA.returnRateOverridePct / 100 : nomReturn
     const nonRegRetB = state.nonRegB.returnRateOverrideEnabled ? state.nonRegB.returnRateOverridePct / 100 : nomReturn
-    const nonRegDivEligA_nom  = nonRegA * (state.nonRegA.eligibleDivYieldPct  / 100)
-    const nonRegDivEligB_nom  = nonRegB * (state.nonRegB.eligibleDivYieldPct  / 100)
-    const nonRegForeignA_nom  = nonRegA * (state.nonRegA.foreignIncomeYieldPct / 100)
-    const nonRegForeignB_nom  = nonRegB * (state.nonRegB.foreignIncomeYieldPct / 100)
+    // Use effective yield rates (blended after spousal rollover) so the transferred
+    // portfolio generates the correct T-slip income for the surviving spouse.
+    const nonRegDivEligA_nom  = nonRegA * (nonRegDivYieldA_eff  / 100)
+    const nonRegDivEligB_nom  = nonRegB * (nonRegDivYieldB_eff  / 100)
+    const nonRegForeignA_nom  = nonRegA * (nonRegForeignYieldA_eff / 100)
+    const nonRegForeignB_nom  = nonRegB * (nonRegForeignYieldB_eff / 100)
 
     // ── Additional spending items (annual — one-time or recurring from a start age) ──
     // Pro-rate by alive months so the final year of the plan isn't inflated.
