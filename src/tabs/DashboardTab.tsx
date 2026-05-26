@@ -1019,7 +1019,7 @@ export function DashboardTab() {
       </SectionCard>
 
       {/* ── Base Plan Modifications Card ──────────────────────────────────── */}
-      <SectionCard title="Base Plan Modifications" width="full" info={<>
+      <SectionCard title="Base Plan Modifications" width="full" onReset={resetWhatIfs} info={<>
         <p className="font-semibold text-slate-700 mb-2">Market — Return Profiles</p>
         <p className="mb-2">The return profile shapes how annual portfolio returns vary over the projection horizon. Peak and low are the max and min of your base plan tiers; mid is their average.</p>
         <ul className="space-y-1.5 mb-3">
