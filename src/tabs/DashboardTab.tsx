@@ -991,46 +991,38 @@ export function DashboardTab() {
           <div className="space-y-3">
 
             <WhatIfSection title="Government Benefits">
-              <WhatIfRow
-                enabled={whatIfs.cppStartAgeA.enabled}
-                onToggle={v => updateWhatIf('cppStartAgeA', { enabled: v, value: v ? cppBaseAgeA : whatIfs.cppStartAgeA.value })}
+              <WhatIfSlider
                 label={`CPP Start — ${aName}`}
-                baseLabel={`age ${cppBaseAgeA}`}
-              >
-                <NumberInput label="" value={whatIfs.cppStartAgeA.value}
-                  onChange={v => updateWhatIf('cppStartAgeA', { value: v })}
-                  suffix="years old" min={60} max={70} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
-              <WhatIfRow
-                enabled={whatIfs.cppStartAgeB.enabled}
-                onToggle={v => updateWhatIf('cppStartAgeB', { enabled: v, value: v ? cppBaseAgeB : whatIfs.cppStartAgeB.value })}
+                min={60} max={70}
+                baseValue={cppBaseAgeA}
+                value={whatIfs.cppStartAgeA.enabled ? whatIfs.cppStartAgeA.value : cppBaseAgeA}
+                enabled={whatIfs.cppStartAgeA.enabled}
+                onChange={(age, active) => updateWhatIf('cppStartAgeA', { enabled: active, value: age })}
+              />
+              <WhatIfSlider
                 label={`CPP Start — ${bName}`}
-                baseLabel={`age ${cppBaseAgeB}`}
-              >
-                <NumberInput label="" value={whatIfs.cppStartAgeB.value}
-                  onChange={v => updateWhatIf('cppStartAgeB', { value: v })}
-                  suffix="years old" min={60} max={70} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
-              <WhatIfRow
-                enabled={whatIfs.oasStartAgeA.enabled}
-                onToggle={v => updateWhatIf('oasStartAgeA', { enabled: v, value: v ? oasBaseAgeA : whatIfs.oasStartAgeA.value })}
+                min={60} max={70}
+                baseValue={cppBaseAgeB}
+                value={whatIfs.cppStartAgeB.enabled ? whatIfs.cppStartAgeB.value : cppBaseAgeB}
+                enabled={whatIfs.cppStartAgeB.enabled}
+                onChange={(age, active) => updateWhatIf('cppStartAgeB', { enabled: active, value: age })}
+              />
+              <WhatIfSlider
                 label={`OAS Start — ${aName}`}
-                baseLabel={`age ${oasBaseAgeA}`}
-              >
-                <NumberInput label="" value={whatIfs.oasStartAgeA.value}
-                  onChange={v => updateWhatIf('oasStartAgeA', { value: v })}
-                  suffix="years old" min={65} max={70} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
-              <WhatIfRow
-                enabled={whatIfs.oasStartAgeB.enabled}
-                onToggle={v => updateWhatIf('oasStartAgeB', { enabled: v, value: v ? oasBaseAgeB : whatIfs.oasStartAgeB.value })}
+                min={65} max={70}
+                baseValue={oasBaseAgeA}
+                value={whatIfs.oasStartAgeA.enabled ? whatIfs.oasStartAgeA.value : oasBaseAgeA}
+                enabled={whatIfs.oasStartAgeA.enabled}
+                onChange={(age, active) => updateWhatIf('oasStartAgeA', { enabled: active, value: age })}
+              />
+              <WhatIfSlider
                 label={`OAS Start — ${bName}`}
-                baseLabel={`age ${oasBaseAgeB}`}
-              >
-                <NumberInput label="" value={whatIfs.oasStartAgeB.value}
-                  onChange={v => updateWhatIf('oasStartAgeB', { value: v })}
-                  suffix="years old" min={65} max={70} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
+                min={65} max={70}
+                baseValue={oasBaseAgeB}
+                value={whatIfs.oasStartAgeB.enabled ? whatIfs.oasStartAgeB.value : oasBaseAgeB}
+                enabled={whatIfs.oasStartAgeB.enabled}
+                onChange={(age, active) => updateWhatIf('oasStartAgeB', { enabled: active, value: age })}
+              />
             </WhatIfSection>
 
             <WhatIfSection title="Withdrawal Strategy">
