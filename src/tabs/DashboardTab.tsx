@@ -193,60 +193,82 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
   )
 }
 
-function LongevitySlider({
-  label, currentAge, baseAge, value, enabled, onChange,
+// Generic what-if slider.
+// All labels — min, base, max, and the current value — live in a single row below
+// the track, each centered on its thumb stop using the 8 px radius correction.
+// The current value is always red; when it coincides with a fixed stop that stop
+// turns red and no separate floating label is rendered.
+function WhatIfSlider({
+  label, min, max, step = 1, baseValue, value, enabled, onChange,
 }: {
   label: string
-  currentAge: number
-  baseAge: number
+  min: number
+  max: number
+  step?: number
+  baseValue: number
   value: number
   enabled: boolean
-  onChange: (age: number, enabled: boolean) => void
+  onChange: (value: number, enabled: boolean) => void
 }) {
-  const min      = Math.floor(currentAge)
-  const max      = 100
-  const val      = Math.max(min, Math.min(max, value))
-  const fillPct  = ((val  - min) / (max - min)) * 100
-  const basePct  = ((baseAge - min) / (max - min)) * 100
-  const active   = enabled
-  const trackFill = active ? '#7B1515' : '#cbd5e1'
+  const val     = Math.max(min, Math.min(max, value))
+  const fillPct = ((val - min) / (max - min)) * 100
+
+  // Returns the CSS left value that centers a label on the thumb stop for value v.
+  // Corrects for the 8 px thumb radius so stops at min/max are not clipped.
+  const thumbLeft = (v: number) => {
+    const p = ((v - min) / (max - min)) * 100
+    return `calc(${p}% + ${(0.5 - p / 100) * 16}px)`
+  }
+
+  const onMin  = val === min
+  const onMax  = val === max
+  const onBase = val === baseValue
+  const onFixed = onMin || onMax || onBase  // val sits exactly on a fixed label
+
+  const trackFill = enabled ? '#7B1515' : '#cbd5e1'
   const trackRest = '#e2e8f0'
 
   return (
     <div className="px-3 py-3">
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-2">
         <span className="text-sm text-slate-600">{label}</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold tabular-nums"
-            style={{ color: active ? '#7B1515' : '#94a3b8' }}>
+      </div>
+
+      <input
+        type="range"
+        min={min} max={max} step={step} value={val}
+        onChange={e => { const v = parseFloat(e.target.value); onChange(v, v !== baseValue) }}
+        className="whatif-slider w-full"
+        style={{
+          color:      trackFill,
+          background: `linear-gradient(to right, ${trackFill} ${fillPct}%, ${trackRest} ${fillPct}%)`,
+        }}
+      />
+
+      {/* Label row — all positioned at their exact thumb stops */}
+      <div className="relative mt-1 h-4">
+        <span className={`absolute text-[10px] leading-none -translate-x-1/2 whitespace-nowrap ${onMin ? 'font-semibold' : ''}`}
+          style={{ left: thumbLeft(min), color: onMin ? '#7B1515' : '#94a3b8' }}>
+          {min}
+        </span>
+        <span className={`absolute text-[10px] leading-none -translate-x-1/2 whitespace-nowrap ${onMax ? 'font-semibold' : ''}`}
+          style={{ left: thumbLeft(max), color: onMax ? '#7B1515' : '#94a3b8' }}>
+          {max}
+        </span>
+        {/* Base label — omit when base coincides with an endpoint to avoid duplicates */}
+        {baseValue !== min && baseValue !== max && (
+          <span className={`absolute text-[10px] leading-none -translate-x-1/2 whitespace-nowrap ${onBase ? 'font-semibold' : ''}`}
+            style={{ left: thumbLeft(baseValue), color: onBase ? '#7B1515' : '#94a3b8' }}>
+            {baseValue}
+          </span>
+        )}
+        {/* Floating value label — only shown when val is not on a fixed stop */}
+        {!onFixed && (
+          <span className="absolute text-[10px] font-semibold leading-none -translate-x-1/2 whitespace-nowrap"
+            style={{ left: thumbLeft(val), color: '#7B1515' }}>
             {val}
           </span>
-          {!active && <span className="text-xs text-slate-400">base plan</span>}
-        </div>
-      </div>
-
-      {/* Slider + tick mark */}
-      <div className="relative pb-6">
-        <input
-          type="range"
-          min={min} max={max} step={1} value={val}
-          onChange={e => { const v = parseInt(e.target.value); onChange(v, v !== baseAge) }}
-          className="longevity-slider w-full"
-          style={{
-            color:      trackFill,
-            background: `linear-gradient(to right, ${trackFill} ${fillPct}%, ${trackRest} ${fillPct}%)`,
-          }}
-        />
-        <div className="absolute bottom-0 flex flex-col items-center pointer-events-none"
-          style={{ left: `${basePct}%`, transform: 'translateX(-50%)' }}>
-          <div className="w-px h-2.5 bg-slate-400" />
-          <span className="text-[9px] text-slate-400 whitespace-nowrap leading-none mt-0.5">base</span>
-        </div>
-      </div>
-
-      <div className="flex justify-between text-[10px] text-slate-400">
-        <span>{min}</span>
-        <span>{max}</span>
+        )}
       </div>
     </div>
   )
@@ -947,18 +969,18 @@ export function DashboardTab() {
             </WhatIfSection>
 
             <WhatIfSection title="Longevity">
-              <LongevitySlider
+              <WhatIfSlider
                 label={`${aName}'s Age at Death`}
-                currentAge={currentAgeA}
-                baseAge={personA.planningEndAge}
+                min={Math.floor(currentAgeA)} max={100}
+                baseValue={personA.planningEndAge}
                 value={whatIfs.longevityA.enabled ? whatIfs.longevityA.value : personA.planningEndAge}
                 enabled={whatIfs.longevityA.enabled}
                 onChange={(age, active) => updateWhatIf('longevityA', { enabled: active, value: age })}
               />
-              <LongevitySlider
+              <WhatIfSlider
                 label={`${bName}'s Age at Death`}
-                currentAge={currentAgeB}
-                baseAge={personB.planningEndAge}
+                min={Math.floor(currentAgeB)} max={100}
+                baseValue={personB.planningEndAge}
                 value={whatIfs.longevityB.enabled ? whatIfs.longevityB.value : personB.planningEndAge}
                 enabled={whatIfs.longevityB.enabled}
                 onChange={(age, active) => updateWhatIf('longevityB', { enabled: active, value: age })}
