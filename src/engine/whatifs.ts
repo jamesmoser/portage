@@ -1,7 +1,7 @@
 // What-if merge and headline metrics computation.
 
 import type { AppState, WhatIfs, HeadlineMetrics, DataPoint } from './types'
-import { dateAtAge, dateAtDecimalAge, deathDate, getYear, onOrAfter, parseDate, formatDate } from './dates'
+import { dateAtAge, dateAtDecimalAge, deathDate, exactAgeAt, getYear, onOrAfter, parseDate, formatDate } from './dates'
 
 // Snap an ISO date to the first of the nearest month.
 function snapToMonthStart(dateStr: string): string {
@@ -148,6 +148,70 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     }
     if (cfg.cascadeNonReg) {
       s = { ...s, nonRegB: { ...s.nonRegB, contributionEndDate: minDate(shiftDateMs(s.nonRegB.contributionEndDate, deltaMs), deadlineB) } }
+    }
+  }
+
+  // ── Layoff — Person A ────────────────────────────────────────────────────────
+  if (wi.layoffA?.enabled) {
+    const { date: layoffDate, severance } = wi.layoffA.value
+    if (layoffDate < s.personA.retirementDate) {
+      s = {
+        ...s,
+        personA: { ...s.personA, retirementDate: layoffDate },
+        rrspA: {
+          ...s.rrspA,
+          contributionEndDate:         minDate(s.rrspA.contributionEndDate,         layoffDate),
+          spousalLastContributionDate: minDate(s.rrspA.spousalLastContributionDate, layoffDate),
+        },
+      }
+    }
+    if (severance > 0) {
+      const year = parseInt(layoffDate.slice(0, 4), 10)
+      s = { ...s, otherIncome: { ...s.otherIncome, otherItems: [...s.otherIncome.otherItems, {
+        id: 'whatif-severance-a', label: `${s.personA.name || 'Person A'} Severance`,
+        annualAmount: severance, startDate: `${year}-01-01`, endDate: `${year}-12-31`,
+        taxable: true, growthRatePct: 0, attributedTo: 'personA' as const,
+      }]}}
+    }
+  }
+
+  // ── Layoff — Person B ────────────────────────────────────────────────────────
+  if (wi.layoffB?.enabled) {
+    const { date: layoffDate, severance } = wi.layoffB.value
+    if (layoffDate < s.personB.retirementDate) {
+      s = {
+        ...s,
+        personB: { ...s.personB, retirementDate: layoffDate },
+        rrspB: {
+          ...s.rrspB,
+          contributionEndDate:         minDate(s.rrspB.contributionEndDate,         layoffDate),
+          spousalLastContributionDate: minDate(s.rrspB.spousalLastContributionDate, layoffDate),
+        },
+      }
+    }
+    if (severance > 0) {
+      const year = parseInt(layoffDate.slice(0, 4), 10)
+      s = { ...s, otherIncome: { ...s.otherIncome, otherItems: [...s.otherIncome.otherItems, {
+        id: 'whatif-severance-b', label: `${s.personB.name || 'Person B'} Severance`,
+        annualAmount: severance, startDate: `${year}-01-01`, endDate: `${year}-12-31`,
+        taxable: true, growthRatePct: 0, attributedTo: 'personB' as const,
+      }]}}
+    }
+  }
+
+  // ── Unexpected Expense ───────────────────────────────────────────────────────
+  if (wi.unexpectedExpense?.enabled && wi.unexpectedExpense.value.amount > 0) {
+    const { date, amount } = wi.unexpectedExpense.value
+    const refBirth = s.ageReferencePerson === 'personB' ? s.personB.birthDate : s.personA.birthDate
+    s = {
+      ...s,
+      additionalSpending: [...s.additionalSpending, {
+        id:        'whatif-unexpected-expense',
+        label:     'Unexpected Expense',
+        amount,
+        startAge:  exactAgeAt(refBirth, date),
+        recurring: false,
+      }],
     }
   }
 

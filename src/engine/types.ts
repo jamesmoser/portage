@@ -297,6 +297,9 @@ export interface WhatIfs {
   marketProfile:     WhatIf<MarketProfileConfig>
   retirementA:       WhatIf<RetirementWhatIfConfig>
   retirementB:       WhatIf<RetirementWhatIfConfig>
+  layoffA?:          WhatIf<{ date: string; severance: number }> // employment/RRSP stop + optional lump-sum severance
+  layoffB?:          WhatIf<{ date: string; severance: number }>
+  unexpectedExpense?: WhatIf<{ date: string; amount: number }>  // one-time household spending hit
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────

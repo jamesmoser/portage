@@ -10,7 +10,8 @@ import { PlotlyChart, withTotals } from '../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../components/XAxisSelector'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
-import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge } from '../engine/dates'
+import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../engine/dates'
+import { DateInput } from '../components/DateInput'
 import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig } from '../engine/types'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
@@ -1317,6 +1318,71 @@ export function DashboardTab() {
                     suffix="%" min={0} max={50} step={1} decimals={0} size="sm" />
                 )}
               </WhatIfRow>
+            </WhatIfSection>
+
+            <WhatIfSection title="One Shot Events">
+              {([
+                { key: 'layoffA' as const, name: aName, baseRetireDate: state.personA.retirementDate },
+                { key: 'layoffB' as const, name: bName, baseRetireDate: state.personB.retirementDate },
+              ]).map(({ key, name, baseRetireDate }) => {
+                const wi       = whatIfs[key]
+                const enabled  = wi?.enabled ?? false
+                const date     = wi?.value?.date      ?? todayStr()
+                const severance = wi?.value?.severance ?? 0
+                const set = (partial: { date?: string; severance?: number }) =>
+                  updateWhatIf(key, { enabled: true, value: { date, severance, ...partial } })
+                return (
+                  <div key={key}>
+                    <div className="px-3 py-2.5 flex items-center gap-3">
+                      <input type="checkbox" checked={enabled}
+                        onChange={e => updateWhatIf(key, { enabled: e.target.checked, value: { date, severance } })}
+                        className="w-4 h-4 rounded shrink-0 cursor-pointer" style={{ accentColor: '#7B1515' }} />
+                      <span className={`text-sm w-52 shrink-0 ${enabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
+                        {name}'s Layoff
+                      </span>
+                      {enabled && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <DateInput label="Layoff Date" value={date} onChange={v => set({ date: v })} />
+                          <NumberInput label="Severance ($)" value={severance} size="sm"
+                            onChange={v => set({ severance: v })} />
+                        </div>
+                      )}
+                    </div>
+                    {enabled && date >= baseRetireDate && (
+                      <div className="px-3 pb-2">
+                        <InfoPanel>Layoff date is on or after {name}'s retirement date — employment would have already ended, this has no effect.</InfoPanel>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {(() => {
+                const wi      = whatIfs.unexpectedExpense
+                const enabled = wi?.enabled ?? false
+                const date    = wi?.value?.date   ?? todayStr()
+                const amount  = wi?.value?.amount ?? 0
+                const set = (partial: { date?: string; amount?: number }) =>
+                  updateWhatIf('unexpectedExpense', { enabled: true, value: { date, amount, ...partial } })
+                return (
+                  <div>
+                    <div className="px-3 py-2.5 flex items-center gap-3">
+                      <input type="checkbox" checked={enabled}
+                        onChange={e => updateWhatIf('unexpectedExpense', { enabled: e.target.checked, value: { date, amount } })}
+                        className="w-4 h-4 rounded shrink-0 cursor-pointer" style={{ accentColor: '#7B1515' }} />
+                      <span className={`text-sm w-52 shrink-0 ${enabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
+                        Unexpected Expense
+                      </span>
+                      {enabled && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <DateInput label="Date" value={date} onChange={v => set({ date: v })} />
+                          <NumberInput label="Amount ($)" value={amount} size="sm"
+                            onChange={v => set({ amount: v })} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
             </WhatIfSection>
 
           </div>
