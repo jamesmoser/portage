@@ -221,11 +221,15 @@ export interface DrawdownConfig {
   nonRegMin: number
 }
 
-// Fixed annual dollar withdrawal per account (today's $, inflated each year)
+// Fixed annual dollar withdrawal per account per person (today's $, inflated each year)
 export interface FixedWithdrawalConfig {
-  rrspAmount:    number
-  tfsaAmount:    number
-  nonRegAmount:  number
+  rrspAmountA:   number
+  rrspAmountB:   number
+  tfsaAmountA:   number
+  tfsaAmountB:   number
+  nonRegAmountA: number
+  nonRegAmountB: number
+  hisaAmount:    number   // joint — no automatic gap-fill; only this explicit amount is drawn
 }
 
 // Shape stored in the drawdownStrategy what-if value

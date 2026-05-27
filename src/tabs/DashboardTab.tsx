@@ -549,6 +549,7 @@ export function DashboardTab() {
   const [xAxisModeIncome,    setXAxisModeIncome]    = useState<XAxisMode>('year')
   const [xAxisModeTax,       setXAxisModeTax]       = useState<XAxisMode>('year')
   const [xAxisModeSpending,  setXAxisModeSpending]  = useState<XAxisMode>('year')
+  const [xAxisModeCashFlow,  setXAxisModeCashFlow]  = useState<XAxisMode>('year')
   const [xAxisModePortfolio, setXAxisModePortfolio] = useState<XAxisMode>('year')
 
   type IncomeMode   = 'gross' | 'net'
@@ -667,6 +668,7 @@ export function DashboardTab() {
   const xAxisIncome    = buildXAxis(years, xAxisModeIncome,    effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
   const xAxisTax       = buildXAxis(years, xAxisModeTax,       effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
   const xAxisSpending  = buildXAxis(years, xAxisModeSpending,  effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
+  const xAxisCashFlow  = buildXAxis(years, xAxisModeCashFlow,  effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
   const xAxisPortfolio = buildXAxis(years, xAxisModePortfolio, effectiveState.personA.birthDate, effectiveState.personB.birthDate, effectiveState.personA.planningEndAge, effectiveState.personB.planningEndAge)
 
   // ── Frozen metric helpers ─────────────────────────────────────────────────
@@ -736,6 +738,15 @@ export function DashboardTab() {
     { x: years, y: dataPoints.map(d => d.contributions),      name: 'Contributions',     type: 'bar', marker: { color: '#3b82f6' } },
     { x: years, y: dataPoints.map(d => d.spendingUnexpected), name: 'Unexpected Expense',type: 'bar', marker: { color: '#f59e0b' } },
   ])
+
+  const cashFlowData: Data[] = [{
+    x: years,
+    y: dataPoints.map(d => d.cashFlow),
+    type: 'bar',
+    name: 'Cash Flow',
+    marker: { color: dataPoints.map(d => d.cashFlow >= 0 ? '#22c55e' : '#ef4444') },
+    hovertemplate: '%{y:$,.0f}<extra></extra>',
+  }]
 
   const allPortfolioSeries: Data[] = [
     { x: years, y: dataPoints.map(d => d.rrspA),   name: `${aName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifA }, _p: 'A', _acct: 'rrif'   },
@@ -938,43 +949,45 @@ export function DashboardTab() {
 
           {/* Fixed Withdrawals config */}
           {whatIfs.drawdownStrategy.value.strategyType === 'fixedWithdrawal' && (
-            <div className="overflow-x-auto rounded border border-slate-200">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — today's dollars, inflated each year</th>
-                  </tr>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                    <th className="px-3 py-2 text-left font-medium">Account</th>
-                    <th className="px-3 py-2 font-medium">Amount ($ / yr)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {([
-                    ['RRSP / RRIF', 'rrspAmount'   ],
-                    ['TFSA',        'tfsaAmount'   ],
-                    ['Non-Reg',     'nonRegAmount' ],
-                  ] as const).map(([label, key]) => (
-                    <tr key={label} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-2 text-slate-600 w-1/2">{label}</td>
-                      <td className="px-2 py-1.5 w-1/2">
-                        <NumberInput label=""
-                          value={whatIfs.drawdownStrategy.value.fixedWithdrawal[key]}
-                          onChange={v => updateWhatIf('drawdownStrategy', {
-                            value: {
-                              ...whatIfs.drawdownStrategy.value,
-                              fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [key]: v },
-                            },
-                          })}
-                          min={0} max={500_000} step={1000} decimals={0} size="sm" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-100">
-                RRSP/RRIF draws also respect mandatory RRIF minimums. Draws occur before tax.
-              </p>
+            <div className="space-y-2 pt-1">
+              <div className="space-y-2">
+                {([
+                  ['RRSP / RRIF', 'rrspAmountA',   'rrspAmountB'  ],
+                  ['TFSA',        'tfsaAmountA',   'tfsaAmountB'  ],
+                  ['Non-Reg',     'nonRegAmountA', 'nonRegAmountB'],
+                ] as const).map(([label, keyA, keyB]) => (
+                  <div key={label} className="flex items-end gap-8 p-3 border border-slate-200 rounded bg-slate-50">
+                    <span className="text-sm text-slate-600 w-24 shrink-0 pb-[3px]">{label}</span>
+                    <div className="flex gap-6">
+                      <NumberInput label={aName}
+                        value={whatIfs.drawdownStrategy.value.fixedWithdrawal[keyA]}
+                        onChange={v => updateWhatIf('drawdownStrategy', {
+                          value: { ...whatIfs.drawdownStrategy.value, fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [keyA]: v } },
+                        })}
+                        prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                      <NumberInput label={bName}
+                        value={whatIfs.drawdownStrategy.value.fixedWithdrawal[keyB]}
+                        onChange={v => updateWhatIf('drawdownStrategy', {
+                          value: { ...whatIfs.drawdownStrategy.value, fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [keyB]: v } },
+                        })}
+                        prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-end gap-8 p-3 border border-slate-200 rounded bg-slate-50">
+                  <span className="text-sm text-slate-600 w-24 shrink-0 pb-[3px]">HISA <span className="text-xs text-slate-400">(joint)</span></span>
+                  <NumberInput label="Annual Draw"
+                    value={whatIfs.drawdownStrategy.value.fixedWithdrawal.hisaAmount}
+                    onChange={v => updateWhatIf('drawdownStrategy', {
+                      value: { ...whatIfs.drawdownStrategy.value, fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, hisaAmount: v } },
+                    })}
+                    prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                </div>
+              </div>
+              <InfoPanel>
+                <p>Draws begin at each account owner's retirement date and are pro-rated in the first retirement year. HISA draws begin at the first retirement. Amounts inflate each year from time zero. All draws are exact — no automatic gap-filling. Any unmet shortfall appears as a red bar in the Cash Flow chart.</p>
+                <p className="mt-1.5">After the first death, the higher of the two per-person amounts is used for each account type, attributed to the survivor. RRSP/RRIF draws always respect mandatory RRIF minimums. Non-reg draws are pre-tax — capital gains on the gain above ACB are taxed each year.</p>
+              </InfoPanel>
             </div>
           )}
 
@@ -2000,6 +2013,20 @@ export function DashboardTab() {
         />
         <XAxisSelector value={xAxisModeSpending} onChange={setXAxisModeSpending} aName={aName} bName={bName} />
         <ChartLegend data={spendingData} />
+      </SectionCard>
+
+      <SectionCard title="Annual Cash Flow" width="full"
+        onReset={() => setXAxisModeCashFlow('year')}
+        info="Net cash flow each year in today's dollars: after-tax income plus account withdrawals (RRSP/RRIF, TFSA, non-reg) minus total spending (lifestyle + contributions + unexpected expense). Green bars are surplus years; red bars are shortfall years where spending exceeds all available income and draws.">
+        <PlotlyChart
+          data={cashFlowData}
+          layout={{
+            yaxis: { title: { text: 'Cash Flow ($)', font: { size: 11 } }, tickformat: ',.0f' },
+            xaxis: { ...xAxisCashFlow },
+          }}
+          style={{ height: 280 }}
+        />
+        <XAxisSelector value={xAxisModeCashFlow} onChange={setXAxisModeCashFlow} aName={aName} bName={bName} />
       </SectionCard>
 
       <SectionCard title="Portfolio Balances" width="full"
