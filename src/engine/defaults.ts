@@ -280,7 +280,7 @@ export const DEFAULT_STATE: AppState = {
     pensionSplitMode: 'auto',
     pensionSplitPct:  0,
     drawdownStrategy:        'none',
-    drawdownFixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0 },
+    drawdownFixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0, hisaPct: 0, hisaMin: 0 },
     drawdownFixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
   },
 

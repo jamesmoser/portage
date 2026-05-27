@@ -7,7 +7,7 @@ import { DateInput } from '../../components/DateInput'
 import { ToggleInput } from '../../components/ToggleInput'
 import { PlotlyChart, withTotals } from '../../components/PlotlyChart'
 import { XAxisSelector, XAxisMode, buildXAxis } from '../../components/XAxisSelector'
-import { exactAgeAt, getYear, dateAtAge, jan1 } from '../../engine/dates'
+import { exactAgeAt, intAgeAt, getYear, dateAtAge, jan1 } from '../../engine/dates'
 import { DEFAULT_STATE } from '../../engine/defaults'
 import { rrifMinFactor } from '../../engine/tax'
 import { CHART_COLORS } from '../PaletteTab'
@@ -205,8 +205,8 @@ export function RRSPTab() {
     const isRrifB = jan1(year) >= rrspB.rrifConversionDate
     const contribA = aAlive && !isRrifA ? rrspContrib(rrspA, year, infl) : 0
     const contribB = bAlive && !isRrifB ? rrspContrib(rrspB, year, infl) : 0
-    const withA = isRrifA ? balA * rrifMinFactor(Math.floor(exactAgeAt(rrspA.useSpouseAgeForMinimums ? personB.birthDate : personA.birthDate, `${year}-01-01`))) + rrspA.additionalWithdrawalAboveMinimum * infl : 0
-    const withB = isRrifB ? balB * rrifMinFactor(Math.floor(exactAgeAt(rrspB.useSpouseAgeForMinimums ? personA.birthDate : personB.birthDate, `${year}-01-01`))) + rrspB.additionalWithdrawalAboveMinimum * infl : 0
+    const withA = isRrifA ? balA * rrifMinFactor(intAgeAt(rrspA.useSpouseAgeForMinimums ? personB.birthDate : personA.birthDate, `${year}-01-01`)) + rrspA.additionalWithdrawalAboveMinimum * infl : 0
+    const withB = isRrifB ? balB * rrifMinFactor(intAgeAt(rrspB.useSpouseAgeForMinimums ? personA.birthDate : personB.birthDate, `${year}-01-01`)) + rrspB.additionalWithdrawalAboveMinimum * infl : 0
     balA = Math.max(0, balA + contribA - withA) * (1 + nomRet(rrspA))
     balB = Math.max(0, balB + contribB - withB) * (1 + nomRet(rrspB))
     rrspAVals.push(balA / infl)

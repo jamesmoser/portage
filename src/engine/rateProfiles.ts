@@ -3,7 +3,7 @@
 // One rate per calendar year from startYear to endYear inclusive.
 
 import type { ReturnRates, MarketProfileConfig } from './types'
-import { exactAgeAt, jan1 } from './dates'
+import { intAgeAt, jan1 } from './dates'
 
 // Mulberry32 seeded pseudo-random number generator.
 function seededRand(seed: number): () => number {
@@ -37,7 +37,7 @@ export function generateRateSchedule(
   // all shaped profiles have the same expected average return as the base plan.
   // This isolates sequencing as the only variable when comparing profiles.
   function stepRate(i: number): number {
-    const age = exactAgeAt(refBirthDate, jan1(startYear + i))
+    const age = intAgeAt(refBirthDate, jan1(startYear + i))
     if (age < 55)       return baseRates.upTo55
     else if (age < 65)  return baseRates.from55to65
     else if (age < 70)  return baseRates.from65to70

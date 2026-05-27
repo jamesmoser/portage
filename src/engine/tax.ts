@@ -129,7 +129,7 @@ export function calculateTax(
 
   // ── OAS clawback (recovery tax) ───────────────────────────────────────────
   const oasClawback = input.oasIncome > 0
-    ? Math.max(0, Math.min(input.oasIncome * 12,
+    ? Math.max(0, Math.min(input.oasIncome,
         (netIncome - s.oasClawbackThreshold) * s.oasClawbackRate))
     : 0
 

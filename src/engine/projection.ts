@@ -16,7 +16,7 @@ import { calculateTax, optimizePensionSplit, rrifMinFactor, type TaxInput } from
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function nominalReturnForAge(age: number, rates: AppState['returnRates']): number {
+export function nominalReturnForAge(age: number, rates: AppState['returnRates']): number {
   if (age < 55)  return rates.upTo55 / 100
   if (age < 65)  return rates.from55to65 / 100
   if (age < 70)  return rates.from65to70 / 100
@@ -61,14 +61,14 @@ function calendarAge(birthDate: string, atDate: string): number {
   return wholeYears + fraction
 }
 
-function cppFactor(startDate: string, birthDate: string): number {
+export function cppFactor(startDate: string, birthDate: string): number {
   const age = calendarAge(birthDate, startDate)
   const monthsFromAge65 = (age - 65) * 12
   if (monthsFromAge65 <= 0) return Math.max(0, 1 + 0.006 * monthsFromAge65)
   return 1 + 0.007 * monthsFromAge65
 }
 
-function oasFactor(startDate: string, birthDate: string): number {
+export function oasFactor(startDate: string, birthDate: string): number {
   const age = calendarAge(birthDate, startDate)
   if (age <= 65) return 1.0
   return Math.min(1 + 0.006 * (age - 65) * 12, 1.36)
@@ -134,7 +134,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const personAAgeInt   = intAgeAt(state.personA.birthDate, dateStr)
     const personBAgeInt   = intAgeAt(state.personB.birthDate, dateStr)
 
-    const refAge    = state.ageReferencePerson === 'personB' ? personBAgeExact : personAAgeExact
+    const refAge    = state.ageReferencePerson === 'personB' ? personBAgeInt : personAAgeInt
     const nomReturn = rateSchedule?.[year - currentYear] ?? nominalReturnForAge(refAge, state.returnRates)
 
     const aAlive = year <= endYearA
@@ -173,8 +173,8 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     // ── RRIF minimums (annual — based on Jan 1 balance and Jan 1 age) ────────
     const isRrifA = aAlive && onOrAfter(dateStr, state.rrspA.rrifConversionDate)
     const isRrifB = bAlive && onOrAfter(dateStr, state.rrspB.rrifConversionDate)
-    const ageForRrifA = state.rrspA.useSpouseAgeForMinimums ? personBAgeExact : personAAgeExact
-    const ageForRrifB = state.rrspB.useSpouseAgeForMinimums ? personAAgeExact : personBAgeExact
+    const ageForRrifA = state.rrspA.useSpouseAgeForMinimums ? personBAgeInt : personAAgeInt
+    const ageForRrifB = state.rrspB.useSpouseAgeForMinimums ? personAAgeInt : personBAgeInt
     const rrifMinA = isRrifA ? rrspA * rrifMinFactor(ageForRrifA) : 0
     const rrifMinB = isRrifB ? rrspB * rrifMinFactor(ageForRrifB) : 0
     const rrifAddA = isRrifA ? state.rrspA.additionalWithdrawalAboveMinimum * inflFactor : 0
