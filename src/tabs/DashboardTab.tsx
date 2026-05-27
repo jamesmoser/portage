@@ -993,55 +993,35 @@ export function DashboardTab() {
 
           {/* Fixed Percentage config */}
           {whatIfs.drawdownStrategy.value.strategyType === 'fixedPct' && (
-            <div className="overflow-x-auto rounded border border-slate-200">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Annual Withdrawals — % of balance, with floor</th>
-                  </tr>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                    <th className="px-3 py-2 text-left font-medium">Account</th>
-                    <th className="px-3 py-2 font-medium">Rate (% / yr)</th>
-                    <th className="px-3 py-2 font-medium">Floor ($ / yr)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {([
-                    ['RRSP / RRIF', 'rrspPct',   'rrspMin'   ],
-                    ['TFSA',        'tfsaPct',   'tfsaMin'   ],
-                    ['Non-Reg',     'nonRegPct', 'nonRegMin' ],
-                  ] as const).map(([label, pctKey, minKey]) => (
-                    <tr key={label} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-2 text-slate-600 w-1/3">{label}</td>
-                      <td className="px-2 py-1.5 w-1/3">
-                        <NumberInput label=""
-                          value={whatIfs.drawdownStrategy.value.fixedPct[pctKey]}
-                          onChange={v => updateWhatIf('drawdownStrategy', {
-                            value: {
-                              ...whatIfs.drawdownStrategy.value,
-                              fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [pctKey]: v },
-                            },
-                          })}
-                          min={0} max={100} step={0.5} decimals={1} size="sm" />
-                      </td>
-                      <td className="px-2 py-1.5 w-1/3">
-                        <NumberInput label=""
-                          value={whatIfs.drawdownStrategy.value.fixedPct[minKey]}
-                          onChange={v => updateWhatIf('drawdownStrategy', {
-                            value: {
-                              ...whatIfs.drawdownStrategy.value,
-                              fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [minKey]: v },
-                            },
-                          })}
-                          min={0} max={500_000} step={1000} decimals={0} size="sm" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-100">
-                Each year: withdraw max(rate × balance, floor). RRSP/RRIF also respects mandatory RRIF minimums. Draws occur before tax.
-              </p>
+            <div className="space-y-2 pt-1">
+              {([
+                ['RRSP / RRIF', 'rrspPct',   'rrspMin'   ],
+                ['TFSA',        'tfsaPct',   'tfsaMin'   ],
+                ['Non-Reg',     'nonRegPct', 'nonRegMin' ],
+                ['HISA',        'hisaPct',   'hisaMin'   ],
+              ] as const).map(([label, pctKey, minKey]) => (
+                <div key={label} className="flex items-end gap-8 p-3 border border-slate-200 rounded bg-slate-50">
+                  <span className="text-sm text-slate-600 w-24 shrink-0 pb-[3px]">{label}</span>
+                  <div className="flex gap-6">
+                    <NumberInput label="Rate (%)"
+                      value={whatIfs.drawdownStrategy.value.fixedPct[pctKey]}
+                      onChange={v => updateWhatIf('drawdownStrategy', {
+                        value: { ...whatIfs.drawdownStrategy.value, fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [pctKey]: v } },
+                      })}
+                      min={0} max={100} step={0.5} decimals={1} size="sm" />
+                    <NumberInput label="Floor ($)"
+                      value={whatIfs.drawdownStrategy.value.fixedPct[minKey]}
+                      onChange={v => updateWhatIf('drawdownStrategy', {
+                        value: { ...whatIfs.drawdownStrategy.value, fixedPct: { ...whatIfs.drawdownStrategy.value.fixedPct, [minKey]: v } },
+                      })}
+                      min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                  </div>
+                </div>
+              ))}
+              <InfoPanel>
+                <p>Each year: withdraw <strong>max(rate × balance, floor)</strong> from each account, capped at the account balance. Draws begin at each account owner's retirement date and are pro-rated in the first retirement year and year of death. HISA draws begin at the first retirement.</p>
+                <p className="mt-1.5">RRSP/RRIF draws always respect mandatory RRIF minimums regardless of the configured rate. Non-reg and HISA draws are pre-tax — capital gains on the gain above ACB are taxed each year. All draws are explicit — no automatic gap-filling from any account. Any unmet shortfall appears as a red bar in the Cash Flow chart.</p>
+              </InfoPanel>
             </div>
           )}
         </div>

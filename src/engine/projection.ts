@@ -187,18 +187,18 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     // startMo = retirement month in retirement year, 1 otherwise.
     // endMo   = death month in death year, 12 otherwise.
     // frac    = (endMo - startMo + 1) / 12
-    let fwFracA = 1, fwFracB = 1, fwFracHisa = 1
-    if (withdrawalStrategy.drawdownStrategy === 'fixedWithdrawal') {
+    let drawFracA = 1, drawFracB = 1, drawFracHisa = 1
+    if (withdrawalStrategy.drawdownStrategy === 'fixedWithdrawal' || withdrawalStrategy.drawdownStrategy === 'fixedPct') {
       const retYA = getYear(state.personA.retirementDate)
       const retMoA = parseInt(state.personA.retirementDate.substring(5, 7), 10)
       const deathMoA = parseInt(deathDateA.substring(5, 7), 10)
-      fwFracA = year < retYA ? 0
+      drawFracA = year < retYA ? 0
         : Math.max(0, (year === endYearA ? deathMoA : 12) - (year === retYA ? retMoA : 1) + 1) / 12
 
       const retYB = getYear(state.personB.retirementDate)
       const retMoB = parseInt(state.personB.retirementDate.substring(5, 7), 10)
       const deathMoB = parseInt(deathDateB.substring(5, 7), 10)
-      fwFracB = year < retYB ? 0
+      drawFracB = year < retYB ? 0
         : Math.max(0, (year === endYearB ? deathMoB : 12) - (year === retYB ? retMoB : 1) + 1) / 12
 
       const firstRetire = state.personA.retirementDate <= state.personB.retirementDate
@@ -206,7 +206,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       const retYH  = getYear(firstRetire)
       const retMoH = parseInt(firstRetire.substring(5, 7), 10)
       const lastDeathMo = endYearA >= endYearB ? deathMoA : deathMoB
-      fwFracHisa = year < retYH ? 0
+      drawFracHisa = year < retYH ? 0
         : Math.max(0, (year === endYear ? lastDeathMo : 12) - (year === retYH ? retMoH : 1) + 1) / 12
     }
 
@@ -217,12 +217,12 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     } else if (withdrawalStrategy.drawdownStrategy === 'fixedPct') {
       const fp = withdrawalStrategy.drawdownFixedPct
       if (aAlive) {
-        const target = Math.max(fp.rrspPct / 100 * rrspA, fp.rrspMin * inflFactor, isRrifA ? rrifMinA : 0)
+        const target = Math.max(fp.rrspPct / 100 * rrspA * drawFracA, fp.rrspMin * inflFactor * drawFracA, isRrifA ? rrifMinA : 0)
         rrifA_nom = Math.min(target, rrspA)
         if (!isRrifA) rrspA = Math.max(0, rrspA - rrifA_nom)
       }
       if (bAlive) {
-        const target = Math.max(fp.rrspPct / 100 * rrspB, fp.rrspMin * inflFactor, isRrifB ? rrifMinB : 0)
+        const target = Math.max(fp.rrspPct / 100 * rrspB * drawFracB, fp.rrspMin * inflFactor * drawFracB, isRrifB ? rrifMinB : 0)
         rrifB_nom = Math.min(target, rrspB)
         if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
       }
@@ -230,13 +230,13 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       const fw = withdrawalStrategy.drawdownFixedWithdrawal
       if (aAlive) {
         const rawAmt = bAlive ? fw.rrspAmountA : Math.max(fw.rrspAmountA, fw.rrspAmountB)
-        const target = Math.max(rawAmt * inflFactor * fwFracA, isRrifA ? rrifMinA : 0)
+        const target = Math.max(rawAmt * inflFactor * drawFracA, isRrifA ? rrifMinA : 0)
         rrifA_nom = Math.min(target, rrspA)
         if (!isRrifA) rrspA = Math.max(0, rrspA - rrifA_nom)
       }
       if (bAlive) {
         const rawAmt = aAlive ? fw.rrspAmountB : Math.max(fw.rrspAmountA, fw.rrspAmountB)
-        const target = Math.max(rawAmt * inflFactor * fwFracB, isRrifB ? rrifMinB : 0)
+        const target = Math.max(rawAmt * inflFactor * drawFracB, isRrifB ? rrifMinB : 0)
         rrifB_nom = Math.min(target, rrspB)
         if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
       }
@@ -457,27 +457,43 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const spendingLifestyle_nom = spending_nom  // phases + regular additional, before contributions
     spending_nom += unexpectedSpend_nom
 
-    // ── Fixed withdrawal: non-reg draws computed pre-tax so capital gains flow through tax engine ──
-    // ACB is updated and balance reduced here; the gap section then picks up the amounts.
-    let fwNonRegWithdrawA = 0, fwNonRegWithdrawB = 0
-    let fwNonRegGainA = 0, fwNonRegGainB = 0
+    // ── Proactive non-reg draws computed pre-tax so capital gains flow through tax engine ──
+    // ACB is updated and balance reduced here; the gap section picks up the amounts.
+    let proNonRegWithdrawA = 0, proNonRegWithdrawB = 0
+    let proNonRegGainA = 0, proNonRegGainB = 0
     if (withdrawalStrategy.drawdownStrategy === 'fixedWithdrawal') {
       const fw = withdrawalStrategy.drawdownFixedWithdrawal
       if (aAlive) {
         const rawAmt = bAlive ? fw.nonRegAmountA : Math.max(fw.nonRegAmountA, fw.nonRegAmountB)
-        fwNonRegWithdrawA = Math.min(rawAmt * inflFactor * fwFracA, nonRegA)
+        proNonRegWithdrawA = Math.min(rawAmt * inflFactor * drawFracA, nonRegA)
         const acbRatio = nonRegA > 0 ? nonRegAcbA / nonRegA : 0
-        fwNonRegGainA = fwNonRegWithdrawA * (1 - acbRatio)
-        if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (fwNonRegWithdrawA / nonRegA)
-        nonRegA -= fwNonRegWithdrawA
+        proNonRegGainA = proNonRegWithdrawA * (1 - acbRatio)
+        if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (proNonRegWithdrawA / nonRegA)
+        nonRegA -= proNonRegWithdrawA
       }
       if (bAlive) {
         const rawAmt = aAlive ? fw.nonRegAmountB : Math.max(fw.nonRegAmountA, fw.nonRegAmountB)
-        fwNonRegWithdrawB = Math.min(rawAmt * inflFactor * fwFracB, nonRegB)
+        proNonRegWithdrawB = Math.min(rawAmt * inflFactor * drawFracB, nonRegB)
         const acbRatio = nonRegB > 0 ? nonRegAcbB / nonRegB : 0
-        fwNonRegGainB = fwNonRegWithdrawB * (1 - acbRatio)
-        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (fwNonRegWithdrawB / nonRegB)
-        nonRegB -= fwNonRegWithdrawB
+        proNonRegGainB = proNonRegWithdrawB * (1 - acbRatio)
+        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (proNonRegWithdrawB / nonRegB)
+        nonRegB -= proNonRegWithdrawB
+      }
+    } else if (withdrawalStrategy.drawdownStrategy === 'fixedPct') {
+      const fp = withdrawalStrategy.drawdownFixedPct
+      if (aAlive) {
+        proNonRegWithdrawA = Math.min(Math.max(fp.nonRegPct / 100 * nonRegA * drawFracA, fp.nonRegMin * inflFactor * drawFracA), nonRegA)
+        const acbRatio = nonRegA > 0 ? nonRegAcbA / nonRegA : 0
+        proNonRegGainA = proNonRegWithdrawA * (1 - acbRatio)
+        if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (proNonRegWithdrawA / nonRegA)
+        nonRegA -= proNonRegWithdrawA
+      }
+      if (bAlive) {
+        proNonRegWithdrawB = Math.min(Math.max(fp.nonRegPct / 100 * nonRegB * drawFracB, fp.nonRegMin * inflFactor * drawFracB), nonRegB)
+        const acbRatio = nonRegB > 0 ? nonRegAcbB / nonRegB : 0
+        proNonRegGainB = proNonRegWithdrawB * (1 - acbRatio)
+        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (proNonRegWithdrawB / nonRegB)
+        nonRegB -= proNonRegWithdrawB
       }
     }
 
@@ -490,7 +506,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       eligibleDividends:    nonRegDivEligA_nom,
       nonEligibleDividends: 0,
       foreignIncome:        nonRegForeignA_nom,
-      capitalGainsRealized: fwNonRegGainA,
+      capitalGainsRealized: proNonRegGainA,
       age:                  personAAgeInt,
     }
     const taxInputB: TaxInput = {
@@ -501,7 +517,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       eligibleDividends:    nonRegDivEligB_nom,
       nonEligibleDividends: 0,
       foreignIncome:        nonRegForeignB_nom,
-      capitalGainsRealized: fwNonRegGainB,
+      capitalGainsRealized: proNonRegGainB,
       age:                  personBAgeInt,
     }
 
@@ -588,27 +604,23 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       }
 
     } else if (withdrawalStrategy.drawdownStrategy === 'fixedPct') {
-      // Fixed percentage: proactive TFSA and Non-Reg draws; HISA covers remaining gap automatically.
+      // Fixed percentage: all draws are explicit — no automatic gap-fill from any source.
+      // RRSP/RRIF and non-reg already drawn pre-tax above.
       const fp = withdrawalStrategy.drawdownFixedPct
       if (aAlive) {
-        tfsaWithdrawA = Math.min(Math.max(fp.tfsaPct / 100 * tfsaA, fp.tfsaMin * inflFactor), tfsaA)
+        tfsaWithdrawA = Math.min(Math.max(fp.tfsaPct / 100 * tfsaA * drawFracA, fp.tfsaMin * inflFactor * drawFracA), tfsaA)
         tfsaA -= tfsaWithdrawA
-        nonRegWithdrawA = Math.min(Math.max(fp.nonRegPct / 100 * nonRegA, fp.nonRegMin * inflFactor), nonRegA)
-        if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
-        nonRegA -= nonRegWithdrawA
       }
       if (bAlive) {
-        tfsaWithdrawB = Math.min(Math.max(fp.tfsaPct / 100 * tfsaB, fp.tfsaMin * inflFactor), tfsaB)
+        tfsaWithdrawB = Math.min(Math.max(fp.tfsaPct / 100 * tfsaB * drawFracB, fp.tfsaMin * inflFactor * drawFracB), tfsaB)
         tfsaB -= tfsaWithdrawB
-        nonRegWithdrawB = Math.min(Math.max(fp.nonRegPct / 100 * nonRegB, fp.nonRegMin * inflFactor), nonRegB)
-        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
-        nonRegB -= nonRegWithdrawB
       }
-      proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB
-      const shortfall = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
-      const hisaDraw  = Math.min(shortfall, hisa)
-      hisa    -= hisaDraw
-      gap_nom  = Math.max(0, shortfall - hisaDraw)
+      nonRegWithdrawA = proNonRegWithdrawA
+      nonRegWithdrawB = proNonRegWithdrawB
+      const hisaDraw = Math.min(Math.max(fp.hisaPct / 100 * hisa * drawFracHisa, fp.hisaMin * inflFactor * drawFracHisa), hisa)
+      hisa -= hisaDraw
+      proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB + hisaDraw
+      gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
 
     } else {
       // Fixed withdrawal: ALL draws are explicit — no automatic gap-fill from any source.
@@ -616,17 +628,17 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       const fw = withdrawalStrategy.drawdownFixedWithdrawal
       if (aAlive) {
         const rawAmt = bAlive ? fw.tfsaAmountA : Math.max(fw.tfsaAmountA, fw.tfsaAmountB)
-        tfsaWithdrawA = Math.min(rawAmt * inflFactor * fwFracA, tfsaA)
+        tfsaWithdrawA = Math.min(rawAmt * inflFactor * drawFracA, tfsaA)
         tfsaA -= tfsaWithdrawA
       }
       if (bAlive) {
         const rawAmt = aAlive ? fw.tfsaAmountB : Math.max(fw.tfsaAmountA, fw.tfsaAmountB)
-        tfsaWithdrawB = Math.min(rawAmt * inflFactor * fwFracB, tfsaB)
+        tfsaWithdrawB = Math.min(rawAmt * inflFactor * drawFracB, tfsaB)
         tfsaB -= tfsaWithdrawB
       }
-      nonRegWithdrawA = fwNonRegWithdrawA
-      nonRegWithdrawB = fwNonRegWithdrawB
-      const hisaDraw = Math.min(fw.hisaAmount * inflFactor * fwFracHisa, hisa)
+      nonRegWithdrawA = proNonRegWithdrawA
+      nonRegWithdrawB = proNonRegWithdrawB
+      const hisaDraw = Math.min(fw.hisaAmount * inflFactor * drawFracHisa, hisa)
       hisa -= hisaDraw
       proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB + hisaDraw
       gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)

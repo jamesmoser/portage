@@ -219,6 +219,8 @@ export interface DrawdownConfig {
   tfsaMin:   number
   nonRegPct: number
   nonRegMin: number
+  hisaPct:   number
+  hisaMin:   number
 }
 
 // Fixed annual dollar withdrawal per account per person (today's $, inflated each year)
