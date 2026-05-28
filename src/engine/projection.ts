@@ -744,11 +744,16 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       // the account.  The last account always receives all remaining surplus
       // regardless of its limit.  TFSA and Non-Reg are split 50/50 A/B; HISA
       // is a joint pool.
-      if (gap_nom <= 0 && sgConfig.surplusItems.length > 0) {
+      const activeSurplusItems = (isRrifA || isRrifB)
+        ? sgConfig.surplusRrifItems
+        : (inMeltdownA || inMeltdownB)
+        ? sgConfig.surplusMeltdownItems
+        : []
+      if (gap_nom <= 0 && activeSurplusItems.length > 0) {
         let surplusRemaining = Math.max(0, totalNetNom + proactiveExtra - spending_nom)
-        const lastIdx = sgConfig.surplusItems.length - 1
+        const lastIdx = activeSurplusItems.length - 1
         for (let si = 0; si <= lastIdx && surplusRemaining > 0.01; si++) {
-          const item = sgConfig.surplusItems[si]
+          const item = activeSurplusItems[si]
           const isLast = si === lastIdx
           const limit_nom = (!isLast && item.limit > 0) ? item.limit * inflFactor : Infinity
           if (!isLast && item.limit === 0) continue  // skip non-last with limit=0

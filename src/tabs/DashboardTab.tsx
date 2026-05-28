@@ -1223,16 +1223,27 @@ export function DashboardTab() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Surplus Routing</th>
+                        <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Surplus Routing</th>
+                      </tr>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
+                        <th className="px-3 py-2 text-left font-medium">Deposit order</th>
+                        <th className="px-3 py-2 font-medium">Phase 2 — Meltdown</th>
+                        <th className="px-3 py-2 font-medium">Phase 3 — RRIF</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      <tr className="hover:bg-slate-50/50">
-                        <td className="px-3 py-2 text-slate-600 align-top w-1/3">Deposit order</td>
+                      <tr className="hover:bg-slate-50/50 align-top">
+                        <td className="px-3 py-2 text-slate-600 w-1/3" />
                         <td className="px-3 py-2">
                           <SurplusOrderInput
-                            items={sg.surplusItems ?? DEFAULT_SURPLUS_ITEMS}
-                            onChange={items => updateSg({ surplusItems: items })}
+                            items={sg.surplusMeltdownItems ?? DEFAULT_SURPLUS_ITEMS}
+                            onChange={items => updateSg({ surplusMeltdownItems: items })}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <SurplusOrderInput
+                            items={sg.surplusRrifItems ?? DEFAULT_SURPLUS_ITEMS}
+                            onChange={items => updateSg({ surplusRrifItems: items })}
                           />
                         </td>
                       </tr>
@@ -1241,7 +1252,7 @@ export function DashboardTab() {
                 </div>
 
                 <InfoPanel>
-                  <p><strong>Surplus routing</strong> — When income exceeds spending and contributions, the remaining surplus is deposited into accounts in the order shown. Each non-last account fills up to its annual limit (today's $, CPI-indexed); set to 0 to skip it. The last account always receives all remaining surplus. TFSA and Non-Reg deposits are split 50/50 between Person A and Person B (or 100% to the survivor). Surplus contributions appear in the TFSA/Non-Reg/HISA columns of the Spending table.</p>
+                  <p><strong>Surplus routing</strong> — When income exceeds spending and contributions, the remaining surplus is deposited into accounts in the order shown. Each non-last account fills up to its annual limit (today's $, CPI-indexed); set to 0 to skip it. The last account always receives all remaining surplus. If either person is in Phase 3, the Phase 3 order is used; otherwise the Phase 2 order applies. TFSA and Non-Reg deposits are split 50/50 between Person A and Person B (or 100% to the survivor). Surplus contributions appear in the TFSA/Non-Reg/HISA columns of the Spending table.</p>
                 </InfoPanel>
 
                 <div className="flex justify-end">

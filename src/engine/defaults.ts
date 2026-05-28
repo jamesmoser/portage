@@ -96,7 +96,8 @@ export const DEFAULT_SPEND_GAP_CONFIG: SpendGapConfig = {
   meltdownB: DEFAULT_SPEND_GAP_PHASE,
   rrifA:     DEFAULT_SPEND_GAP_PHASE,
   rrifB:     DEFAULT_SPEND_GAP_PHASE,
-  surplusItems: DEFAULT_SURPLUS_ITEMS,
+  surplusMeltdownItems: DEFAULT_SURPLUS_ITEMS,
+  surplusRrifItems:     DEFAULT_SURPLUS_ITEMS,
 }
 
 export const DEFAULT_WHATIFS: WhatIfs = {

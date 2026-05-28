@@ -246,11 +246,13 @@ export interface SpendGapConfig {
   meltdownB: SpendGapPhaseConfig
   rrifA: SpendGapPhaseConfig
   rrifB: SpendGapPhaseConfig
-  /** Ordered list of accounts to receive surplus income after spending and contributions are covered.
+  /** Surplus routing during Phase 2 (Meltdown — retired, pre-RRIF).
    *  Non-last items fill up to their limit then pass remaining to the next.
    *  Last item always receives all remaining surplus (its limit is ignored).
    *  limit = 0 skips the account (unless it is last). */
-  surplusItems: SpendGapSurplusItem[]
+  surplusMeltdownItems: SpendGapSurplusItem[]
+  /** Surplus routing during Phase 3 (RRIF — forced minimums may produce excess income). */
+  surplusRrifItems: SpendGapSurplusItem[]
 }
 
 // Fixed % of balance per year, with a floor amount

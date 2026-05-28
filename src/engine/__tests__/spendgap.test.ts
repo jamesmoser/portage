@@ -149,7 +149,8 @@ function sgState(p: SgParams = {}): AppState {
           grossIncomeCeiling: 0,
           deficitItems: p.rrifBItems ?? items('tfsa', 'nonReg', 'hisa'),
         },
-        surplusItems: DEFAULT_SURPLUS_ITEMS,
+        surplusMeltdownItems: DEFAULT_SURPLUS_ITEMS,
+        surplusRrifItems:     DEFAULT_SURPLUS_ITEMS,
       },
     },
   }
