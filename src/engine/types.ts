@@ -204,12 +204,54 @@ export interface TaxSettings {
 
 // ─── Withdrawal Strategy ─────────────────────────────────────────────────────
 
-export type WithdrawalOrder = 'tfsa_first' | 'rrsp_first' | 'nonreg_first' | 'optimized'
 export type PensionSplitMode = 'auto' | 'manual'
 
 // ─── Drawdown Strategies ──────────────────────────────────────────────────────
 
 export type DrawdownStrategyType = 'none' | 'spendGap' | 'fixedWithdrawal' | 'fixedPct'
+
+// ─── Spend-Gap Strategy ───────────────────────────────────────────────────────
+
+export type SpendGapAccountType = 'tfsa' | 'nonReg' | 'hisa' | 'rrif'
+
+export interface SpendGapDeficitItem {
+  account: SpendGapAccountType
+  /** Max household draw per year from this account (today's $, CPI-indexed). 0 = unlimited. */
+  cap: number
+}
+
+export type SpendGapSurplusAccountType = 'tfsa' | 'nonReg' | 'hisa'
+
+export interface SpendGapSurplusItem {
+  account: SpendGapSurplusAccountType
+  /** Max household deposit per year into this account (today's $, CPI-indexed).
+   *  0 = skip this account (except the last item, which always receives all remaining surplus). */
+  limit: number
+}
+
+export interface SpendGapPhaseConfig {
+  /** Meltdown phase only: proactively draw RRSP up to this gross income ceiling (today's $,
+   *  CPI-indexed in engine). 0 = no proactive meltdown draw. */
+  grossIncomeCeiling: number
+  /** Ordered deficit accounts with per-account annual draw caps.
+   *  'rrif' = draw above the mandatory minimum (RRIF phase only).
+   *  cap = 0 means unlimited; engine moves to next account only after cap is reached. */
+  deficitItems: SpendGapDeficitItem[]
+}
+
+export interface SpendGapConfig {
+  /** Stop contributions for a person once their partner retires. Default false. */
+  stopContributionsWhenPartnerRetired: boolean
+  meltdownA: SpendGapPhaseConfig
+  meltdownB: SpendGapPhaseConfig
+  rrifA: SpendGapPhaseConfig
+  rrifB: SpendGapPhaseConfig
+  /** Ordered list of accounts to receive surplus income after spending and contributions are covered.
+   *  Non-last items fill up to their limit then pass remaining to the next.
+   *  Last item always receives all remaining surplus (its limit is ignored).
+   *  limit = 0 skips the account (unless it is last). */
+  surplusItems: SpendGapSurplusItem[]
+}
 
 // Fixed % of balance per year, with a floor amount
 export interface DrawdownConfig {
@@ -239,10 +281,10 @@ export interface DrawdownStrategyConfig {
   strategyType:    DrawdownStrategyType
   fixedPct:        DrawdownConfig
   fixedWithdrawal: FixedWithdrawalConfig
+  spendGapConfig:  SpendGapConfig
 }
 
 export interface WithdrawalStrategy {
-  withdrawalOrder:  WithdrawalOrder
   pensionSplitMode: PensionSplitMode
   pensionSplitPct:  number           // 0–50, person A to person B; used when mode=manual
 
@@ -250,6 +292,7 @@ export interface WithdrawalStrategy {
   drawdownStrategy:        DrawdownStrategyType
   drawdownFixedPct:        DrawdownConfig
   drawdownFixedWithdrawal: FixedWithdrawalConfig
+  spendGapConfig:          SpendGapConfig
 }
 
 // ─── Market Profile ───────────────────────────────────────────────────────────
@@ -297,7 +340,6 @@ export interface WhatIfs {
   cppStartAgeB:      WhatIf<number>
   oasStartAgeA:      WhatIf<number>              // OAS start age (65–70)
   oasStartAgeB:      WhatIf<number>
-  withdrawalOrder:   WhatIf<WithdrawalOrder>
   pensionSplit:      WhatIf<{ mode: PensionSplitMode; pct: number }>
   drawdownStrategy:  WhatIf<DrawdownStrategyConfig>
   marketProfile:     WhatIf<MarketProfileConfig>
@@ -423,6 +465,10 @@ export interface DataPoint {
   nonRegYieldB: number
   otherIncomeA: number
   otherIncomeB: number
+  pensionSplitPaid:     number  // amount A transferred to B via pension splitting (PD$); positive
+  pensionSplitReceived: number  // amount B received from A via pension splitting (PD$); positive
+
+  hisaWithdrawal: number       // HISA drawn to fund gap or via explicit strategy (joint, PD$)
 
   // Tax summary (present-day dollars)
   grossIncomeA: number
@@ -441,6 +487,13 @@ export interface DataPoint {
   householdSpending:  number   // total: lifestyle + contributions + unexpected expense
   spendingLifestyle:  number   // spending phases + regular additional spending items only
   contributions:      number   // total RRSP + TFSA + non-reg contributions (both people)
+  contribRrspA:   number       // effective RRSP contribution Person A
+  contribRrspB:   number
+  contribTfsaA:   number       // effective TFSA contribution Person A
+  contribTfsaB:   number
+  contribNonRegA: number       // effective non-reg contribution Person A
+  contribNonRegB: number
+  hisaContrib: number          // surplus deposit into HISA (from surplus routing)
   spendingUnexpected: number   // what-if unexpected expense only
   cashFlow: number             // totalHouseholdNet - householdSpending
 

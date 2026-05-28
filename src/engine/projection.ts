@@ -10,7 +10,7 @@
 //   3. After the monthly loop, run taxes on annual totals, apply drawdown,
 //      update account balances, and emit a DataPoint in present-day dollars.
 
-import type { AppState, DataPoint, ProjectionResult } from './types'
+import type { AppState, DataPoint, ProjectionResult, SpendGapAccountType, SpendGapDeficitItem, SpendGapSurplusAccountType } from './types'
 import { jan1, getYear, exactAgeAt, intAgeAt, onOrAfter, before, dateAtAge, dateAtDecimalAge } from './dates'
 import { calculateTax, optimizePensionSplit, rrifMinFactor, type TaxInput } from './tax'
 
@@ -524,18 +524,17 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const eligibleForSplitA = (aAlive ? dbBase_nom + dbBridge_nom : 0) +
       (personAAgeInt >= 65 && aAlive ? rrifA_nom : 0)
 
-    let taxA, taxB, splitPct
+    let taxA, taxB, splitAmount = 0
     if (withdrawalStrategy.pensionSplitMode === 'auto' && aAlive && bAlive) {
       const opt = optimizePensionSplit(taxInputA, taxInputB, eligibleForSplitA, taxSettings, yearsFromNow, state.cpiRatePct)
-      taxA = opt.taxA; taxB = opt.taxB; splitPct = opt.splitPct
+      taxA = opt.taxA; taxB = opt.taxB
+      splitAmount = eligibleForSplitA * (opt.splitPct / 100)
     } else {
       const manualPct = withdrawalStrategy.pensionSplitMode === 'manual' ? withdrawalStrategy.pensionSplitPct : 0
-      const transfer  = eligibleForSplitA * (manualPct / 100)
-      taxA = calculateTax({ ...taxInputA, pensionIncome: taxInputA.pensionIncome - transfer }, taxSettings, yearsFromNow - baseYear + baseYear, state.cpiRatePct)
-      taxB = calculateTax({ ...taxInputB, pensionIncome: taxInputB.pensionIncome + transfer }, taxSettings, yearsFromNow - baseYear + baseYear, state.cpiRatePct)
-      splitPct = manualPct
+      splitAmount  = eligibleForSplitA * (manualPct / 100)
+      taxA = calculateTax({ ...taxInputA, pensionIncome: taxInputA.pensionIncome - splitAmount }, taxSettings, yearsFromNow - baseYear + baseYear, state.cpiRatePct)
+      taxB = calculateTax({ ...taxInputB, pensionIncome: taxInputB.pensionIncome + splitAmount }, taxSettings, yearsFromNow - baseYear + baseYear, state.cpiRatePct)
     }
-    void splitPct
 
     // Non-reg yield (dividends, foreign income) stays in the account — it is NOT received as
     // spendable cash.  The T-slip tax liability is real and must be paid from actual income or
@@ -543,63 +542,237 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     // gap calculation correctly treats the tax as a cost without crediting phantom income.
     const nonRegYieldA = aAlive ? nonRegDivEligA_nom + nonRegForeignA_nom : 0
     const nonRegYieldB = bAlive ? nonRegDivEligB_nom + nonRegForeignB_nom : 0
-    const totalNetNom = (aAlive ? taxA.netAfterTax - nonRegYieldA + otherNonTaxA_nom : 0)
-                      + (bAlive ? taxB.netAfterTax - nonRegYieldB + otherNonTaxB_nom : 0)
+    let totalNetNom = (aAlive ? taxA.netAfterTax - nonRegYieldA + otherNonTaxA_nom : 0)
+                   + (bAlive ? taxB.netAfterTax - nonRegYieldB + otherNonTaxB_nom : 0)
 
     // ── Contributions — computed here so they can be added to spending_nom ──────
     // Contributions are real cash outflows (money leaving the household and going
     // into investment accounts). Including them in spending gives an accurate
     // cash flow: income - lifestyle spending - contributions = true surplus/deficit.
-    const tfsaContribA  = tfsaContribNom(state.tfsaA,  year, aAlive, inflFactor)
-    const tfsaContribB  = tfsaContribNom(state.tfsaB,  year, bAlive, inflFactor)
-    const rrspContribA  = rrspContribNom(state.rrspA,  year, aAlive, isRrifA, inflFactor)
-    const rrspContribB  = rrspContribNom(state.rrspB,  year, bAlive, isRrifB, inflFactor)
-    const nonRegContribA = contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aAlive, inflFactor)
-    const nonRegContribB = contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bAlive, inflFactor)
+    //
+    // stopContributionsWhenPartnerRetired: when enabled under the spendGap strategy,
+    // a person's contributions cease once their partner has retired.
+    const sgStop = withdrawalStrategy.drawdownStrategy === 'spendGap'
+      && withdrawalStrategy.spendGapConfig.stopContributionsWhenPartnerRetired
+    const aPartnerRetired = bAlive && onOrAfter(dateStr, state.personB.retirementDate)
+    const bPartnerRetired = aAlive && onOrAfter(dateStr, state.personA.retirementDate)
+    const aContribActive = aAlive && !(sgStop && aPartnerRetired)
+    const bContribActive = bAlive && !(sgStop && bPartnerRetired)
+
+    const tfsaContribA  = tfsaContribNom(state.tfsaA,  year, aContribActive, inflFactor)
+    const tfsaContribB  = tfsaContribNom(state.tfsaB,  year, bContribActive, inflFactor)
+    const rrspContribA  = rrspContribNom(state.rrspA,  year, aContribActive, isRrifA, inflFactor)
+    const rrspContribB  = rrspContribNom(state.rrspB,  year, bContribActive, isRrifB, inflFactor)
+    const nonRegContribA = contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aContribActive, inflFactor)
+    const nonRegContribB = contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bContribActive, inflFactor)
     const totalContribs_nom = rrspContribA + rrspContribB + tfsaContribA + tfsaContribB + nonRegContribA + nonRegContribB
-    spending_nom += totalContribs_nom
+
+    // Contributions are funded from surplus only — no gap-fill or account draws are used.
+    // Cap total contributions at income remaining after lifestyle + unexpected spending.
+    const surplusBeforeContribs = Math.max(0, totalNetNom - spending_nom)
+    const contribScale = totalContribs_nom > 0 ? Math.min(1, surplusBeforeContribs / totalContribs_nom) : 0
+    let effTfsaContribA   = tfsaContribA   * contribScale
+    let effTfsaContribB   = tfsaContribB   * contribScale
+    const effRrspContribA   = rrspContribA   * contribScale
+    const effRrspContribB   = rrspContribB   * contribScale
+    let effNonRegContribA = nonRegContribA * contribScale
+    let effNonRegContribB = nonRegContribB * contribScale
+    const effTotalContribs  = effTfsaContribA + effTfsaContribB + effRrspContribA + effRrspContribB + effNonRegContribA + effNonRegContribB
+    spending_nom += effTotalContribs
 
     // ── Gap fill / account draws ──────────────────────────────────────────────
     let tfsaWithdrawA = 0, tfsaWithdrawB = 0
     let nonRegWithdrawA = 0, nonRegWithdrawB = 0
+    let hisaWithdraw_nom = 0
+    let hisaSurplusContrib_nom = 0
     let proactiveExtra = 0
     let gap_nom: number
+    let surplusRoutedTotal_nom = 0
 
     if (withdrawalStrategy.drawdownStrategy === 'none') {
       gap_nom = Math.max(0, spending_nom - totalNetNom)
 
     } else if (withdrawalStrategy.drawdownStrategy === 'spendGap') {
+      const sgConfig = withdrawalStrategy.spendGapConfig
+      const aRetired = onOrAfter(dateStr, state.personA.retirementDate)
+      const bRetired = onOrAfter(dateStr, state.personB.retirementDate)
+      const inMeltdownA = aAlive && aRetired && !isRrifA
+      const inMeltdownB = bAlive && bRetired && !isRrifB
+
+      // ── Phase 2 — Meltdown: proactively draw RRSP up to gross income ceiling ──
+      // Use pre-split gross income as the ceiling baseline.  taxA/B.grossIncome
+      // reflects pension splitting and may understate each person's individual
+      // income (optimizer transfers income between spouses).  The pre-split gross
+      // is the correct reference for per-person meltdown ceiling decisions.
+      let meltdownExtraA = 0, meltdownExtraB = 0
+      if (inMeltdownA && sgConfig.meltdownA.grossIncomeCeiling > 0) {
+        const preGrossA = calculateTax(taxInputA, taxSettings, yearsFromNow, state.cpiRatePct).grossIncome
+        const ceiling_nom = sgConfig.meltdownA.grossIncomeCeiling * inflFactor
+        meltdownExtraA = Math.max(0, Math.min(ceiling_nom - preGrossA, rrspA))
+        rrifA_nom += meltdownExtraA
+        rrspA = Math.max(0, rrspA - meltdownExtraA)
+      }
+      if (inMeltdownB && sgConfig.meltdownB.grossIncomeCeiling > 0) {
+        const preGrossB = calculateTax(taxInputB, taxSettings, yearsFromNow, state.cpiRatePct).grossIncome
+        const ceiling_nom = sgConfig.meltdownB.grossIncomeCeiling * inflFactor
+        meltdownExtraB = Math.max(0, Math.min(ceiling_nom - preGrossB, rrspB))
+        rrifB_nom += meltdownExtraB
+        rrspB = Math.max(0, rrspB - meltdownExtraB)
+      }
+
+      // ── Recompute tax if meltdown draws changed RRSP/RRIF income ─────────
+      if (meltdownExtraA > 0 || meltdownExtraB > 0) {
+        const updInputA = { ...taxInputA, pensionIncome: dbBase_nom + dbBridge_nom + rrifA_nom }
+        const updInputB = { ...taxInputB, pensionIncome: dbBaseB_nom + dbBridgeB_nom + rrifB_nom }
+        const eligSplitA2 = (aAlive ? dbBase_nom + dbBridge_nom : 0)
+                          + (personAAgeInt >= 65 && aAlive ? rrifA_nom : 0)
+        if (withdrawalStrategy.pensionSplitMode === 'auto' && aAlive && bAlive) {
+          const opt = optimizePensionSplit(updInputA, updInputB, eligSplitA2, taxSettings, yearsFromNow, state.cpiRatePct)
+          taxA = opt.taxA; taxB = opt.taxB
+          splitAmount = eligSplitA2 * (opt.splitPct / 100)
+        } else {
+          const manualPct = withdrawalStrategy.pensionSplitMode === 'manual' ? withdrawalStrategy.pensionSplitPct : 0
+          splitAmount  = eligSplitA2 * (manualPct / 100)
+          taxA = calculateTax({ ...updInputA, pensionIncome: updInputA.pensionIncome - splitAmount }, taxSettings, yearsFromNow, state.cpiRatePct)
+          taxB = calculateTax({ ...updInputB, pensionIncome: updInputB.pensionIncome + splitAmount }, taxSettings, yearsFromNow, state.cpiRatePct)
+        }
+        totalNetNom = (aAlive ? taxA.netAfterTax - nonRegYieldA + otherNonTaxA_nom : 0)
+                    + (bAlive ? taxB.netAfterTax - nonRegYieldB + otherNonTaxB_nom : 0)
+      }
+
+      // ── Gap after proactive meltdown/RRIF draws ───────────────────────────
       gap_nom = Math.max(0, spending_nom - totalNetNom)
-      const hisaDraw = Math.min(gap_nom, hisa)
-      hisa    -= hisaDraw
-      gap_nom -= hisaDraw
+
+      // ── Deficit routing: draw accounts in merged phase-specific order ─────
+      // Caps are per-person per-account — A's cap limits draws from A's account,
+      // B's cap limits draws from B's account, independently.
+      // Account ordering: A's items first, then any accounts B introduces, then fallbacks.
+      // HISA is joint: use A's cap when A is active, else B's (one cap for one pool).
+      const phaseItemsA: SpendGapDeficitItem[] = inMeltdownA ? sgConfig.meltdownA.deficitItems
+        : isRrifA ? sgConfig.rrifA.deficitItems : []
+      const phaseItemsB: SpendGapDeficitItem[] = inMeltdownB ? sgConfig.meltdownB.deficitItems
+        : isRrifB ? sgConfig.rrifB.deficitItems : []
+      const capMapA = new Map<SpendGapAccountType, number>()
+      const capMapB = new Map<SpendGapAccountType, number>()
+      for (const item of phaseItemsA) capMapA.set(item.account, item.cap)
+      for (const item of phaseItemsB) capMapB.set(item.account, item.cap)
+
+      const acctOrder: SpendGapAccountType[] = []
+      const seenAccts = new Set<SpendGapAccountType>()
+      for (const item of [...phaseItemsA, ...phaseItemsB]) {
+        if (!seenAccts.has(item.account)) { seenAccts.add(item.account); acctOrder.push(item.account) }
+      }
+      for (const acct of ['tfsa', 'nonReg', 'hisa'] as SpendGapAccountType[]) {
+        if (!seenAccts.has(acct)) acctOrder.push(acct)
+      }
+
+      for (const acct of acctOrder) {
+        if (gap_nom <= 0) break
+        // Per-person cap: 0 = no cap (unlimited draw from that person's account).
+        const capA_nom = (capMapA.get(acct) ?? 0) > 0 ? capMapA.get(acct)! * inflFactor : Infinity
+        const capB_nom = (capMapB.get(acct) ?? 0) > 0 ? capMapB.get(acct)! * inflFactor : Infinity
+
+        if (acct === 'hisa') {
+          // Joint account — use A's cap when A is active, else B's.
+          const cap_nom = phaseItemsA.length > 0 ? capA_nom : capB_nom
+          const draw = Math.min(gap_nom, cap_nom, hisa)
+          hisa -= draw; gap_nom -= draw; proactiveExtra += draw; hisaWithdraw_nom += draw
+        } else if (acct === 'tfsa') {
+          // Per-person caps: maxA and maxB each independently limited.
+          const maxA = aAlive ? Math.min(capA_nom, tfsaA) : 0
+          const maxB = bAlive ? Math.min(capB_nom, tfsaB) : 0
+          const maxTotal = maxA + maxB
+          if (maxTotal > 0) {
+            const draw = Math.min(gap_nom, maxTotal)
+            const drawA = draw * (maxA / maxTotal)
+            const drawB = draw - drawA
+            tfsaWithdrawA += drawA; tfsaWithdrawB += drawB
+            tfsaA -= drawA; tfsaB -= drawB
+            gap_nom -= draw; proactiveExtra += draw
+          }
+        } else if (acct === 'nonReg') {
+          const maxA = aAlive ? Math.min(capA_nom, nonRegA) : 0
+          const maxB = bAlive ? Math.min(capB_nom, nonRegB) : 0
+          const maxTotal = maxA + maxB
+          if (maxTotal > 0) {
+            const draw = Math.min(gap_nom, maxTotal)
+            const drawA = draw * (maxA / maxTotal)
+            const drawB = draw - drawA
+            if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (drawA / nonRegA)
+            if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (drawB / nonRegB)
+            nonRegWithdrawA += drawA; nonRegWithdrawB += drawB
+            nonRegA -= drawA; nonRegB -= drawB
+            gap_nom -= draw; proactiveExtra += draw
+          }
+        } else if (acct === 'rrif') {
+          // Extra draw above mandatory minimum — per-person caps applied independently.
+          // Tax on the extra draw is NOT recomputed in this pass (known single-pass limitation).
+          const maxA = isRrifA && aAlive ? Math.min(capA_nom, rrspA) : 0
+          const maxB = isRrifB && bAlive ? Math.min(capB_nom, rrspB) : 0
+          const maxTotal = maxA + maxB
+          if (maxTotal > 0) {
+            const draw = Math.min(gap_nom, maxTotal)
+            const drawA = draw * (maxA / maxTotal)
+            rrifA_nom += drawA; rrifB_nom += draw - drawA
+            gap_nom -= draw
+          }
+        }
+      }
+
+      // ── Emergency fallback: retired accounts still have balance ───────────
+      // Covers the case where the ceiling was set low and deficit accounts exhausted.
+      // Draws from any remaining RRSP (meltdown) or RRIF balance proportionally.
       if (gap_nom > 0) {
-        const order = withdrawalStrategy.withdrawalOrder
-        const half  = gap_nom / 2
-        if (order === 'tfsa_first' || order === 'optimized') {
-          tfsaWithdrawA = Math.min(aAlive ? half : 0, tfsaA)
-          tfsaWithdrawB = Math.min(bAlive ? half : 0, tfsaB)
-          gap_nom = Math.max(0, gap_nom - tfsaWithdrawA - tfsaWithdrawB)
-          tfsaA -= tfsaWithdrawA
-          tfsaB -= tfsaWithdrawB
+        const availA = (inMeltdownA || isRrifA) && aAlive ? rrspA : 0
+        const availB = (inMeltdownB || isRrifB) && bAlive ? rrspB : 0
+        const total = availA + availB
+        if (total > 0) {
+          const draw = Math.min(gap_nom, total)
+          const drawA = draw * (availA / total)
+          const drawB = draw - drawA
+          rrifA_nom += drawA; rrifB_nom += drawB
+          if (!isRrifA) rrspA = Math.max(0, rrspA - drawA)
+          if (!isRrifB) rrspB = Math.max(0, rrspB - drawB)
+          gap_nom -= draw
         }
-        if (gap_nom > 0 && (order === 'nonreg_first' || order === 'optimized')) {
-          nonRegWithdrawA = Math.min(aAlive ? gap_nom / 2 : 0, nonRegA)
-          nonRegWithdrawB = Math.min(bAlive ? gap_nom / 2 : 0, nonRegB)
-          gap_nom = Math.max(0, gap_nom - nonRegWithdrawA - nonRegWithdrawB)
-          if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (nonRegWithdrawA / nonRegA)
-          if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (nonRegWithdrawB / nonRegB)
-          nonRegA -= nonRegWithdrawA
-          nonRegB -= nonRegWithdrawB
-        }
-        if (gap_nom > 0 && (order === 'rrsp_first' || order === 'optimized')) {
-          const rrspDrawA = !isRrifA && aAlive ? Math.min(gap_nom / 2, rrspA) : 0
-          const rrspDrawB = !isRrifB && bAlive ? Math.min(gap_nom / 2, rrspB) : 0
-          rrifA_nom += rrspDrawA
-          rrifB_nom += rrspDrawB
-          rrspA -= rrspDrawA
-          rrspB -= rrspDrawB
-          gap_nom = Math.max(0, gap_nom - rrspDrawA - rrspDrawB)
+      }
+
+      // ── Surplus routing ────────────────────────────────────────────────────
+      // When income exceeds spending + contributions (gap_nom = 0), route the
+      // remaining surplus into accounts in the configured order.  Each non-last
+      // account fills up to its limit (today's $, CPI-indexed); limit=0 skips
+      // the account.  The last account always receives all remaining surplus
+      // regardless of its limit.  TFSA and Non-Reg are split 50/50 A/B; HISA
+      // is a joint pool.
+      if (gap_nom <= 0 && sgConfig.surplusItems.length > 0) {
+        let surplusRemaining = Math.max(0, totalNetNom + proactiveExtra - spending_nom)
+        const lastIdx = sgConfig.surplusItems.length - 1
+        for (let si = 0; si <= lastIdx && surplusRemaining > 0.01; si++) {
+          const item = sgConfig.surplusItems[si]
+          const isLast = si === lastIdx
+          const limit_nom = (!isLast && item.limit > 0) ? item.limit * inflFactor : Infinity
+          if (!isLast && item.limit === 0) continue  // skip non-last with limit=0
+          const alloc = Math.min(surplusRemaining, limit_nom)
+          if (alloc <= 0) continue
+          const acct = item.account as SpendGapSurplusAccountType
+          if (acct === 'hisa') {
+            hisa += alloc
+            hisaSurplusContrib_nom += alloc
+          } else if (acct === 'tfsa') {
+            const addA = (aAlive && bAlive) ? alloc / 2 : (aAlive ? alloc : 0)
+            const addB = alloc - addA
+            effTfsaContribA += addA
+            effTfsaContribB += addB
+          } else if (acct === 'nonReg') {
+            const addA = (aAlive && bAlive) ? alloc / 2 : (aAlive ? alloc : 0)
+            const addB = alloc - addA
+            effNonRegContribA += addA
+            effNonRegContribB += addB
+            nonRegAcbA += addA
+            nonRegAcbB += addB
+          }
+          surplusRoutedTotal_nom += alloc
+          surplusRemaining -= alloc
         }
       }
 
@@ -618,7 +791,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       nonRegWithdrawA = proNonRegWithdrawA
       nonRegWithdrawB = proNonRegWithdrawB
       const hisaDraw = Math.min(Math.max(fp.hisaPct / 100 * hisa * drawFracHisa, fp.hisaMin * inflFactor * drawFracHisa), hisa)
-      hisa -= hisaDraw
+      hisa -= hisaDraw; hisaWithdraw_nom += hisaDraw
       proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB + hisaDraw
       gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
 
@@ -639,7 +812,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       nonRegWithdrawA = proNonRegWithdrawA
       nonRegWithdrawB = proNonRegWithdrawB
       const hisaDraw = Math.min(fw.hisaAmount * inflFactor * drawFracHisa, hisa)
-      hisa -= hisaDraw
+      hisa -= hisaDraw; hisaWithdraw_nom += hisaDraw
       proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB + hisaDraw
       gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
     }
@@ -657,12 +830,12 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const tfsaRetA = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
     const tfsaRetB = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
 
-    rrspA   = grow(Math.max(0, rrspA  + rrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
-    rrspB   = grow(Math.max(0, rrspB  + rrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
-    tfsaA   = grow(tfsaA  + tfsaContribA, tfsaRetA)
-    tfsaB   = grow(tfsaB  + tfsaContribB, tfsaRetB)
-    nonRegA = grow(nonRegA + nonRegContribA, nonRegRetA)
-    nonRegB = grow(nonRegB + nonRegContribB, nonRegRetB)
+    rrspA   = grow(Math.max(0, rrspA  + effRrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
+    rrspB   = grow(Math.max(0, rrspB  + effRrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
+    tfsaA   = grow(tfsaA  + effTfsaContribA, tfsaRetA)
+    tfsaB   = grow(tfsaB  + effTfsaContribB, tfsaRetB)
+    nonRegA = grow(nonRegA + effNonRegContribA, nonRegRetA)
+    nonRegB = grow(nonRegB + effNonRegContribB, nonRegRetB)
     hisa    = grow(hisa, state.cash.hisaRatePct / 100)
 
     // ── Convert to present-day dollars and emit DataPoint ────────────────────
@@ -693,8 +866,11 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       nonRegWithdrawalB: pd(nonRegWithdrawB),
       nonRegYieldA: pd(nonRegDivEligA_nom + nonRegForeignA_nom),
       nonRegYieldB: pd(nonRegDivEligB_nom + nonRegForeignB_nom),
+      hisaWithdrawal: pd(hisaWithdraw_nom),
       otherIncomeA: pd(otherTaxableA_nom + otherNonTaxA_nom),
       otherIncomeB: pd(otherTaxableB_nom + otherNonTaxB_nom),
+      pensionSplitPaid:     pd(aAlive && bAlive ? splitAmount : 0),
+      pensionSplitReceived: pd(aAlive && bAlive ? splitAmount : 0),
 
       grossIncomeA: pd(aAlive ? taxA.grossIncome : 0),
       grossIncomeB: pd(bAlive ? taxB.grossIncome : 0),
@@ -710,9 +886,16 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
 
       householdSpending:  pd(spending_nom),
       spendingLifestyle:  pd(spendingLifestyle_nom),
-      contributions:      pd(totalContribs_nom),
+      contributions:      pd(effTotalContribs + surplusRoutedTotal_nom),
+      contribRrspA:   pd(effRrspContribA),
+      contribRrspB:   pd(effRrspContribB),
+      contribTfsaA:   pd(effTfsaContribA),
+      contribTfsaB:   pd(effTfsaContribB),
+      contribNonRegA: pd(effNonRegContribA),
+      contribNonRegB: pd(effNonRegContribB),
+      hisaContrib: pd(hisaSurplusContrib_nom),
       spendingUnexpected: pd(unexpectedSpend_nom),
-      cashFlow:           pd(totalNetNom + proactiveExtra - spending_nom),
+      cashFlow:           pd(totalNetNom + proactiveExtra - spending_nom - surplusRoutedTotal_nom),
 
       rrspA:  pd(rrspA),
       rrspB:  pd(rrspB),

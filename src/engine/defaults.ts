@@ -1,7 +1,7 @@
 // Default values for the full AppState — all monetary values in today's dollars.
 // Tax brackets use 2024 reference values and are indexed forward by CPI in the engine.
 
-import type { AppState, TaxSettings, WhatIfs } from './types'
+import type { AppState, TaxSettings, WhatIfs, SpendGapPhaseConfig, SpendGapConfig, SpendGapDeficitItem, SpendGapSurplusItem } from './types'
 import { todayStr, dateAtAge } from './dates'
 import { DEFAULT_MARKET_PROFILE } from './rateProfiles'
 
@@ -71,6 +71,34 @@ const birthB = `${new Date().getFullYear() - 50}-03-22`
 const retireA = dateAtAge(birthA, 55)
 const retireB = dateAtAge(birthB, 53)
 
+export const DEFAULT_DEFICIT_ITEMS: SpendGapDeficitItem[] = [
+  { account: 'tfsa',   cap: 0 },
+  { account: 'nonReg', cap: 0 },
+  { account: 'hisa',   cap: 0 },
+]
+
+// Default surplus routing: TFSA and Non-Reg with limit=0 (skipped unless last),
+// HISA last (receives all remaining surplus).
+export const DEFAULT_SURPLUS_ITEMS: SpendGapSurplusItem[] = [
+  { account: 'tfsa',   limit: 0 },
+  { account: 'nonReg', limit: 0 },
+  { account: 'hisa',   limit: 0 },
+]
+
+const DEFAULT_SPEND_GAP_PHASE: SpendGapPhaseConfig = {
+  grossIncomeCeiling: 0,
+  deficitItems: DEFAULT_DEFICIT_ITEMS,
+}
+
+export const DEFAULT_SPEND_GAP_CONFIG: SpendGapConfig = {
+  stopContributionsWhenPartnerRetired: false,
+  meltdownA: DEFAULT_SPEND_GAP_PHASE,
+  meltdownB: DEFAULT_SPEND_GAP_PHASE,
+  rrifA:     DEFAULT_SPEND_GAP_PHASE,
+  rrifB:     DEFAULT_SPEND_GAP_PHASE,
+  surplusItems: DEFAULT_SURPLUS_ITEMS,
+}
+
 export const DEFAULT_WHATIFS: WhatIfs = {
   returnRateOffset:  { enabled: false, value: 0 },
   inflationRate:     { enabled: false, value: 3.0 },
@@ -81,7 +109,6 @@ export const DEFAULT_WHATIFS: WhatIfs = {
   cppStartAgeB:      { enabled: false, value: 65 },
   oasStartAgeA:      { enabled: false, value: 65 },
   oasStartAgeB:      { enabled: false, value: 65 },
-  withdrawalOrder:   { enabled: false, value: 'optimized' },
   pensionSplit:      { enabled: false, value: { mode: 'auto', pct: 0 } },
   drawdownStrategy:  {
     enabled: false,
@@ -89,6 +116,7 @@ export const DEFAULT_WHATIFS: WhatIfs = {
       strategyType: 'none',
       fixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0, hisaPct: 0, hisaMin: 0 },
       fixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
+      spendGapConfig:  DEFAULT_SPEND_GAP_CONFIG,
     },
   },
   marketProfile: { enabled: false, value: DEFAULT_MARKET_PROFILE },
@@ -276,12 +304,12 @@ export const DEFAULT_STATE: AppState = {
   taxSettings: DEFAULT_TAX_SETTINGS,
 
   withdrawalStrategy: {
-    withdrawalOrder:  'optimized',
     pensionSplitMode: 'auto',
     pensionSplitPct:  0,
     drawdownStrategy:        'none',
     drawdownFixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0, hisaPct: 0, hisaMin: 0 },
     drawdownFixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
+    spendGapConfig:          DEFAULT_SPEND_GAP_CONFIG,
   },
 
   scenarios: [],

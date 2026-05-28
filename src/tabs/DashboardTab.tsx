@@ -12,7 +12,8 @@ import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../engine/dates'
 import { DateInput } from '../components/DateInput'
-import type { AppState, HeadlineMetrics, WithdrawalOrder, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig } from '../engine/types'
+import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem } from '../engine/types'
+import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS } from '../engine/defaults'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +49,7 @@ const fmtSigned = (v: number) => Math.abs(v) < NEAR_ZERO ? fmt(0) : (v >= 0 ? '+
 const fmtFlow   = (v: number) => Math.abs(v) < NEAR_ZERO ? fmt(0) : fmt(v)
 const flowColor = (v: number) => v < -NEAR_ZERO ? 'text-red-600' : v > NEAR_ZERO ? 'text-green-700' : ''
 
-type TableGroupKey = 'year' | 'income' | 'tax' | 'portfolio'
+type TableGroupKey = 'year' | 'income' | 'tax' | 'spending' | 'portfolio'
 type TableCol = {
   label: string
   value: (d: DataPoint) => number
@@ -56,26 +57,13 @@ type TableCol = {
   className?: string
   person?: 'A' | 'B'
   tSlipOnly?: boolean   // T-slip income: taxable but not received as cash (e.g. non-reg yield)
+  splitPaid?: boolean   // pension split paid out by A: shown in parentheses, muted
 }
 
 function hexTint(hex: string, alpha: number): string {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
   if (!m) return 'transparent'
   return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${alpha})`
-}
-
-const WITHDRAWAL_ORDER_OPTIONS: { value: string; label: string }[] = [
-  { value: 'optimized',    label: 'Optimized' },
-  { value: 'tfsa_first',   label: 'TFSA First' },
-  { value: 'rrsp_first',   label: 'RRSP / RRIF First' },
-  { value: 'nonreg_first', label: 'Non-Registered First' },
-]
-
-const WITHDRAWAL_ORDER_LABELS: Record<WithdrawalOrder, string> = {
-  optimized:    'Optimized',
-  tfsa_first:   'TFSA First',
-  rrsp_first:   'RRSP / RRIF First',
-  nonreg_first: 'Non-Registered First',
 }
 
 const PENSION_SPLIT_OPTIONS: { value: string; label: string }[] = [
@@ -116,7 +104,7 @@ const PORTFOLIO_DEFS: { key: PortfolioKey; label: string; color: string }[] = [
 
 const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
   none:             'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
-  spendGap:         'Withdraw only what is needed to cover the spending shortfall each year — nothing more. Accounts are drawn in the configured withdrawal order (TFSA first, Non-Reg, RRSP/RRIF, etc.). RRIF mandatory minimums are always withdrawn regardless of need.',
+  spendGap:         'Three-phase drawdown: (1) Contribution — no proactive draws pre-retirement. (2) Meltdown — retired, pre-RRIF: proactively draw RRSP up to a gross income ceiling to reduce future RRIF forced withdrawals. (3) RRIF — mandatory minimum plus optional extra draws. In all phases, a deficit is covered from accounts in the configured order.',
   fixedWithdrawal:  'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
   fixedPct:         'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
 }
@@ -421,6 +409,161 @@ function MetricCard({ label, value, sub, frozen, betterWhenHigher = true, onClic
           <div className="text-[11px] text-slate-400 mt-0.5">{sub ?? '\u00A0'}</div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── DeficitOrderInput ────────────────────────────────────────────────────────
+// Must be a top-level component (not nested inside DashboardTab) so React sees
+// a stable component identity across renders and does not remount it on state
+// changes — which would drop focus mid-keystroke in the cap NumberInputs.
+
+const ACCT_LABELS: Record<SpendGapAccountType, string> = {
+  tfsa: 'TFSA', nonReg: 'Non-Reg', hisa: 'HISA', rrif: 'RRSP/RRIF',
+}
+
+function DeficitOrderInput({
+  phase,
+  allowRrif,
+  onChange,
+}: {
+  phase: SpendGapPhaseConfig
+  allowRrif: boolean
+  onChange: (items: SpendGapDeficitItem[]) => void
+}) {
+  const baseAccts: SpendGapAccountType[] = ['tfsa', 'nonReg', 'hisa']
+  const allAccts: SpendGapAccountType[] = allowRrif ? [...baseAccts, 'rrif'] : baseAccts
+  const existingAccts = phase.deficitItems.map(i => i.account).filter(a => allAccts.includes(a))
+  const missingAccts = allAccts.filter(a => !existingAccts.includes(a))
+  const items: SpendGapDeficitItem[] = [
+    ...phase.deficitItems.filter(i => allAccts.includes(i.account)),
+    ...missingAccts.map(account => ({ account, cap: 0 })),
+  ]
+  const move = (idx: number, dir: -1 | 1) => {
+    const next = [...items]
+    const swap = idx + dir
+    if (swap < 0 || swap >= next.length) return
+    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    onChange(next)
+  }
+  const setCap = (idx: number, cap: number) => {
+    onChange(items.map((item, i) => i === idx ? { ...item, cap } : item))
+  }
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1 text-xs text-slate-400 pb-0.5">
+        <span className="w-5 shrink-0" />
+        <span className="flex-1" />
+        <span className="w-6 text-center shrink-0" />
+        <span className="w-6 text-center shrink-0" />
+        <span className="w-20 text-center shrink-0">Cap/yr ($)</span>
+      </div>
+      {items.map((item, i) => (
+        <div key={item.account} className="flex items-center gap-1">
+          <span className="w-5 text-right text-slate-400 text-xs shrink-0">{i + 1}.</span>
+          <span className="flex-1 text-sm text-slate-700">{ACCT_LABELS[item.account]}</span>
+          <button
+            className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
+            onClick={() => move(i, -1)}
+            disabled={i === 0}
+            title="Move up"
+          >▲</button>
+          <button
+            className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
+            onClick={() => move(i, 1)}
+            disabled={i === items.length - 1}
+            title="Move down"
+          >▼</button>
+          <div className="w-20 shrink-0">
+            <NumberInput
+              label=""
+              value={item.cap}
+              onChange={v => setCap(i, v)}
+              min={0} max={500_000} step={5_000} decimals={0} size="sm"
+            />
+          </div>
+        </div>
+      ))}
+      <p className="text-xs text-slate-400 pt-0.5">0 = unlimited</p>
+    </div>
+  )
+}
+
+// ─── SurplusOrderInput ────────────────────────────────────────────────────────
+// Must be top-level (not nested) so React sees a stable component identity and
+// does not remount on state changes — preserving focus in limit NumberInputs.
+
+const SURPLUS_ACCT_LABELS: Record<SpendGapSurplusAccountType, string> = {
+  tfsa: 'TFSA', nonReg: 'Non-Reg', hisa: 'HISA',
+}
+
+function SurplusOrderInput({
+  items,
+  onChange,
+}: {
+  items: SpendGapSurplusItem[]
+  onChange: (items: SpendGapSurplusItem[]) => void
+}) {
+  const allAccts: SpendGapSurplusAccountType[] = ['tfsa', 'nonReg', 'hisa']
+  const existingAccts = items.map(i => i.account)
+  const missingAccts = allAccts.filter(a => !existingAccts.includes(a))
+  const resolved: SpendGapSurplusItem[] = [
+    ...items.filter(i => allAccts.includes(i.account)),
+    ...missingAccts.map(account => ({ account, limit: 0 })),
+  ]
+  const lastIdx = resolved.length - 1
+  const move = (idx: number, dir: -1 | 1) => {
+    const next = [...resolved]
+    const swap = idx + dir
+    if (swap < 0 || swap >= next.length) return
+    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    onChange(next)
+  }
+  const setLimit = (idx: number, limit: number) => {
+    onChange(resolved.map((item, i) => i === idx ? { ...item, limit } : item))
+  }
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1 text-xs text-slate-400 pb-0.5">
+        <span className="w-5 shrink-0" />
+        <span className="flex-1" />
+        <span className="w-6 text-center shrink-0" />
+        <span className="w-6 text-center shrink-0" />
+        <span className="w-24 text-center shrink-0">Limit/yr ($)</span>
+      </div>
+      {resolved.map((item, i) => {
+        const isLast = i === lastIdx
+        return (
+          <div key={item.account} className="flex items-center gap-1">
+            <span className="w-5 text-right text-slate-400 text-xs shrink-0">{i + 1}.</span>
+            <span className="flex-1 text-sm text-slate-700">{SURPLUS_ACCT_LABELS[item.account]}</span>
+            <button
+              className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
+              onClick={() => move(i, -1)}
+              disabled={i === 0}
+              title="Move up"
+            >▲</button>
+            <button
+              className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
+              onClick={() => move(i, 1)}
+              disabled={isLast}
+              title="Move down"
+            >▼</button>
+            <div className="w-24 shrink-0">
+              {isLast
+                ? <span className="text-xs text-slate-400 pl-2">— remainder</span>
+                : <NumberInput
+                    label=""
+                    value={item.limit}
+                    onChange={v => setLimit(i, v)}
+                    min={0} max={500_000} step={5_000} decimals={0} size="sm"
+                  />
+              }
+            </div>
+          </div>
+        )
+      })}
+      <p className="text-xs text-slate-400 pt-0.5">0 = skip (unless last). Last always receives remainder.</p>
     </div>
   )
 }
@@ -769,6 +912,7 @@ export function DashboardTab() {
   const yearOpen      = expandedTableGroups.has('year')
   const incomeOpen    = expandedTableGroups.has('income')
   const taxOpen       = expandedTableGroups.has('tax')
+  const spendingOpen  = expandedTableGroups.has('spending')
   const portfolioOpen = expandedTableGroups.has('portfolio')
 
   const a = aName, b = bName   // short aliases for compact column label strings
@@ -794,12 +938,15 @@ export function DashboardTab() {
     { label: `OAS — ${b}`,    value: d => d.oasB,              person: 'B' },
     { label: `RRIF — ${a}`,   value: d => d.rrifA,             person: 'A' },
     { label: `RRIF — ${b}`,   value: d => d.rrifB,             person: 'B' },
+    { label: `Split Paid — ${a}`,  value: d => d.pensionSplitPaid,     person: 'A', splitPaid: true },
+    { label: `Split Rcvd — ${b}`,  value: d => d.pensionSplitReceived, person: 'B' },
     { label: `TFSA — ${a}`,   value: d => d.tfsaWithdrawalA,   person: 'A' },
     { label: `TFSA — ${b}`,   value: d => d.tfsaWithdrawalB,   person: 'B' },
     { label: `NR — ${a}`,       value: d => d.nonRegWithdrawalA, person: 'A' },
     { label: `NR — ${b}`,       value: d => d.nonRegWithdrawalB, person: 'B' },
     { label: `NR Yield † — ${a}`, value: d => d.nonRegYieldA,      person: 'A', tSlipOnly: true },
     { label: `NR Yield † — ${b}`, value: d => d.nonRegYieldB,      person: 'B', tSlipOnly: true },
+    { label: 'HISA',              value: d => d.hisaWithdrawal },
     { label: `Other — ${a}`,    value: d => d.otherIncomeA,      person: 'A' },
     { label: `Other — ${b}`,    value: d => d.otherIncomeB,      person: 'B' },
   ] : [
@@ -815,6 +962,20 @@ export function DashboardTab() {
   ] : [
     { label: `Tax — ${a}`, value: d => d.taxA, person: 'A' },
     { label: `Tax — ${b}`, value: d => d.taxB, person: 'B' },
+  ]
+
+  const spendingTableCols: TableCol[] = spendingOpen ? [
+    { label: 'Lifestyle',       value: d => d.spendingLifestyle },
+    { label: `RRSP — ${a}`,    value: d => d.contribRrspA,   person: 'A' },
+    { label: `RRSP — ${b}`,    value: d => d.contribRrspB,   person: 'B' },
+    { label: `TFSA — ${a}`,    value: d => d.contribTfsaA,   person: 'A' },
+    { label: `TFSA — ${b}`,    value: d => d.contribTfsaB,   person: 'B' },
+    { label: `NR — ${a}`,      value: d => d.contribNonRegA, person: 'A' },
+    { label: `NR — ${b}`,      value: d => d.contribNonRegB, person: 'B' },
+    { label: 'HISA',           value: d => d.hisaContrib },
+    { label: 'Unexpected',     value: d => d.spendingUnexpected },
+  ] : [
+    { label: 'Spending',       value: d => d.householdSpending },
   ]
 
   const portfolioTableCols: TableCol[] = portfolioOpen ? [
@@ -946,6 +1107,154 @@ export function DashboardTab() {
               </tbody>
             </table>
           </div>
+
+          {/* Spend-Gap config */}
+          {whatIfs.drawdownStrategy.value.strategyType === 'spendGap' && (() => {
+            const sg = whatIfs.drawdownStrategy.value.spendGapConfig
+            const updateSg = (patch: Partial<typeof sg>) =>
+              updateWhatIf('drawdownStrategy', {
+                value: {
+                  ...whatIfs.drawdownStrategy.value,
+                  spendGapConfig: { ...sg, ...patch },
+                },
+              })
+            const updatePhase = (
+              phase: 'meltdownA' | 'meltdownB' | 'rrifA' | 'rrifB',
+              patch: Partial<SpendGapPhaseConfig>,
+            ) => updateSg({ [phase]: { ...sg[phase], ...patch } })
+
+
+            return (
+              <div className="space-y-3 pt-1">
+                {/* Global toggle */}
+                <div className="flex items-center gap-3 px-3 py-2 border border-slate-200 rounded bg-slate-50">
+                  <ToggleInput
+                    label="Stop contributions when partner retires"
+                    value={sg.stopContributionsWhenPartnerRetired}
+                    onChange={v => updateSg({ stopContributionsWhenPartnerRetired: v })}
+                  />
+                </div>
+
+                {/* Phase tables */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {/* Meltdown Phase */}
+                  <div className="overflow-x-auto rounded border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">
+                            Phase 2 — RRSP Meltdown
+                          </th>
+                        </tr>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
+                          <th className="px-3 py-2 text-left font-medium">Parameter</th>
+                          <th className="px-3 py-2 font-medium">{aName}</th>
+                          <th className="px-3 py-2 font-medium">{bName}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2 text-slate-600">Gross Income Ceiling ($)</td>
+                          <td className="px-2 py-1.5">
+                            <NumberInput label=""
+                              value={sg.meltdownA.grossIncomeCeiling}
+                              onChange={v => updatePhase('meltdownA', { grossIncomeCeiling: v })}
+                              prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <NumberInput label=""
+                              value={sg.meltdownB.grossIncomeCeiling}
+                              onChange={v => updatePhase('meltdownB', { grossIncomeCeiling: v })}
+                              prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50 align-top">
+                          <td className="px-3 py-2 text-slate-600">Deficit Order</td>
+                          <td className="px-3 py-2">
+                            <DeficitOrderInput phase={sg.meltdownA} allowRrif={false} onChange={items => updatePhase('meltdownA', { deficitItems: items })} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* RRIF Phase */}
+                  <div className="overflow-x-auto rounded border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">
+                            Phase 3 — RRIF Forced Minimums
+                          </th>
+                        </tr>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
+                          <th className="px-3 py-2 text-left font-medium">Parameter</th>
+                          <th className="px-3 py-2 font-medium">{aName}</th>
+                          <th className="px-3 py-2 font-medium">{bName}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className="hover:bg-slate-50/50 align-top">
+                          <td className="px-3 py-2 text-slate-600">Deficit Order</td>
+                          <td className="px-3 py-2">
+                            <DeficitOrderInput phase={sg.rrifA} allowRrif={true} onChange={items => updatePhase('rrifA', { deficitItems: items })} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <InfoPanel>
+                  <p><strong>Phase 1 (Contribution)</strong> — Both working. No proactive RRSP draws. Any spending shortfall is flagged but not covered from registered accounts.</p>
+                  <p className="mt-1.5"><strong>Phase 2 (Meltdown)</strong> — Retired, before RRIF conversion. Each year the engine draws enough RRSP to bring each person's pre-split gross income up to the ceiling (in today's $, CPI-indexed). Set 0 to disable proactive draws for that person. If the ceiling draw doesn't fully cover the spending gap, the deficit accounts fill the rest.</p>
+                  <p className="mt-1.5"><strong>Phase 3 (RRIF)</strong> — After RRIF conversion. Mandatory CRA minimums are always withdrawn first. The deficit account order governs which accounts fill any remaining spending gap.</p>
+                  <p className="mt-1.5"><strong>Cap/yr</strong> — limits each person's annual draw from their own account (today's $, CPI-indexed). 0 = unlimited. For TFSA and Non-Reg, A's cap limits A's account and B's cap limits B's account independently — the total draw is the sum of what each person can contribute before the engine moves to the next account. HISA is joint: A's cap applies when A is in an active phase, otherwise B's.</p>
+                </InfoPanel>
+
+                {/* Surplus routing */}
+                <div className="overflow-x-auto rounded border border-slate-200 mt-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Surplus Routing</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600 align-top w-1/3">Deposit order</td>
+                        <td className="px-3 py-2">
+                          <SurplusOrderInput
+                            items={sg.surplusItems ?? DEFAULT_SURPLUS_ITEMS}
+                            onChange={items => updateSg({ surplusItems: items })}
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <InfoPanel>
+                  <p><strong>Surplus routing</strong> — When income exceeds spending and contributions, the remaining surplus is deposited into accounts in the order shown. Each non-last account fills up to its annual limit (today's $, CPI-indexed); set to 0 to skip it. The last account always receives all remaining surplus. TFSA and Non-Reg deposits are split 50/50 between Person A and Person B (or 100% to the survivor). Surplus contributions appear in the TFSA/Non-Reg/HISA columns of the Spending table.</p>
+                </InfoPanel>
+
+                <div className="flex justify-end">
+                  <button
+                    className="btn-secondary text-xs"
+                    onClick={() => updateSg(DEFAULT_SPEND_GAP_CONFIG)}
+                  >
+                    Reset to defaults
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Fixed Withdrawals config */}
           {whatIfs.drawdownStrategy.value.strategyType === 'fixedWithdrawal' && (
@@ -1285,16 +1594,6 @@ export function DashboardTab() {
             </WhatIfSection>
 
             <WhatIfSection title="Withdrawal Strategy">
-              <WhatIfRow
-                enabled={whatIfs.withdrawalOrder.enabled}
-                onToggle={v => updateWhatIf('withdrawalOrder', { enabled: v, value: v ? withdrawalStrategy.withdrawalOrder : whatIfs.withdrawalOrder.value })}
-                label="Withdrawal Order"
-                baseLabel={WITHDRAWAL_ORDER_LABELS[withdrawalStrategy.withdrawalOrder]}
-              >
-                <SelectInput label="" value={whatIfs.withdrawalOrder.value}
-                  onChange={v => updateWhatIf('withdrawalOrder', { value: v as WithdrawalOrder })}
-                  options={WITHDRAWAL_ORDER_OPTIONS} />
-              </WhatIfRow>
               <WhatIfRow
                 enabled={whatIfs.pensionSplit.enabled}
                 onToggle={v => updateWhatIf('pensionSplit', {
@@ -2067,7 +2366,8 @@ export function DashboardTab() {
           <div className="space-y-3 text-sm">
             <div>
               <p className="font-semibold mb-1">Income Columns</p>
-              <p>The collapsed Income view shows each person's <strong>taxable income</strong> — the total reported on their tax return. This includes employment income, DB pension, CPP, OAS, RRIF withdrawals, non-registered withdrawals (capital gains portion), and any other taxable income. TFSA withdrawals are tax-free and not included here; they appear as their own columns when the Income section is expanded.</p>
+              <p>The collapsed Income view shows each person's <strong>taxable income</strong> — the total reported on their tax return. This includes employment income, DB pension, CPP, OAS, RRIF withdrawals, non-registered withdrawals (capital gains portion), pension split received, and any other taxable income. TFSA withdrawals are tax-free and not included here; they appear as their own columns when the Income section is expanded.</p>
+              <p className="mt-1">When pension splitting is active, <strong>Split Paid</strong> shows the amount transferred away from {aName || 'Person A'} (displayed in parentheses as a reduction) and <strong>Split Rcvd</strong> shows the matching amount received by {bName || 'Person B'}. Together these reconcile each person's individual income sources to their Taxable total.</p>
             </div>
             <div>
               <p className="font-semibold mb-1">Non-Reg Yield † (T-slip income)</p>
@@ -2109,16 +2409,14 @@ export function DashboardTab() {
             <thead>
               {/* Row 1 — group headers */}
               <tr style={{ backgroundColor: '#7B1515' }} className="text-white">
-                {(['year', 'income', 'tax', 'portfolio'] as TableGroupKey[]).map(key => {
-                  const cols = { year: yearTableCols, income: incomeTableCols, tax: taxTableCols, portfolio: portfolioTableCols }[key]
+                {(['year', 'income', 'tax', 'spending', 'portfolio'] as TableGroupKey[]).map(key => {
+                  const cols = { year: yearTableCols, income: incomeTableCols, tax: taxTableCols, spending: spendingTableCols, portfolio: portfolioTableCols }[key]
                   const open = expandedTableGroups.has(key)
-                  const label = { year: 'Year', income: 'Income', tax: 'Tax', portfolio: 'Portfolio' }[key]
+                  const label = { year: 'Year', income: 'Income', tax: 'Tax', spending: 'Spending', portfolio: 'Portfolio' }[key]
                   const after: React.ReactNode = key === 'tax'
-                    ? <>
-                        <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom whitespace-nowrap">Net HH</th>
-                        <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom">Spending</th>
-                        <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom whitespace-nowrap">Cash Flow</th>
-                      </>
+                    ? <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom whitespace-nowrap">Net HH</th>
+                    : key === 'spending'
+                    ? <th rowSpan={2} className="px-2 py-1.5 text-right font-bold border border-red-900 align-bottom whitespace-nowrap">Cash Flow</th>
                     : null
                   return (
                     <React.Fragment key={key}>
@@ -2148,6 +2446,9 @@ export function DashboardTab() {
                 {taxTableCols.map(col => (
                   <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
                 ))}
+                {spendingTableCols.map(col => (
+                  <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
+                ))}
                 {portfolioTableCols.map(col => (
                   <th key={col.label} className="px-2 py-1 text-right font-bold border border-red-900 whitespace-nowrap">{col.label}</th>
                 ))}
@@ -2162,13 +2463,19 @@ export function DashboardTab() {
                     </td>
                   ))}
                   {incomeTableCols.map(col => (
-                    <td key={col.label} className={`px-2 py-1 border border-slate-100 text-right${col.tSlipOnly ? ' italic text-slate-400' : ''}`} style={colTint(col, i)}>{fmtT(col.value(d))}</td>
+                    <td key={col.label} className={`px-2 py-1 border border-slate-100 text-right${col.tSlipOnly ? ' italic text-slate-400' : col.splitPaid ? ' text-slate-400' : ''}`} style={colTint(col, i)}>
+                      {col.splitPaid
+                        ? (col.value(d) > 0 ? `(${fmt(col.value(d))})` : '—')
+                        : fmtT(col.value(d))}
+                    </td>
                   ))}
                   {taxTableCols.map(col => (
                     <td key={col.label} className="px-2 py-1 border border-slate-100 text-right text-red-600" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
                   ))}
                   <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt(d.totalHouseholdNet)}</td>
-                  <td className="px-2 py-1 border border-slate-100 text-right">{fmt(d.householdSpending)}</td>
+                  {spendingTableCols.map(col => (
+                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
+                  ))}
                   <td className={`px-2 py-1 border border-slate-100 text-right font-medium ${flowColor(d.cashFlow)}`}>
                     {fmtFlow(d.cashFlow)}
                   </td>

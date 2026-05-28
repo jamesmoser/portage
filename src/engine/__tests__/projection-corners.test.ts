@@ -449,3 +449,186 @@ describe('death edge cases', () => {
     }
   })
 })
+
+// ─── Contribution surplus capping ─────────────────────────────────────────────
+// Contributions are funded from surplus only — income remaining after lifestyle
+// and unexpected spending.  If surplus < planned contributions, they are scaled
+// proportionally.  Account balances must reflect the effective (scaled) amount,
+// not the planned amount, so no money is created from nothing.
+
+describe('contribution surplus capping', () => {
+  // Pre-retirement couple; both working, retire far in future.
+  // pi=0, cpi=0, return=0 → PD = nominal, balances are exact.
+  const bA50 = `${CY - 50}-01-01`
+  const bB47 = `${CY - 47}-01-01`
+  const retireFar = `${CY + 20}-01-01`
+
+  function contribState(overrides: Partial<AppState> = {}): AppState {
+    return makeState(bA50, 52, retireFar, bB47, 50, retireFar, overrides)
+  }
+
+  it('contributions are suppressed entirely when there is no income surplus', () => {
+    // No income, no spending → totalNetNom = 0 → surplus = 0 → all contributions = 0.
+    const state = contribState({
+      tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 0, annualContribution: 10_000,
+               contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
+    })
+    const { dataPoints } = runProjection(state)
+    const d = dp(dataPoints, CY)
+    expect(d.contribTfsaA).toBe(0)
+    expect(d.tfsaA).toBe(0)
+    expect(d.contributions).toBe(0)
+  })
+
+  it('existing account balance is unchanged when contributions are suppressed', () => {
+    // Starting balance 50,000; no income → surplus = 0 → no contribution → balance stays.
+    const state = contribState({
+      tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 50_000, annualContribution: 10_000,
+               contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
+    })
+    const { dataPoints } = runProjection(state)
+    expect(dp(dataPoints, CY).tfsaA).toBeCloseTo(50_000, 0)
+  })
+
+  it('full planned contribution lands when surplus clearly exceeds it', () => {
+    // Large employment income → after-tax net >> spending + contribution.
+    const state = contribState({
+      employmentA: { annualAmount: 200_000, growthRatePct: 0 },
+      tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 0, annualContribution: 10_000,
+               contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
+    })
+    const { dataPoints } = runProjection(state)
+    const d = dp(dataPoints, CY)
+    expect(d.contribTfsaA).toBeCloseTo(10_000, 0)
+    expect(d.tfsaA).toBeCloseTo(10_000, 0)
+    expect(d.contributions).toBeCloseTo(10_000, 0)
+  })
+
+  it('contribution is capped at available surplus — below-BPA income gives exact math', () => {
+    // Employment $5,000 < federal BPA ($15,705) and Ontario BPA ($11,865) → tax = 0 exactly.
+    // totalNetNom = $5,000.  Lifestyle spending = $1,000.  Surplus = $4,000.
+    // Planned TFSA contribution = $10,000 → scale = 4,000/10,000 = 0.4 → effective = $4,000.
+    const state = contribState({
+      employmentA: { annualAmount: 5_000, growthRatePct: 0 },
+      spendingPhases: [{ id: 'p0', label: 'test', startAge: 0, annualAmount: 1_000,
+                         growthRatePct: 0, linkedToFirstDeath: false }],
+      tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 0, annualContribution: 10_000,
+               contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
+    })
+    const { dataPoints } = runProjection(state)
+    const d = dp(dataPoints, CY)
+    expect(d.contribTfsaA).toBeCloseTo(4_000, 0)
+    expect(d.tfsaA).toBeCloseTo(4_000, 0)
+  })
+
+  it('multiple account contributions are scaled proportionally when total exceeds surplus', () => {
+    // Same below-BPA setup: totalNetNom = $5,000, spending = $1,000, surplus = $4,000.
+    // TFSA A $3,000 + TFSA B $3,000 = $6,000 total > $4,000 surplus.
+    // Scale = 4,000/6,000 = 2/3 → each person gets $2,000.
+    const state = contribState({
+      employmentA: { annualAmount: 5_000, growthRatePct: 0 },
+      spendingPhases: [{ id: 'p0', label: 'test', startAge: 0, annualAmount: 1_000,
+                         growthRatePct: 0, linkedToFirstDeath: false }],
+      tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 0, annualContribution: 3_000,
+               contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
+      tfsaB: { ...DEFAULT_STATE.tfsaB, balance: 0, annualContribution: 3_000,
+               contributionEndDate: dateAtAge(bB47, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
+    })
+    const { dataPoints } = runProjection(state)
+    const d = dp(dataPoints, CY)
+    expect(d.contribTfsaA).toBeCloseTo(2_000, 0)
+    expect(d.contribTfsaB).toBeCloseTo(2_000, 0)
+    expect(d.tfsaA).toBeCloseTo(2_000, 0)
+    expect(d.tfsaB).toBeCloseTo(2_000, 0)
+  })
+})
+
+// ─── Pension split tracking ────────────────────────────────────────────────────
+// pensionSplitPaid (A's deduction) and pensionSplitReceived (B's addition) must
+// always be equal — the split is a zero-sum transfer between spouses.
+// Both must be zero when only one person is alive.
+
+describe('pension split tracking (pensionSplitPaid / pensionSplitReceived)', () => {
+  const bSplitA = `${CY - 65}-01-01`   // A age 65; planEnd 68 → 3 data points
+  const bSplitB = `${CY - 62}-01-01`   // B age 62; planEnd 65 → 3 data points
+  const retiredLongAgo = `${CY - 20}-01-01`
+
+  // DB pension for A: $80k/year, already started, no indexing, no survivor benefit.
+  const dbPension80k = {
+    ...DEFAULT_STATE.dbPensionA,
+    enabled: true,
+    startDate: retiredLongAgo,
+    annualAmount: 80_000,
+    cpiIndexed: false,
+    indexingRatePct: 0,
+    bridgeBenefitAmount: 0,
+    survivorBenefitPct: 0,
+    cppIntegration: false,
+  }
+
+  it('both fields are zero when there is no eligible pension income', () => {
+    const state = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo)
+    const { dataPoints } = runProjection(state)
+    for (const d of dataPoints) {
+      expect(d.pensionSplitPaid).toBe(0)
+      expect(d.pensionSplitReceived).toBe(0)
+    }
+  })
+
+  it('pensionSplitPaid equals pensionSplitReceived in all years when splitting occurs', () => {
+    // A has $80k pension, B has no income — auto split should transfer a significant amount.
+    const state = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
+      dbPensionA: dbPension80k,
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'auto' },
+    })
+    const { dataPoints } = runProjection(state)
+    const hasSplit = dataPoints.some(d => d.pensionSplitPaid > 0)
+    expect(hasSplit).toBe(true)
+    for (const d of dataPoints) {
+      expect(d.pensionSplitPaid).toBeGreaterThanOrEqual(0)
+      expect(d.pensionSplitReceived).toBeGreaterThanOrEqual(0)
+      expect(d.pensionSplitPaid).toBeCloseTo(d.pensionSplitReceived, 1)
+    }
+  })
+
+  it('both fields are zero after A dies — split requires both spouses alive', () => {
+    const bADies  = `${CY - 65}-01-01`  // planEnd 67 → A's last year is CY+2
+    const bBLives = `${CY - 60}-01-01`  // planEnd 65 → B lives to CY+5
+    const state = makeState(bADies, 67, retiredLongAgo, bBLives, 65, retiredLongAgo, {
+      dbPensionA: { ...dbPension80k, startDate: retiredLongAgo },
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'auto' },
+    })
+    const { dataPoints } = runProjection(state)
+    const afterDeath = dataPoints.filter(d => d.year >= CY + 3)
+    expect(afterDeath.length).toBeGreaterThan(0)
+    for (const d of afterDeath) {
+      expect(d.pensionSplitPaid).toBe(0)
+      expect(d.pensionSplitReceived).toBe(0)
+    }
+  })
+
+  it('total household gross income is conserved regardless of split percentage', () => {
+    // Splitting transfers income from A to B but must not create or destroy taxable income.
+    // grossIncomeA + grossIncomeB must be the same whether split is 0% or auto-optimised.
+    const base = {
+      dbPensionA: dbPension80k,
+    }
+    const stateNoSplit = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
+      ...base,
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none',
+                             pensionSplitMode: 'manual', pensionSplitPct: 0 },
+    })
+    const stateAutoSplit = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
+      ...base,
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'auto' },
+    })
+    const dpNo   = runProjection(stateNoSplit).dataPoints
+    const dpAuto = runProjection(stateAutoSplit).dataPoints
+    expect(dpNo).toHaveLength(dpAuto.length)
+    for (let i = 0; i < dpNo.length; i++) {
+      const totalNo   = dpNo[i].grossIncomeA   + dpNo[i].grossIncomeB
+      const totalAuto = dpAuto[i].grossIncomeA + dpAuto[i].grossIncomeB
+      expect(totalAuto).toBeCloseTo(totalNo, 0)
+    }
+  })
+})
