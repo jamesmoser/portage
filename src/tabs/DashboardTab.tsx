@@ -1921,6 +1921,9 @@ export function DashboardTab() {
               })}
             </WhatIfSection>
 
+          </div>
+          <div className="space-y-3">
+
             <WhatIfSection title="Longevity">
               <WhatIfSlider
                 label={`${aName}'s Age at Death`}
@@ -1939,9 +1942,6 @@ export function DashboardTab() {
                 onChange={(age, active) => updateWhatIf('longevityB', { enabled: active, value: age })}
               />
             </WhatIfSection>
-
-          </div>
-          <div className="space-y-3">
 
             <WhatIfSection title="Government Benefits">
               <WhatIfSlider
