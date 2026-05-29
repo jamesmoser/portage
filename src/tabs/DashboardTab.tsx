@@ -2058,6 +2058,33 @@ export function DashboardTab() {
                   </div>
                 )
               })()}
+              {(() => {
+                const wi      = whatIfs.lifestyleChange
+                const enabled = wi?.enabled ?? false
+                const date    = wi?.value?.date   ?? todayStr()
+                const amount  = wi?.value?.amount ?? 0
+                const set = (partial: { date?: string; amount?: number }) =>
+                  updateWhatIf('lifestyleChange', { enabled: true, value: { date, amount, ...partial } })
+                return (
+                  <div>
+                    <div className="px-3 py-2.5 flex items-center gap-3">
+                      <input type="checkbox" checked={enabled}
+                        onChange={e => updateWhatIf('lifestyleChange', { enabled: e.target.checked, value: { date, amount } })}
+                        className="w-4 h-4 rounded shrink-0 cursor-pointer" style={{ accentColor: '#7B1515' }} />
+                      <span className={`text-sm w-52 shrink-0 ${enabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
+                        Lifestyle Change
+                      </span>
+                      {enabled ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <DateInput label="Start Date" value={date} onChange={v => set({ date: v })} />
+                          <NumberInput label="Annual Amount ($)" value={amount} size="sm"
+                            onChange={v => set({ amount: v })} />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })()}
             </WhatIfSection>
 
           </div>

@@ -683,6 +683,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
         spending_nom += amt
       }
     }
+    spending_nom = Math.max(0, spending_nom)    // clamp: lifestyle change may push it negative
     const spendingLifestyle_nom = spending_nom  // phases + regular additional, before contributions
     spending_nom += unexpectedSpend_nom
 

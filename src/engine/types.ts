@@ -431,6 +431,7 @@ export interface WhatIfs {
   layoffA?:          WhatIf<{ date: string; severance: number }> // employment/RRSP stop + optional lump-sum severance
   layoffB?:          WhatIf<{ date: string; severance: number }>
   unexpectedExpense?: WhatIf<{ date: string; amount: number }>  // one-time household spending hit
+  lifestyleChange?:   WhatIf<{ date: string; amount: number }>  // permanent recurring offset to lifestyle spending (may be negative)
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────

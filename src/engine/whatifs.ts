@@ -214,6 +214,22 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     }
   }
 
+  // ── Lifestyle Change ──────────────────────────────────────────────────────────
+  if (wi.lifestyleChange?.enabled && wi.lifestyleChange.value.amount !== 0) {
+    const { date, amount } = wi.lifestyleChange.value
+    const refBirth = s.ageReferencePerson === 'personB' ? s.personB.birthDate : s.personA.birthDate
+    s = {
+      ...s,
+      additionalSpending: [...s.additionalSpending, {
+        id:        'mod-lifestyle-change',
+        label:     'Lifestyle Change',
+        amount,
+        startAge:  exactAgeAt(refBirth, date),
+        recurring: true,
+      }],
+    }
+  }
+
   return s
 }
 
