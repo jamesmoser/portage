@@ -107,7 +107,8 @@ const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, React.ReactNo
   none: 'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
   bengen: (<>
     <p>The Bengen Rule (commonly called the 4% rule): in year 1 of retirement, withdraw a fixed percentage of the total portfolio. Each subsequent year draw that same nominal amount adjusted for inflation — constant in today's dollars when indexing by personal inflation, or slowly declining when indexing by CPI (matching the original research). Toggle <em>Index by CPI</em> on to use the historical convention.</p>
-    <p className="mt-1.5">Draws are per person from their own accounts (RRSP/RRIF, Non-Reg, TFSA) in the configured order, with RRIF mandatory minimums always taken first and netted from the target. After the first death, the survivor draws the sum of both people's annual amounts from their combined accounts. There is no automatic gap-filling — any difference between the draw and spending appears directly as a cash flow surplus or deficit.</p>
+    <p className="mt-1.5">Draws are per person from their own accounts (RRSP/RRIF, Non-Reg, TFSA) in the configured order, with RRIF mandatory minimums always taken first and netted from the target. After the first death, the survivor draws the sum of both people's annual amounts from their combined accounts. There is no automatic gap-filling — any difference between the draw and spending appears directly as a surplus or deficit in the cash flow chart.</p>
+    <p className="mt-1.5">Two HISA buffer toggles control how surpluses and deficits are handled. With both off you see the raw Bengen picture — surplus and deficit bars exactly as the rule produces them, with no wealth preservation. With "Route surplus to HISA" on, annual surpluses are deposited into HISA rather than disappearing; the surplus bars remain fully visible and HISA accumulates the excess. This matters most with large RRSPs: once RRIF conversion begins, mandatory minimums can far exceed the Bengen target, producing large surpluses that inflate HISA while the invested accounts drain. With "Cover deficit from HISA" also on, HISA is drawn down in deficit years to eliminate red bars — but only while it has funds. Red bars return once HISA is exhausted, marking the true shortfall point. Running both toggles together is the most diagnostic combination: if the plan stays green throughout, Bengen works with a HISA buffer and the surplus bars tell you how large that buffer needs to be; if red bars still appear in the final years, the buffer ran dry and Bengen is not the right rule for this situation.</p>
   </>),
   spendGap: (<>
     <p>Draws exactly what is needed from investment accounts to cover the gap between spending and after-tax income each year. Pre-retirement follows the base plan with no proactive draws. From retirement until RRIF conversion, RRSP can be melted down proactively up to a gross income ceiling to reduce future forced minimums. After RRIF conversion, the CRA mandatory minimum is always withdrawn first; the deficit order covers any remaining shortfall.</p>
@@ -1382,7 +1383,7 @@ export function DashboardTab() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       <tr className="hover:bg-slate-50/50">
-                        <td className="px-3 py-2 text-slate-600 w-44">Index by CPI</td>
+                        <td className="px-3 py-2 text-slate-600 w-52">Index by CPI</td>
                         <td className="px-2 py-1.5">
                           <ToggleInput
                             label=""
@@ -1392,7 +1393,27 @@ export function DashboardTab() {
                         </td>
                       </tr>
                       <tr className="hover:bg-slate-50/50">
-                        <td className="px-3 py-2 text-slate-600">Year-1 Draw Rate (%)</td>
+                        <td className="px-3 py-2 text-slate-600">Route surplus to HISA</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={bg.surplusToHisa ?? true}
+                            onChange={v => updateBg({ surplusToHisa: v })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Cover deficit from HISA</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={bg.deficitFromHisa ?? false}
+                            onChange={v => updateBg({ deficitFromHisa: v })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Year-1 Draw Rate</td>
                         <td className="px-2 py-1.5">
                           <div className="flex gap-6">
                             <NumberInput

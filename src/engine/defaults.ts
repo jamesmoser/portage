@@ -97,7 +97,9 @@ export const DEFAULT_BENGEN_ACCOUNT_ORDER: BengenAccountItem[] = [
 ]
 
 export const DEFAULT_BENGEN_CONFIG: BengenConfig = {
-  inflationIndex: 'personal',
+  inflationIndex:  'personal',
+  surplusToHisa:   true,
+  deficitFromHisa: false,
   personA: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
   personB: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
 }

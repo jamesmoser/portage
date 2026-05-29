@@ -937,6 +937,25 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       // TFSA and non-reg draws are additional cash not in totalNetNom.
       proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB
       gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
+      // Surplus routing: park excess cash in HISA so wealth is preserved rather than
+      // lost.  The surplus bar remains visible in the cash flow chart; HISA simply
+      // accumulates it.  Deficits (gap_nom > 0) are never covered — they stay visible.
+      if (withdrawalStrategy.bengenConfig.surplusToHisa && gap_nom <= 0) {
+        const surplus = totalNetNom + proactiveExtra - spending_nom
+        if (surplus > 0) {
+          hisa += surplus
+          hisaSurplusContrib_nom += surplus
+        }
+      }
+      // Deficit coverage: draw from HISA to cover any remaining shortfall.
+      // Surplus bars are unaffected.  Red bars return only once HISA is exhausted.
+      if (withdrawalStrategy.bengenConfig.deficitFromHisa && gap_nom > 0) {
+        const draw = Math.min(gap_nom, hisa)
+        hisa -= draw
+        hisaWithdraw_nom += draw
+        proactiveExtra += draw
+        gap_nom -= draw
+      }
 
     } else {
       // Fixed withdrawal: ALL draws are explicit — no automatic gap-fill from any source.

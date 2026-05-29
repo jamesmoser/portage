@@ -237,6 +237,14 @@ export interface BengenConfig {
    *  'cpi'      → draw tracks general inflation (historically accurate; declines
    *               in real terms when personal inflation > CPI). */
   inflationIndex: 'personal' | 'cpi'
+  /** When true, any annual cash flow surplus (net income + draws − spending > 0)
+   *  is deposited into HISA each year.  Surplus bars remain visible in the cash
+   *  flow chart; HISA accumulates the excess rather than the money disappearing. */
+  surplusToHisa: boolean
+  /** When true, any annual cash flow deficit is covered by drawing from HISA
+   *  (up to the available balance).  Deficit bars are eliminated while HISA has
+   *  funds; red bars return only once HISA is exhausted — the true shortfall point. */
+  deficitFromHisa: boolean
   personA: BengenPersonConfig
   personB: BengenPersonConfig
 }
