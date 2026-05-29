@@ -1704,24 +1704,47 @@ export function DashboardTab() {
 
       {/* ── Base Plan Modifications Card ──────────────────────────────────── */}
       <SectionCard title="Base Plan Modifications" width="full" onReset={resetWhatIfsExceptDrawdown} info={<>
-        <p className="font-semibold text-slate-700 mb-2">Market — Return Profiles</p>
-        <p className="mb-2">The return profile shapes how annual portfolio returns vary over the projection horizon. Peak and low are the max and min of your base plan tiers; mid is their average.</p>
-        <ul className="space-y-1.5 mb-3">
-          <li><span className="font-medium">Base</span> — Uses your four age-based return rate tiers exactly as entered.</li>
-          <li><span className="font-medium">Front-Loaded</span> — Returns start at peak and fall linearly to low. Models front-heavy outperformance early in retirement.</li>
-          <li><span className="font-medium">Back-Loaded</span> — Returns start at low and rise linearly to peak. Models a slow-growth early period followed by stronger returns.</li>
-          <li><span className="font-medium">Cyclical Crest</span> — Cosine wave starting at peak. One full cycle spans the configured period.</li>
-          <li><span className="font-medium">Cyclical Trough</span> — Inverted cosine starting at trough. Useful for stress-testing a down-cycle at the start of retirement.</li>
-          <li><span className="font-medium">Noise</span> — Seeded uniform random between low and peak each year. Re-roll generates a new random sequence.</li>
+        <p className="mb-3">Each modification overrides a specific part of the base plan. Modifications stack — all enabled toggles apply simultaneously. The Reset button clears all modifications except the Drawdown Strategy.</p>
+
+        <p className="font-semibold text-slate-700 mb-1">Market — Return Profile</p>
+        <p className="mb-1">Shapes how nominal portfolio returns vary year-to-year. Peak and low are the max and min of your base plan age-tier rates; mid is their average.</p>
+        <ul className="space-y-1 mb-1 ml-2 text-slate-600">
+          <li><span className="font-medium text-slate-700">Base</span> — Age-based tiers exactly as entered (default).</li>
+          <li><span className="font-medium text-slate-700">Flat Rate</span> — A single fixed return for every year of the plan.</li>
+          <li><span className="font-medium text-slate-700">Front-Loaded</span> — Returns start at peak and fall linearly to low.</li>
+          <li><span className="font-medium text-slate-700">Back-Loaded</span> — Returns start at low and rise linearly to peak.</li>
+          <li><span className="font-medium text-slate-700">Cyclical Crest</span> — Cosine wave starting at peak; one full cycle spans the configured period.</li>
+          <li><span className="font-medium text-slate-700">Cyclical Trough</span> — Inverted cosine starting at trough. Stress-tests a down-cycle at the start of retirement.</li>
+          <li><span className="font-medium text-slate-700">Noise</span> — Seeded random between low and peak each year. Re-roll generates a new sequence.</li>
         </ul>
-        <p className="font-semibold text-slate-700 mb-1">Outlook</p>
-        <p className="mb-2">Shifts the entire curve up or down by a fixed number of percentage points. Applied after beta scaling.</p>
-        <p className="font-semibold text-slate-700 mb-1">Beta</p>
-        <p className="mb-3">Scales the amplitude of the curve around the midpoint. β=1: unchanged. β=2: swings twice as wide (same average, higher peaks, lower troughs). β=0: flat line at mid.</p>
-        <p className="font-semibold text-slate-700 mb-1">Manual Pension Income Splitting</p>
-        <p className="mb-1">When this modification is <strong>off</strong>, the engine auto-optimizes pension splitting each year: it tests every integer percentage from 0–50% and picks whichever split minimizes the combined household tax bill. This is the default and is usually the tax-efficient choice.</p>
-        <p className="mb-1">When <strong>on</strong>, you fix the split at the entered percentage for every year it is eligible. The percentage represents the share of {aName || 'Person A'}'s eligible pension income transferred to {bName || 'Person B'} for tax purposes — the maximum allowed by CRA is 50%.</p>
-        <p>Eligible income includes DB pension payments and RRIF withdrawals once {aName || 'Person A'} is age 65 or older. The split has no effect before pension or RRIF income exists, or in years when both people are in the same marginal bracket.</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Outlook</span> — Shifts the entire return curve up or down by a fixed number of percentage points (applied after beta scaling).</p>
+        <p className="mb-3"><span className="font-medium text-slate-700">Beta</span> — Scales amplitude around the midpoint. β=1: unchanged. β=2: twice as wide (same average, higher peaks, lower troughs). β=0: flat at mid.</p>
+
+        <p className="font-semibold text-slate-700 mb-1">Inflation</p>
+        <p className="mb-3">Overrides either or both inflation rates. <span className="font-medium text-slate-700">Personal inflation</span> deflates all outputs to present-day dollars and grows your spending phases. <span className="font-medium text-slate-700">CPI</span> indexes government benefits (CPP, OAS, GIS), DB pension escalation, and tax bracket thresholds forward each year.</p>
+
+        <p className="font-semibold text-slate-700 mb-1">Retirement</p>
+        <p className="mb-3">Shifts each person's retirement date. The slider adjusts the retirement age; employment income and RRSP contributions stop at the new date, and the DB pension start (if not locked) shifts accordingly.</p>
+
+        <p className="font-semibold text-slate-700 mb-1">Longevity</p>
+        <p className="mb-3">Adjusts each person's planning end age (the age through which the projection runs). The engine assumes the person is alive through the entire final year. Use this to explore longevity risk — extending the plan horizon tests whether the portfolio survives a longer-than-expected life.</p>
+
+        <p className="font-semibold text-slate-700 mb-1">Government Benefits</p>
+        <p className="mb-3">Adjusts CPP and OAS collection start ages for each person. CPP adjusts ±0.6%/month before age 65 and +0.7%/month after (max +42% at 70). OAS adjusts +0.6%/month deferred past 65 (max +36% at 70).</p>
+
+        <p className="font-semibold text-slate-700 mb-1">Withdrawal Strategy</p>
+        <p className="mb-3">Overrides the drawdown strategy used to meet the spending gap. Options include Cover Spending Gap (draw exactly what's needed), Fixed Withdrawal, Fixed Percentage, Bengen Rule (inflation-adjusted % of initial portfolio), and Guyton-Klinger (guardrail-adjusted draws). This modification is preserved when you hit Reset.</p>
+
+        <p className="font-semibold text-slate-700 mb-1">One Shot Events</p>
+        <ul className="space-y-1 mb-3 ml-2 text-slate-600">
+          <li><span className="font-medium text-slate-700">Layoff</span> — Terminates employment for either person on the specified date, stopping employment income and RRSP contributions. An optional severance lump sum is added as taxable other income in that calendar year.</li>
+          <li><span className="font-medium text-slate-700">Unexpected Expense</span> — A one-time household spending hit in the calendar year of the specified date. Draws from the portfolio as needed to cover it.</li>
+          <li><span className="font-medium text-slate-700">Lifestyle Change</span> — A permanent recurring offset to lifestyle spending starting from the specified date. Positive values increase annual spending; negative values reduce it. Spending is floored at zero — it cannot go negative.</li>
+        </ul>
+
+        <p className="font-semibold text-slate-700 mb-1">Manual Pension Splitting</p>
+        <p className="mb-1">When <strong>off</strong>, the engine auto-optimizes pension splitting each year — testing every integer from 0–50% and picking the split that minimizes combined household tax. This is the default.</p>
+        <p>When <strong>on</strong>, the split is fixed at the entered percentage for every eligible year. The percentage is the share of {aName || 'Person A'}'s eligible pension income transferred to {bName || 'Person B'} for tax purposes (CRA maximum: 50%). Eligible income includes DB pension and RRIF withdrawals once {aName || 'Person A'} is 65 or older.</p>
       </>}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-3">
@@ -2096,12 +2119,12 @@ export function DashboardTab() {
       <SectionCard title="Key Outcomes" width="full"
         info={
           <div className="space-y-2 text-sm">
-            <p>Key Outcomes summarizes the most important results from the simulation across three groups: Portfolio, Spending, and Government Benefits. Each tile shows the current scenario value; click any tile to open a year-by-year detail table for that metric.</p>
-            <p><strong>Freeze</strong> — Captures the current values as a comparison baseline. Once frozen, each tile splits to show the current value alongside the frozen value, with a coloured arrow indicating whether the change is better (green) or worse (red). Use this to compare two scenarios: configure and freeze the first, then load or adjust the second — the deltas appear immediately on every tile.</p>
-            <p><strong>Portfolio tiles</strong> — Show the total investment portfolio (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones: today, each person's retirement, the peak balance, and each person's death. The peak balance and its year reveal when the portfolio is most exposed — a high peak followed by rapid decline may indicate sequencing risk.</p>
-            <p><strong>Spending tiles</strong> — Count years where annual cash flow is negative (spending exceeds all income and draws). The average and peak shortfall amounts help size the gap. Zero shortfall years is the primary goal of the simulation.</p>
-            <p><strong>Tax tiles</strong> — Total lifetime tax paid (federal + provincial + OAS clawback), the average effective rate across the plan, and the single worst tax year. Use these to evaluate the tax cost of different drawdown strategies — a higher RRSP meltdown rate often trades higher taxes now for lower taxes (and less clawback) later.</p>
-            <p><strong>Government Benefits tiles</strong> — Total CPP and OAS collected and years with OAS clawback. The vs-Age-65 tiles show whether your chosen CPP/OAS start ages were better or worse than starting at 65 — accounting for the full projection horizon including survivor benefits.</p>
+            <p>Key Outcomes summarizes the most important results across four groups: Portfolio, Spending, Tax, and Government Benefits. All values are in present-day dollars. Click any tile to open a year-by-year detail table.</p>
+            <p><strong>Freeze</strong> — Captures the current values as a comparison baseline. Once frozen, each tile shows the current value alongside the frozen value with a coloured arrow (green = better, red = worse). Freeze a scenario, then adjust or load another — deltas update live on every tile.</p>
+            <p><strong>Portfolio</strong> — Total invested assets (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones: today, each person's retirement, the peak balance, and each person's death. A high peak followed by rapid decline can signal sequence-of-returns risk.</p>
+            <p><strong>Spending</strong> — Two shortfall tiles count years where cash flow is negative (spending exceeds all income and draws) and show the average and peak shortfall. Three net income tiles show average, minimum, and maximum household net income across all full plan years (first and last years excluded as partial). Zero shortfall years is the primary plan goal.</p>
+            <p><strong>Tax</strong> — Total lifetime tax paid (federal + Ontario + OAS clawback), the average effective rate (total tax ÷ gross income across the plan), and the single peak tax year. Use these to evaluate drawdown strategy tradeoffs — earlier RRSP draws typically raise near-term taxes while reducing OAS clawback and estate tax later.</p>
+            <p><strong>Government Benefits</strong> — Total CPP and OAS collected (gross, before clawback) and years with OAS clawback. The vs-Age-65 tiles show the net lifetime difference between your chosen CPP/OAS start ages and collecting at exactly 65, accounting for the full projection horizon and survivor benefits.</p>
           </div>
         }>
         <div className="flex justify-end mb-3">
