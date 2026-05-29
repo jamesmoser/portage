@@ -1810,9 +1810,17 @@ export function DashboardTab() {
                               label=""
                               value={mValue.flatRate}
                               onChange={v => setMarketProfile({ flatRate: v })}
-                              min={0} max={30} step={0.25}
+                              min={0} max={30} step={0.25} decimals={2}
                               size="sm"
                             />
+                            <button className="btn-primary"
+                              onClick={() => setMarketProfile({ flatRate: whatIfs.inflationRate.enabled ? whatIfs.inflationRate.value : personalInflationRatePct })}>
+                              Use Inflation
+                            </button>
+                            <button className="btn-primary"
+                              onClick={() => setMarketProfile({ flatRate: whatIfs.cpiRate?.enabled ? whatIfs.cpiRate.value : cpiRatePct })}>
+                              Use CPI
+                            </button>
                           </div>
                         ) : (
                           <>
