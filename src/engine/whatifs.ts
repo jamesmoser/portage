@@ -235,6 +235,7 @@ export function computeHeadlineMetrics(
     portfolioAtDeathA: 0, portfolioAtDeathB: 0,
     shortfallYears: 0, totalYears: 0, shortfallPct: 0,
     avgAnnualShortfall: 0, peakAnnualShortfall: 0, peakShortfallYear: 0,
+    avgNetIncome: 0, minNetIncome: 0, minNetIncomeYear: 0, maxNetIncome: 0, maxNetIncomeYear: 0,
     lifetimeTaxPaid: 0, avgEffectiveTaxRate: 0, peakTaxYear: 0, peakTaxAmount: 0,
     totalCPPCollected: 0, totalOASCollected: 0, totalOASClawback: 0,
     oasClawbackYears: 0, oasClawbackPct: 0, cppVs65: 0, oasVs65: 0,
@@ -264,6 +265,16 @@ export function computeHeadlineMetrics(
     ? shortfallPoints.reduce((sum, d) => sum + -d.cashFlow, 0) / shortfallYears : 0
   const peakShortfallPoint = shortfallPoints.length > 0
     ? shortfallPoints.reduce((a, b) => -b.cashFlow > -a.cashFlow ? b : a) : null
+
+  // Net income stats — exclude the first year (current year, may be mid-simulation) and
+  // the last year of the plan (surviving spouse dies before Dec 31 — a partial year).
+  // If the plan is too short to have any interior years, fall back to all data points.
+  const endYear = Math.max(endYearA, endYearB)
+  const fullYearPoints = dataPoints.filter(d => d.year !== currentYear && d.year !== endYear)
+  const incomeBase = fullYearPoints.length > 0 ? fullYearPoints : dataPoints
+  const avgNetIncome = incomeBase.reduce((s, d) => s + d.totalHouseholdNet, 0) / incomeBase.length
+  const minNetPoint  = incomeBase.reduce((a, b) => b.totalHouseholdNet < a.totalHouseholdNet ? b : a)
+  const maxNetPoint  = incomeBase.reduce((a, b) => b.totalHouseholdNet > a.totalHouseholdNet ? b : a)
 
   // Tax
   const lifetimeTaxPaid = dataPoints.reduce(
@@ -360,6 +371,12 @@ export function computeHeadlineMetrics(
     avgAnnualShortfall,
     peakAnnualShortfall: peakShortfallPoint ? -peakShortfallPoint.cashFlow : 0,
     peakShortfallYear:   peakShortfallPoint?.year ?? 0,
+
+    avgNetIncome,
+    minNetIncome:     minNetPoint.totalHouseholdNet,
+    minNetIncomeYear: minNetPoint.year,
+    maxNetIncome:     maxNetPoint.totalHouseholdNet,
+    maxNetIncomeYear: maxNetPoint.year,
 
     lifetimeTaxPaid,
     avgEffectiveTaxRate: totalGross > 0 ? lifetimeTaxPaid / totalGross : 0,

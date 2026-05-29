@@ -846,6 +846,8 @@ export function DashboardTab() {
   // Planning-end years for modal highlights
   const endYearA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
   const endYearB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+  const endYear  = Math.max(endYearA, endYearB)
+  const currentYear = new Date().getFullYear()
   // Retirement years for modal highlights
   const retirementYearA = getYear(effectiveState.personA.retirementDate)
   const retirementYearB = getYear(effectiveState.personB.retirementDate)
@@ -2317,6 +2319,73 @@ export function DashboardTab() {
                   highlightRow: d => d.year === metrics.peakShortfallYear,
                   summary: [
                     { label: 'Peak Annual Shortfall', value: metrics.peakAnnualShortfall < 1 ? 'None' : fmt(metrics.peakAnnualShortfall) + ` (${metrics.peakShortfallYear})` },
+                  ],
+                })} />
+              <MetricCard label="Net Income — Average"
+                value={fmt(metrics.avgNetIncome)}
+                sub="full years only"
+                frozen={frozenFor(metrics.avgNetIncome, frozenMetrics?.avgNetIncome, fmt)}
+                onClick={() => setModalDef({
+                  title: 'Net Income — All Full Years',
+                  note: "Today's dollars. Total household net income (after tax, including all draws). First and last plan years excluded as partial years.",
+                  columns: [
+                    { header: 'Year',        render: d => d.year },
+                    { header: `Age — ${aName}`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'Net Income',  right: true, bold: true, render: d => fmt(d.totalHouseholdNet) },
+                    { header: 'Spending',    right: true, render: d => fmt(d.householdSpending) },
+                    { header: 'Cash Flow',   right: true, render: d => (
+                      <span className={d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(d.cashFlow)}</span>
+                    )},
+                  ],
+                  rows: dataPoints.filter(d => d.year !== currentYear && d.year !== endYear),
+                  summary: [
+                    { label: 'Average Net Income', value: fmt(metrics.avgNetIncome) },
+                    { label: 'Min', value: fmt(metrics.minNetIncome) + ` (${metrics.minNetIncomeYear})` },
+                    { label: 'Max', value: fmt(metrics.maxNetIncome) + ` (${metrics.maxNetIncomeYear})` },
+                  ],
+                })} />
+              <MetricCard label="Net Income — Min"
+                value={fmt(metrics.minNetIncome)}
+                sub={`in ${metrics.minNetIncomeYear}`}
+                frozen={frozenFor(metrics.minNetIncome, frozenMetrics?.minNetIncome, fmt)}
+                onClick={() => setModalDef({
+                  title: 'Net Income — All Full Years',
+                  note: "Today's dollars. Minimum net income year highlighted.",
+                  columns: [
+                    { header: 'Year',        render: d => d.year },
+                    { header: `Age — ${aName}`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'Net Income',  right: true, bold: true, render: d => fmt(d.totalHouseholdNet) },
+                    { header: 'Spending',    right: true, render: d => fmt(d.householdSpending) },
+                    { header: 'Cash Flow',   right: true, render: d => (
+                      <span className={d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(d.cashFlow)}</span>
+                    )},
+                  ],
+                  rows: dataPoints.filter(d => d.year !== currentYear && d.year !== endYear),
+                  highlightRow: d => d.year === metrics.minNetIncomeYear,
+                  summary: [
+                    { label: 'Min Net Income', value: fmt(metrics.minNetIncome) + ` (${metrics.minNetIncomeYear})` },
+                  ],
+                })} />
+              <MetricCard label="Net Income — Max"
+                value={fmt(metrics.maxNetIncome)}
+                sub={`in ${metrics.maxNetIncomeYear}`}
+                frozen={frozenFor(metrics.maxNetIncome, frozenMetrics?.maxNetIncome, fmt)}
+                onClick={() => setModalDef({
+                  title: 'Net Income — All Full Years',
+                  note: "Today's dollars. Maximum net income year highlighted.",
+                  columns: [
+                    { header: 'Year',        render: d => d.year },
+                    { header: `Age — ${aName}`, right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'Net Income',  right: true, bold: true, render: d => fmt(d.totalHouseholdNet) },
+                    { header: 'Spending',    right: true, render: d => fmt(d.householdSpending) },
+                    { header: 'Cash Flow',   right: true, render: d => (
+                      <span className={d.cashFlow < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(d.cashFlow)}</span>
+                    )},
+                  ],
+                  rows: dataPoints.filter(d => d.year !== currentYear && d.year !== endYear),
+                  highlightRow: d => d.year === metrics.maxNetIncomeYear,
+                  summary: [
+                    { label: 'Max Net Income', value: fmt(metrics.maxNetIncome) + ` (${metrics.maxNetIncomeYear})` },
                   ],
                 })} />
             </div>

@@ -453,6 +453,13 @@ export interface HeadlineMetrics {
   peakAnnualShortfall: number
   peakShortfallYear:   number
 
+  // Net household income — today's $, full years only (first/last plan year excluded)
+  avgNetIncome:     number
+  minNetIncome:     number
+  minNetIncomeYear: number
+  maxNetIncome:     number
+  maxNetIncomeYear: number
+
   // Tax — today's $, household
   lifetimeTaxPaid:     number
   avgEffectiveTaxRate: number   // 0–1
