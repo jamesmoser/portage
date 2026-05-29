@@ -1,5 +1,5 @@
 // Default values for the full AppState — all monetary values in today's dollars.
-// Tax brackets use 2024 reference values and are indexed forward by CPI in the engine.
+// Tax brackets use 2026 reference values and are indexed forward by CPI in the engine.
 
 import type { AppState, TaxSettings, WhatIfs, SpendGapPhaseConfig, SpendGapConfig, SpendGapDeficitItem, SpendGapSurplusItem } from './types'
 import { todayStr, dateAtAge } from './dates'
@@ -7,61 +7,61 @@ import { DEFAULT_MARKET_PROFILE } from './rateProfiles'
 
 const today = todayStr()
 
-// ─── CPP maximum monthly benefit (2024, today's dollars) ────────────────────
+// ─── CPP maximum monthly benefit (2026, today's dollars) ────────────────────
 // Base CPP max at age 65 with full contributions (39 effective years at YMPE).
-// CPP2 max assumes 39 years of contributions at/above YAMPE; note CPP2 only
-// started January 2024, so this overstates CPP2 for near-term retirees.
-export const CPP_BASE_MAX_MONTHLY = 1364    // $1,364.60 — base CPP, 2024
-export const CPP2_MAX_MONTHLY     = 130     // ~$130/month — CPP2 fully phased in
-export const CPP_COMBINED_MAX_MONTHLY = CPP_BASE_MAX_MONTHLY + CPP2_MAX_MONTHLY  // $1,494
+// CPP2 max reflects 2026 actuals; CPP2 started January 2024, so this still
+// understates CPP2 for anyone retiring before completing a full career of CPP2.
+export const CPP_BASE_MAX_MONTHLY = 1508    // $1,507.65 — base CPP, 2026
+export const CPP2_MAX_MONTHLY     = 55      // ~$54.69/month — CPP2, 2026
+export const CPP_COMBINED_MAX_MONTHLY = CPP_BASE_MAX_MONTHLY + CPP2_MAX_MONTHLY  // $1,563
 
-export const OAS_MAX_MONTHLY = 713          // ~$713/month — full OAS at 65, 2024
-export const GIS_MAX_MONTHLY = 641          // ~$641/month — max GIS for coupled recipient, 2024
+export const OAS_MAX_MONTHLY = 742          // $742.31/month — full OAS at 65, 2026
+export const GIS_MAX_MONTHLY = 667          // $667.41/month — max GIS for coupled recipient, 2026
 
 export const DEFAULT_TAX_SETTINGS: TaxSettings = {
-  taxYear: 2024,
+  taxYear: 2026,
 
-  // Federal 2024
+  // Federal 2026 — lowest bracket rate reduced to 14% effective Jan 1, 2026
   federalBrackets: [
-    { upTo: 55_867,  rate: 0.1500 },
-    { upTo: 111_733, rate: 0.2050 },
-    { upTo: 154_906, rate: 0.2600 },
-    { upTo: 220_000, rate: 0.2900 },
+    { upTo: 58_523,  rate: 0.1400 },
+    { upTo: 117_045, rate: 0.2050 },
+    { upTo: 181_440, rate: 0.2600 },
+    { upTo: 258_482, rate: 0.2900 },
     { upTo: Infinity, rate: 0.3300 },
   ],
-  federalBPA: 15_705,
-  federalAgeAmount: 8_790,
-  federalAgeAmountThreshold: 42_335,
+  federalBPA: 16_452,
+  federalAgeAmount: 9_209,
+  federalAgeAmountThreshold: 46_432,
   federalAgeAmountReductionRate: 0.15,
   federalPensionIncomeAmount: 2_000,
   federalEligibleDivGrossUp: 0.38,
-  federalEligibleDivCredit: 0.1502,
+  federalEligibleDivCredit: 0.150198,
   federalNonEligibleDivGrossUp: 0.15,
   federalNonEligibleDivCredit: 0.090301,
   capitalGainsInclusionRate: 0.5,
   capitalGainsHighRate: 0.5,
   capitalGainsHighThreshold: 10_000_000,
-  oasClawbackThreshold: 90_997,
+  oasClawbackThreshold: 95_323,
   oasClawbackRate: 0.15,
 
-  // Ontario 2024
+  // Ontario 2026
   ontarioBrackets: [
-    { upTo: 51_446,  rate: 0.0505 },
-    { upTo: 102_894, rate: 0.0915 },
+    { upTo: 53_891,  rate: 0.0505 },
+    { upTo: 107_785, rate: 0.0915 },
     { upTo: 150_000, rate: 0.1116 },
     { upTo: 220_000, rate: 0.1216 },
     { upTo: Infinity, rate: 0.1316 },
   ],
-  ontarioBPA: 11_865,
-  ontarioAgeAmount: 5_750,
-  ontarioAgeAmountThreshold: 42_335,
+  ontarioBPA: 12_989,
+  ontarioAgeAmount: 6_342,
+  ontarioAgeAmountThreshold: 47_210,
   ontarioAgeAmountReductionRate: 0.15,
-  ontarioPensionIncomeAmount: 1_637,
+  ontarioPensionIncomeAmount: 1_796,
   ontarioEligibleDivCredit: 0.10,
-  ontarioNonEligibleDivCredit: 0.0329,
-  ontarioSurtax1Threshold: 5_315,
+  ontarioNonEligibleDivCredit: 0.029863,
+  ontarioSurtax1Threshold: 5_818,
   ontarioSurtax1Rate: 0.20,
-  ontarioSurtax2Threshold: 6_802,
+  ontarioSurtax2Threshold: 7_446,
   ontarioSurtax2Rate: 0.36,
 }
 

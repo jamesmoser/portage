@@ -238,11 +238,43 @@ Live at the top of the What-If panel. Pattern: active scenario name + "Save As�
 
 ---
 
-## Canadian Tax Rules (2024 base, CPI-indexed forward)
+## Canadian Tax Rules (2026 base, CPI-indexed forward)
 
 - Capital gains inclusion: **50%** for all gains as of 2025 (proposed 66.67% above $250k was cancelled Jan 2025)
 - Default "high rate threshold" set to $10,000,000 to effectively disable two-tier logic while preserving the feature for scenario modelling
-- OAS clawback: 15% above ~$90,997
+- OAS clawback: 15% above ~$95,323 (2026)
 - CPP: −0.6%/month before 65, +0.7%/month after 65
 - OAS: +0.6%/month deferral past 65 (max +36% at 70)
 - RRIF minimums: CRA table by age, in `tax.ts`
+
+---
+
+## Annual Tax Year Update
+
+Run this each January when CRA and Ontario publish new parameters. Full procedure with the AI prompt to gather values is in `memory/annual-tax-update.md`.
+
+### Files to update
+
+**`src/engine/defaults.ts`** — the only file with actual numbers:
+- `CPP_BASE_MAX_MONTHLY`, `CPP2_MAX_MONTHLY`, `OAS_MAX_MONTHLY`, `GIS_MAX_MONTHLY` constants
+- `DEFAULT_TAX_SETTINGS` block: `taxYear`, all federal + Ontario bracket thresholds, BPA, Age Amount, surtax thresholds, clawback threshold, dividend credit rates
+
+**Comment/text files** — search `grep -r "YYYY" src/ README.md` for the old year:
+- `src/engine/defaults.ts` — file header, inline comments
+- `src/engine/tax.ts` — line 1 header
+- `src/engine/types.ts` — section header comment, `oasClawbackThreshold` inline comment
+- `src/tabs/input/TaxSettingsTab.tsx` — info modal: bracket example, BPA amount, Age Amount value + threshold, OAS clawback figure
+- `src/tabs/input/CPPOASTab.tsx` — info modal prose + all tooltips (CPP max, OAS max, GIS max, YAMPE)
+- `src/tabs/input/TFSATab.tsx` — TFSA annual limit year
+- `src/tabs/DashboardTab.tsx` — OAS clawback detail note
+- `src/App.tsx` — About modal "Tax year" row; AI context export (multiple locations)
+- `README.md` — OAS clawback threshold, tax engine reference year, surtax thresholds
+- `CLAUDE.md` (this file) — the section heading and OAS clawback figure above
+
+### Do NOT change
+- Test files — use years as calendar date fixtures, not tax references
+- `defaults.ts` line referencing "CPP2 started January 2024" — historical fact
+- `TaxSettingsTab.tsx` note about "2024 Federal Budget proposal" — historical policy context
+
+### localStorage migration note
+Updating `DEFAULT_TAX_SETTINGS` does not auto-update existing users. They must hit **Reset** on each Tax Settings card (Federal Brackets, Ontario Brackets, Federal Credits, Ontario Credits) and the CPP/OAS card to pull in the new defaults.

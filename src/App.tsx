@@ -163,7 +163,7 @@ function generateAIContext(): string {
   h('# Portage — Canadian Retirement Plan Context')
   h(`*Generated: ${today}*`)
   br()
-  h('This document contains the complete inputs for a Canadian (Ontario) household retirement projection. All monetary values are in **today\'s dollars** — nominal future amounts are deflated using the personal inflation rate. Combined federal + Ontario income tax is calculated annually using 2024 bracket values, CPI-indexed forward.')
+  h('This document contains the complete inputs for a Canadian (Ontario) household retirement projection. All monetary values are in **today\'s dollars** — nominal future amounts are deflated using the personal inflation rate. Combined federal + Ontario income tax is calculated annually using 2026 bracket values, CPI-indexed forward.')
   br()
   h('> **How to use this context:** The plan has a *base plan* (the permanent foundation) and *current modifications* (temporary what-if overrides active at time of export). Effective values — base plan with modifications applied — are shown throughout, with the original base value noted in parentheses where a modification is active. **Reason from the effective values.** They represent what the simulation is currently computing.')
   br()
@@ -257,7 +257,7 @@ function generateAIContext(): string {
     `| ${aName} | $${s.oasA.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${modVal(wi.oasStartAgeA.enabled, effOasStartA, s.oasA.startDate)} | ${ageBetween(s.personA.birthDate, effOasStartA)} | ${oasFacA} | $${Math.round(oasEffA).toLocaleString('en-CA')} | ${c(oasEffA * 12)} |`,
     `| ${bName} | $${s.oasB.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${modVal(wi.oasStartAgeB.enabled, effOasStartB, s.oasB.startDate)} | ${ageBetween(s.personB.birthDate, effOasStartB)} | ${oasFacB} | $${Math.round(oasEffB).toLocaleString('en-CA')} | ${c(oasEffB * 12)} |`)
   br()
-  h(`OAS deferral: +0.6%/month after age 65, maximum +36% at age 70. Clawback: 15% of net income above ~$90,997 (2024, CPI-indexed annually). OAS does not pass to a survivor — it stops at death.`)
+  h(`OAS deferral: +0.6%/month after age 65, maximum +36% at age 70. Clawback: 15% of net income above ~$95,323 (2026, CPI-indexed annually). OAS does not pass to a survivor — it stops at death.`)
   const gisPeople = [
     ...(s.oasA.gisEligible ? [`${aName}: $${s.oasA.gisMonthlyAmount}/month`] : []),
     ...(s.oasB.gisEligible ? [`${bName}: $${s.oasB.gisMonthlyAmount}/month`] : []),
@@ -421,12 +421,12 @@ function generateAIContext(): string {
   const psDesc = effPSMode === 'auto'
     ? `Auto-optimized each year — the model allocates up to 50% of eligible pension income from ${aName} to ${bName} to minimize combined tax`
     : `Manual — ${pct(effPSPct)} of eligible pension income allocated from ${aName} to ${bName}`
-  h(`- **Jurisdiction:** Ontario + Federal combined, 2024 bracket values, CPI-indexed forward annually`,
+  h(`- **Jurisdiction:** Ontario + Federal combined, 2026 bracket values, CPI-indexed forward annually`,
     `- **Capital gains inclusion:** ${pct(cgRate)} of net realized gains included in taxable income (${100 - cgRate}% exempt)`,
     `- **Eligible dividends:** Grossed up 38%; federal dividend tax credit ~15.0% of grossed-up amount; Ontario credit ~10.0%`,
     `- **Pension income splitting:** ${psDesc}${wi.pensionSplit.enabled ? ` *(base: ${s.withdrawalStrategy.pensionSplitMode === 'auto' ? 'auto' : `manual ${pct(s.withdrawalStrategy.pensionSplitPct)}`})*` : ''}`,
-    `- **OAS clawback:** 15% of net income above ~$90,997 (2024, CPI-indexed annually)`,
-    `- **Ontario surtax:** 20% surcharge on Ontario tax above $5,315; additional 36% surcharge on Ontario tax above $6,802 (2024)`)
+    `- **OAS clawback:** 15% of net income above ~$95,323 (2026, CPI-indexed annually)`,
+    `- **Ontario surtax:** 20% surcharge on Ontario tax above $5,818; additional 36% surcharge on Ontario tax above $7,446 (2026)`)
   br()
   h('---')
   br()
@@ -576,13 +576,13 @@ function generateAIContext(): string {
   // ── 8. Canadian Rules Reference ─────────────────────────────────────────────
   h('## 8. Key Canadian Rules Built Into This Model')
   br()
-  h(`- **CPP:** Max ~$1,364/month base + ~$130/month CPP2 (2024). Deferral: −0.6%/month before 65, +0.7%/month after (cap −36% at 60, +42% at 70). Survivor: 60% of deceased's entitlement to the survivor.`,
-    `- **OAS:** Max ~$713/month at 65 (2024). Deferral: +0.6%/month past 65, max +36% at 70. Clawback: 15% above ~$90,997 net income. No survivor OAS.`,
+  h(`- **CPP:** Max ~$1,508/month base + ~$55/month CPP2 (2026). Deferral: −0.6%/month before 65, +0.7%/month after (cap −36% at 60, +42% at 70). Survivor: 60% of deceased's entitlement to the survivor.`,
+    `- **OAS:** Max ~$742/month at 65 (2026). Deferral: +0.6%/month past 65, max +36% at 70. Clawback: 15% above ~$95,323 net income. No survivor OAS.`,
     `- **RRIF minimums:** CRA table by age — ~5.3% at 71, ~6.8% at 75, ~10.2% at 85, ~20.0% at 95+. All mandatory withdrawals are fully taxable.`,
     `- **Pension income splitting:** Up to 50% of eligible pension income (DB pension, RRIF withdrawals after age 65) may be allocated to a lower-income spouse for tax purposes.`,
-    `- **TFSA:** Tax-free growth and withdrawals. Contribution room ($7,000/yr in 2024, indexed) restored in the following calendar year.`,
+    `- **TFSA:** Tax-free growth and withdrawals. Contribution room ($7,000/yr in 2026, indexed) restored in the following calendar year.`,
     `- **Capital gains:** ${pct(cgRate)} of net gains included in income (${100 - cgRate}% exempt). Gains triggered on withdrawal at the ACB ratio.`,
-    `- **Ontario surtax:** Applied to Ontario tax itself — 20% above $5,315 and 36% above $6,802 of Ontario tax owing (2024).`)
+    `- **Ontario surtax:** Applied to Ontario tax itself — 20% above $5,818 and 36% above $7,446 of Ontario tax owing (2026).`)
   br()
   h('---')
   br()
@@ -711,7 +711,7 @@ function VersionModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Tax year</span>
-            <span className="font-medium">2024 (CPI-indexed forward)</span>
+            <span className="font-medium">2026 (CPI-indexed forward)</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Capital gains inclusion</span>

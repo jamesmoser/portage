@@ -19,7 +19,7 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 
 - **DB Pension** — defined benefit pension with CPI indexing (with optional annual cap), bridge benefit, CPP integration reduction at 65, early retirement reduction factor, survivor benefit percentage, and independent modelling per person
 - **CPP** — early/deferred start with full actuarial adjustment (−0.6%/month before age 65, +0.7%/month after age 65, maximum ±42%/36% at ages 70/60). Survivor CPP modelled at 60% of deceased's entitlement.
-- **OAS** — deferred start with +0.6%/month after age 65 (max +36% at 70). Clawback at 15% above the threshold (~$90,997 in 2024, CPI-indexed). Optional GIS supplement per person.
+- **OAS** — deferred start with +0.6%/month after age 65 (max +36% at 70). Clawback at 15% above the threshold (~$95,323 in 2026, CPI-indexed). Optional GIS supplement per person.
 - **Employment income** — per-person salary with configurable real growth rate, pro-rated to the month of retirement
 - **Other income** — recurring or one-time items per person or joint, taxable/non-taxable flag, with start/end dates and real growth rate
 
@@ -35,13 +35,13 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 - **Spending phases** — multiple phases (e.g. Go-Go / Slow-Go / No-Go / Survivor) each with an annual amount and real growth rate. The survivor phase can be linked to the first death so its start date adjusts automatically.
 - **Additional spending** — recurring or one-time items keyed to the reference person's age, in today's dollars
 
-### Tax Engine (Ontario + Federal, 2024 reference year, CPI-indexed forward)
+### Tax Engine (Ontario + Federal, 2026 reference year, CPI-indexed forward)
 
 - Full marginal tax on employment, pension, CPP, OAS, RRIF, eligible dividends (38% gross-up with federal + Ontario credits), non-eligible dividends, foreign income, and interest income
 - Capital gains at 50% inclusion (two-tier structure preserved for scenario analysis; proposed 66.67% above $250k was cancelled January 2025)
 - Pension income splitting — auto-optimized each year or manual (0–50% of eligible pension from Person A to Person B)
 - Age amount, pension income amount, basic personal amount — all CPI-indexed
-- Ontario surtax: 20% on Ontario tax above $5,315; additional 36% above $6,802
+- Ontario surtax: 20% on Ontario tax above $5,818; additional 36% above $7,446
 - OAS clawback at 15% above the annual threshold
 
 ### Withdrawal / Drawdown Strategies
@@ -165,7 +165,7 @@ All data operations are available from the **menu** (top-right of the header):
 ## Scope & Limitations
 
 - **Ontario only** — provincial tax calculations are hardcoded for Ontario; multi-province support is a future concern
-- **2024 tax reference year** — brackets and credits are indexed forward by CPI each year in the engine
+- **2026 tax reference year** — brackets and credits are indexed forward by CPI each year in the engine
 - **Annual granularity** — the engine walks year-by-year with a monthly inner loop for income pro-ration; account balances compound annually
 - **Single household** — two people; no support for blended families or more complex household structures
 - **Exploratory strategies** — Fixed Withdrawal and Fixed Percentage are designed for scenario exploration, not as complete decumulation optimizers; they do not automatically reinvest surplus or fill shortfalls

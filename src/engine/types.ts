@@ -160,7 +160,7 @@ export interface AdditionalSpending {
   recurring: boolean           // true = every year from startAge; false = one-time in that year
 }
 
-// ─── Tax Settings (Ontario + Federal, 2024 values, editable) ─────────────────
+// ─── Tax Settings (Ontario + Federal, 2026 values, editable) ─────────────────
 
 export interface TaxBracket {
   upTo: number    // upper threshold; last bracket: Infinity
@@ -184,7 +184,7 @@ export interface TaxSettings {
   capitalGainsInclusionRate: number        // e.g. 0.5
   capitalGainsHighRate: number             // e.g. 0.6667 above threshold
   capitalGainsHighThreshold: number        // e.g. 250000
-  oasClawbackThreshold: number             // 2024: ~$90,997
+  oasClawbackThreshold: number             // 2026: ~$95,323
   oasClawbackRate: number                  // 0.15
 
   // Ontario

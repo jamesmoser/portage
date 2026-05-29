@@ -38,7 +38,7 @@ function TFSASection({ label, account, birthDate, planningEndAge, retirementDate
       </div>
       <div>
         <p className="font-semibold mb-1">Contribution Room</p>
-        <p>Room accumulates every calendar year for any Canadian resident age 18+, regardless of employment or retirement status. The 2024 annual limit is $7,000, indexed to CPI in $500 increments. Any amount <strong>withdrawn in a year is restored as new contribution room on January 1 of the following year</strong> — so strategic withdrawals in one year can be re-contributed the next.</p>
+        <p>Room accumulates every calendar year for any Canadian resident age 18+, regardless of employment or retirement status. The 2026 annual limit is $7,000, indexed to CPI in $500 increments. Any amount <strong>withdrawn in a year is restored as new contribution room on January 1 of the following year</strong> — so strategic withdrawals in one year can be re-contributed the next.</p>
       </div>
       <div>
         <p className="font-semibold mb-1">RRSP Meltdown Strategy</p>

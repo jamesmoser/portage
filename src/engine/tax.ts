@@ -1,4 +1,4 @@
-// Ontario + Federal tax calculation engine (2024 reference values, indexed forward by CPI)
+// Ontario + Federal tax calculation engine (2026 reference values, indexed forward by CPI)
 // All dollar inputs in nominal dollars for the calculation year.
 // Returns taxes in nominal dollars.
 

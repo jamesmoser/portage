@@ -63,8 +63,8 @@ export function TaxSettingsTab() {
         onReset={() => update2('federalBrackets', DEFAULT_TAX_SETTINGS.federalBrackets)}
         info={
           <div className="space-y-2 text-sm">
-            <p>Federal income tax is applied progressively — only the income within each band is taxed at that band's rate. You never pay the higher rate on all your income, only on the slice above each threshold. For example, at $120,000 income in 2024: the first $55,867 is taxed at 15%, the next $55,866 at 20.5%, and only the remaining $8,267 at 26%.</p>
-            <p>These default to the 2024 federal brackets. The engine indexes all bracket thresholds forward each year by the CPI rate you set in Assumptions, so bracket creep is automatically accounted for. You only need to change these if federal tax policy changes significantly or you want to model a specific scenario.</p>
+            <p>Federal income tax is applied progressively — only the income within each band is taxed at that band's rate. You never pay the higher rate on all your income, only on the slice above each threshold. For example, at $120,000 income in 2026: the first $58,523 is taxed at 14%, the next $58,522 at 20.5%, and only the remaining $2,955 at 26%. Note: the lowest federal bracket rate was reduced from 15% to 14% effective January 1, 2026.</p>
+            <p>These default to the 2026 federal brackets. The engine indexes all bracket thresholds forward each year by the CPI rate you set in Assumptions, so bracket creep is automatically accounted for. You only need to change these if federal tax policy changes significantly or you want to model a specific scenario.</p>
             <p>Federal tax applies to both people independently based on each person's net income in each year. Pension income splitting can shift income between spouses to reduce the combined tax burden — this is managed in the Dashboard's drawdown strategy.</p>
           </div>
         }>
@@ -77,7 +77,7 @@ export function TaxSettingsTab() {
           <div className="space-y-2 text-sm">
             <p>Ontario provincial tax brackets, applied on top of federal tax. Ontario also levies an additional surtax on high provincial tax amounts — configured in the Ontario Credits & Surtax card below. This surtax is unique to Ontario and can add several thousand dollars for incomes above $100,000.</p>
             <p>Combined federal + Ontario marginal rates at the top bracket reach approximately 53.5%, making tax-efficient income splitting and account sequencing important for higher-income households.</p>
-            <p>Like federal brackets, these defaults are based on 2024 rates and are indexed forward by CPI each year. Only modify these if Ontario tax policy changes or you want to model a scenario.</p>
+            <p>Like federal brackets, these defaults are based on 2026 rates and are indexed forward by CPI each year. Only modify these if Ontario tax policy changes or you want to model a scenario.</p>
           </div>
         }>
         <BracketTable title="Ontario Tax Brackets" brackets={s.ontarioBrackets} onChange={v => update2('ontarioBrackets', v)} />
@@ -88,10 +88,10 @@ export function TaxSettingsTab() {
         info={
           <div className="space-y-2 text-sm">
             <p>Non-refundable credits reduce the tax you owe. They can reduce your tax to zero but cannot create a refund. The credit value equals the amount times the lowest federal bracket rate (15%).</p>
-            <p><strong>Basic Personal Amount (BPA)</strong> — Every Canadian gets this deduction. At $15,705, it provides a ~$2,356 federal credit, effectively making the first $15,705 of income federally tax-free for each person.</p>
-            <p><strong>Pension Income Amount</strong> — A $2,000 deduction for eligible pension income: RRIF withdrawals, DB pension payments, and CPP all qualify. Worth ~$300 in federal tax savings per person per year. Pension income splitting (in the Dashboard) helps ensure both spouses can claim it.</p>
-            <p><strong>Age Amount</strong> — An additional deduction for Canadians age 65 and older, worth up to $8,790 in 2024. It phases out at 15 cents for every dollar of net income above $42,335, disappearing entirely around $100,000 income. This is one reason to manage RRIF withdrawal levels carefully — keeping net income below $42,335 preserves the full Age Amount credit.</p>
-            <p><strong>OAS Clawback Threshold</strong> — OAS is "clawed back" (recovered) at 15% of net income above this threshold. For every $10,000 above ~$90,997, you lose $1,500 of OAS. For high RRIF withdrawal scenarios, this can significantly reduce OAS income — use the Dashboard to model the impact.</p>
+            <p><strong>Basic Personal Amount (BPA)</strong> — Every Canadian gets this deduction. At $16,452, it provides a ~$2,303 federal credit (at 14%), effectively making the first $16,452 of income federally tax-free for each person.</p>
+            <p><strong>Pension Income Amount</strong> — A $2,000 deduction for eligible pension income: RRIF withdrawals, DB pension payments, and CPP all qualify. Worth ~$280 in federal tax savings per person per year (at 14%). Pension income splitting (in the Dashboard) helps ensure both spouses can claim it.</p>
+            <p><strong>Age Amount</strong> — An additional deduction for Canadians age 65 and older, worth up to $9,209 in 2026. It phases out at 15 cents for every dollar of net income above $46,432, disappearing entirely around $108,000 income. This is one reason to manage RRIF withdrawal levels carefully — keeping net income below $46,432 preserves the full Age Amount credit.</p>
+            <p><strong>OAS Clawback Threshold</strong> — OAS is "clawed back" (recovered) at 15% of net income above this threshold. For every $10,000 above ~$95,323, you lose $1,500 of OAS. For high RRIF withdrawal scenarios, this can significantly reduce OAS income — use the Dashboard to model the impact.</p>
           </div>
         }>
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

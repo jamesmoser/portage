@@ -98,8 +98,8 @@ export function CPPOASTab() {
       <p><strong>Residency-based benefit</strong> — Unlike CPP, OAS is not based on employment or contributions. Eligibility requires at least 10 years of Canadian residency after age 18; the full benefit requires 40 years. Most long-term Canadian residents qualify for the full amount.</p>
       <p><strong>Estimation Methods</strong> — <em>Direct Entry</em>: enter the monthly amount from your My Service Canada account. <em>Years of Residency</em>: enter your years of Canadian residency after age 18; the app calculates (years ÷ 40) × the maximum benefit.</p>
       <p><strong>Deferral</strong> — OAS can start between age 65 and 70. There is no early option. Each month deferred past 65 increases the benefit by 0.6% per month (maximum +36% at age 70). There is no survivor benefit — payments stop at death.</p>
-      <p><strong>Clawback (OAS Recovery Tax)</strong> — 15% of net income above ~$90,997 (2024, indexed to CPI annually), calculated per person. The clawback is <strong>not applied in the base model</strong> and will be addressed in scenario analysis for high-income projections.</p>
-      <p><strong>GIS (Guaranteed Income Supplement)</strong> — A non-taxable monthly top-up for low-income OAS recipients. If enabled, the app adds the entered GIS amount to OAS in the base projection, but does <strong>not apply the income test</strong>. For high earners, GIS would be $0 in practice. The 2024 maximum for a coupled recipient is ~$641/month.</p>
+      <p><strong>Clawback (OAS Recovery Tax)</strong> — 15% of net income above ~$95,323 (2026, indexed to CPI annually), calculated per person. The clawback is <strong>not applied in the base model</strong> and will be addressed in scenario analysis for high-income projections.</p>
+      <p><strong>GIS (Guaranteed Income Supplement)</strong> — A non-taxable monthly top-up for low-income OAS recipients. If enabled, the app adds the entered GIS amount to OAS in the base projection, but does <strong>not apply the income test</strong>. For high earners, GIS would be $0 in practice. The 2026 maximum for a coupled recipient is ~$667/month.</p>
     </div>
   )
 
@@ -116,7 +116,7 @@ export function CPPOASTab() {
       <p><strong>CPP Enhancement (CPP2)</strong> — Since 2019, CPP contributions are split into two tiers (base CPP and CPP2 on earnings between the YMPE and YAMPE). My Service Canada's projected retirement amount includes both tiers, so entering the figure from your statement implicitly captures CPP2 with no separate input required.</p>
       <p><strong>CPP Disability</strong> — CPP disability is not modelled in this app. If you are currently receiving CPP disability, your My Service Canada statement will show that benefit rather than a retirement projection — contact Service Canada for an equivalent retirement estimate. Note: years spent on CPP disability are excluded from the contributory period, which is favourable to the retirement calculation.</p>
       <p><strong>Survivor Benefit</strong> — When the CPP recipient dies, the surviving spouse receives up to 60% of the deceased's adjusted retirement pension. This calculation assumes the survivor is age 65 or older at the time. The combined CPP (survivor + own) cannot exceed the maximum CPP pension; this cap is not applied here.</p>
-      <p><strong>Estimation Methods</strong> — Three methods are available. <em>Direct Entry</em>: enter the projected amount from My Service Canada directly. <em>% of Maximum</em>: enter your benefit as a percentage of the 2024 combined maximum ({fmt0(CPP_COMBINED_MAX_MONTHLY)}/month). <em>Years at Maximum</em>: enter years of full contributions; the app calculates (years ÷ 39) × maximum. All methods assume the combined base CPP + CPP2 maximum. <strong>CPP2 caveat:</strong> CPP2 only started January 2024, so the CPP2 component (~$130/month at full contribution) is overstated for anyone retiring before completing a full career of CPP2 contributions. Use Direct Entry from My Service Canada for the most accurate figure.</p>
+      <p><strong>Estimation Methods</strong> — Three methods are available. <em>Direct Entry</em>: enter the projected amount from My Service Canada directly. <em>% of Maximum</em>: enter your benefit as a percentage of the 2026 combined maximum ({fmt0(CPP_COMBINED_MAX_MONTHLY)}/month). <em>Years at Maximum</em>: enter years of full contributions; the app calculates (years ÷ 39) × maximum. All methods assume the combined base CPP + CPP2 maximum. <strong>CPP2 caveat:</strong> CPP2 only started January 2024, so the CPP2 component (~$55/month in 2026) is understated for anyone expecting a full career of CPP2 contributions. Use Direct Entry from My Service Canada for the most accurate figure.</p>
       <p><strong>Start Age Adjustment Rates</strong></p>
       <div className="grid grid-cols-2 gap-2 text-xs">
         {[
@@ -169,7 +169,7 @@ export function CPPOASTab() {
                 value={cppA.maxMonthlyBenefit}
                 onChange={v => update('cppA', { ...cppA, maxMonthlyBenefit: v, estimatedMonthlyAt65: cppMonthlyFromInputs('pctOfMax', cppA.pctOfMax, 0, v) })}
                 prefix="$" min={0} max={2000} step={1} decimals={0} size="sm"
-                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2024 combined maximum of $1,494/month."
+                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2026 combined maximum of $1,563/month."
               />
               <NumberInput
                 label="% of Maximum Benefit"
@@ -186,14 +186,14 @@ export function CPPOASTab() {
                 value={cppA.maxMonthlyBenefit}
                 onChange={v => update('cppA', { ...cppA, maxMonthlyBenefit: v, estimatedMonthlyAt65: cppMonthlyFromInputs('yearsAtMax', 0, cppA.yearsAtMax, v) })}
                 prefix="$" min={0} max={2000} step={1} decimals={0} size="sm"
-                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2024 combined maximum of $1,494/month."
+                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2026 combined maximum of $1,563/month."
               />
               <NumberInput
                 label="Years at Max Earnings"
                 value={cppA.yearsAtMax}
                 onChange={v => update('cppA', { ...cppA, yearsAtMax: v, estimatedMonthlyAt65: cppMonthlyFromInputs('yearsAtMax', 0, v, cppA.maxMonthlyBenefit) })}
                 min={0} max={40} step={1} decimals={0} size="sm"
-                tooltip="Years with earnings at or above the YAMPE (~$73,200 in 2024). Assumes all years count toward both base CPP and CPP2."
+                tooltip="Years with earnings at or above the YAMPE (~$85,000 in 2026). Assumes all years count toward both base CPP and CPP2."
               />
             </>
           )}
@@ -253,7 +253,7 @@ export function CPPOASTab() {
                 value={cppB.maxMonthlyBenefit}
                 onChange={v => update('cppB', { ...cppB, maxMonthlyBenefit: v, estimatedMonthlyAt65: cppMonthlyFromInputs('pctOfMax', cppB.pctOfMax, 0, v) })}
                 prefix="$" min={0} max={2000} step={1} decimals={0} size="sm"
-                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2024 combined maximum of $1,494/month."
+                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2026 combined maximum of $1,563/month."
               />
               <NumberInput
                 label="% of Maximum Benefit"
@@ -270,14 +270,14 @@ export function CPPOASTab() {
                 value={cppB.maxMonthlyBenefit}
                 onChange={v => update('cppB', { ...cppB, maxMonthlyBenefit: v, estimatedMonthlyAt65: cppMonthlyFromInputs('yearsAtMax', 0, cppB.yearsAtMax, v) })}
                 prefix="$" min={0} max={2000} step={1} decimals={0} size="sm"
-                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2024 combined maximum of $1,494/month."
+                tooltip="Combined CPP + CPP2 maximum. Defaults to the 2026 combined maximum of $1,563/month."
               />
               <NumberInput
                 label="Years at Max Earnings"
                 value={cppB.yearsAtMax}
                 onChange={v => update('cppB', { ...cppB, yearsAtMax: v, estimatedMonthlyAt65: cppMonthlyFromInputs('yearsAtMax', 0, v, cppB.maxMonthlyBenefit) })}
                 min={0} max={40} step={1} decimals={0} size="sm"
-                tooltip="Years with earnings at or above the YAMPE (~$73,200 in 2024). Assumes all years count toward both base CPP and CPP2."
+                tooltip="Years with earnings at or above the YAMPE (~$85,000 in 2026). Assumes all years count toward both base CPP and CPP2."
               />
             </>
           )}
@@ -326,7 +326,7 @@ export function CPPOASTab() {
               value={oasA.estimatedMonthlyAt65}
               onChange={v => update('oasA', { ...oasA, estimatedMonthlyAt65: v })}
               prefix="$" min={0} max={1000} step={1} decimals={0} size="sm"
-              tooltip="From your My Service Canada account. 2024 maximum is $713/month."
+              tooltip="From your My Service Canada account. 2026 maximum is $742/month."
             />
           )}
           {oasA.inputMode === 'yearsOfResidency' && (
@@ -336,7 +336,7 @@ export function CPPOASTab() {
                 value={oasA.maxMonthlyBenefit}
                 onChange={v => update('oasA', { ...oasA, maxMonthlyBenefit: v, estimatedMonthlyAt65: oasMonthlyFromYears(oasA.yearsOfResidency, v) })}
                 prefix="$" min={0} max={1000} step={1} decimals={0} size="sm"
-                tooltip="Full OAS at 40 years residency. 2024 maximum is $713/month."
+                tooltip="Full OAS at 40 years residency. 2026 maximum is $742/month."
               />
               <NumberInput
                 label="Years of Canadian Residency (after age 18)"
@@ -371,7 +371,7 @@ export function CPPOASTab() {
               value={oasA.gisMonthlyAmount}
               onChange={v => update('oasA', { ...oasA, gisMonthlyAmount: v })}
               prefix="$" min={0} max={1200} step={1} decimals={0} size="sm"
-              tooltip="2024 maximum for a coupled recipient is ~$641/month. Non-taxable. Income test not applied."
+              tooltip="2026 maximum for a coupled recipient is ~$667/month. Non-taxable. Income test not applied."
             />
           )}
         </div>
@@ -415,7 +415,7 @@ export function CPPOASTab() {
                 value={oasB.maxMonthlyBenefit}
                 onChange={v => update('oasB', { ...oasB, maxMonthlyBenefit: v, estimatedMonthlyAt65: oasMonthlyFromYears(oasB.yearsOfResidency, v) })}
                 prefix="$" min={0} max={1000} step={1} decimals={0} size="sm"
-                tooltip="Full OAS at 40 years residency. 2024 maximum is $713/month."
+                tooltip="Full OAS at 40 years residency. 2026 maximum is $742/month."
               />
               <NumberInput
                 label="Years of Canadian Residency (after age 18)"
@@ -449,7 +449,7 @@ export function CPPOASTab() {
               value={oasB.gisMonthlyAmount}
               onChange={v => update('oasB', { ...oasB, gisMonthlyAmount: v })}
               prefix="$" min={0} max={1200} step={1} decimals={0} size="sm"
-              tooltip="2024 maximum for a coupled recipient is ~$641/month. Non-taxable. Income test not applied."
+              tooltip="2026 maximum for a coupled recipient is ~$667/month. Non-taxable. Income test not applied."
             />
           )}
         </div>

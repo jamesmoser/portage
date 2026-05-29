@@ -2123,7 +2123,7 @@ export function DashboardTab() {
                     ? `${fmtPct(frozenMetrics.oasClawbackPct)} of OAS years` : undefined)}
                 onClick={() => setModalDef({
                   title: 'OAS — Clawback Detail',
-                  note: "Today's dollars. Clawback = 15% of income above threshold (~$90,997 in 2024, CPI-indexed). Rows with clawback highlighted.",
+                  note: "Today's dollars. Clawback = 15% of income above threshold (~$95,323 in 2026, CPI-indexed). Rows with clawback highlighted.",
                   columns: [
                     { header: 'Year',              render: d => d.year },
                     { header: `Age — ${aName}`,  right: true, render: d => d.personAAge.toFixed(1) },
