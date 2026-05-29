@@ -100,6 +100,7 @@ function generateAIContext(): string {
           fixedWithdrawal: s.withdrawalStrategy.drawdownFixedWithdrawal,
           spendGapConfig:  s.withdrawalStrategy.spendGapConfig,
           bengenConfig:    s.withdrawalStrategy.bengenConfig,
+          gkConfig:        s.withdrawalStrategy.gkConfig,
         }
 
   const effRates = {

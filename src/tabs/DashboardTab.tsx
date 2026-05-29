@@ -12,8 +12,8 @@ import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../engine/dates'
 import { DateInput } from '../components/DateInput'
-import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem } from '../engine/types'
-import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG } from '../engine/defaults'
+import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem, GKPersonConfig } from '../engine/types'
+import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG, DEFAULT_GK_CONFIG } from '../engine/defaults'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,6 +76,7 @@ const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[
   { value: 'fixedWithdrawal', label: 'Fixed Withdrawals' },
   { value: 'fixedPct',        label: 'Fixed Percentage' },
   { value: 'bengen',          label: 'Bengen Rule' },
+  { value: 'gk',              label: 'Guyton-Klinger' },
   { value: 'spendGap',        label: 'Cover Spending Gap' },
 ]
 
@@ -109,6 +110,10 @@ const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, React.ReactNo
     <p>The Bengen Rule (commonly called the 4% rule): in year 1 of retirement, withdraw a fixed percentage of the total portfolio. Each subsequent year draw that same nominal amount adjusted for inflation — constant in today's dollars when indexing by personal inflation, or slowly declining when indexing by CPI (matching the original research). Toggle <em>Index by CPI</em> on to use the historical convention.</p>
     <p className="mt-1.5">Draws are per person from their own accounts (RRSP/RRIF, Non-Reg, TFSA) in the configured order, with RRIF mandatory minimums always taken first and netted from the target. After the first death, the survivor draws the sum of both people's annual amounts from their combined accounts. There is no automatic gap-filling — any difference between the draw and spending appears directly as a surplus or deficit in the cash flow chart.</p>
     <p className="mt-1.5">Two HISA buffer toggles control how surpluses and deficits are handled. With both off you see the raw Bengen picture — surplus and deficit bars exactly as the rule produces them, with no wealth preservation. With "Route surplus to HISA" on, annual surpluses are deposited into HISA rather than disappearing; the surplus bars remain fully visible and HISA accumulates the excess. This matters most with large RRSPs: once RRIF conversion begins, mandatory minimums can far exceed the Bengen target, producing large surpluses that inflate HISA while the invested accounts drain. With "Cover deficit from HISA" also on, HISA is drawn down in deficit years to eliminate red bars — but only while it has funds. Red bars return once HISA is exhausted, marking the true shortfall point. Running both toggles together is the most diagnostic combination: if the plan stays green throughout, Bengen works with a HISA buffer and the surplus bars tell you how large that buffer needs to be; if red bars still appear in the final years, the buffer ran dry and Bengen is not the right rule for this situation.</p>
+  </>),
+  gk: (<>
+    <p>The Guyton-Klinger Guardrail strategy begins like the Bengen Rule — withdraw a fixed percentage of the portfolio in year 1, then inflation-adjust that amount annually — but applies three guardrails each year to keep the withdrawal rate in range. Gate 1 (Inflation Rule) skips the annual inflation raise if the prior year's portfolio return was negative and the current withdrawal rate has risen above the initial rate. Gate 2 (Capital Preservation) cuts the withdrawal by the configured percentage when the rate has risen too far above the initial rate; it is automatically disabled in each person's final 15 years when reducing income would be counterproductive. Gate 3 (Prosperity) raises the withdrawal when the rate has fallen well below the initial rate, capturing portfolio gains as additional spending power.</p>
+    <p className="mt-1.5">Draws are per person from their own accounts in the configured order, with RRIF minimums always taken first and netted from the target. After the first death, the survivor draws the sum of both people's guardrail-adjusted amounts from their combined accounts. HISA buffer toggles work the same as in the Bengen strategy — surplus to HISA preserves excess cash rather than losing it, and cover deficit from HISA extends the portfolio's effective life before red bars appear.</p>
   </>),
   spendGap: (<>
     <p>Draws exactly what is needed from investment accounts to cover the gap between spending and after-tax income each year. Pre-retirement follows the base plan with no proactive draws. From retirement until RRIF conversion, RRSP can be melted down proactively up to a gross income ceiling to reduce future forced minimums. After RRIF conversion, the CRA mandatory minimum is always withdrawn first; the deficit order covers any remaining shortfall.</p>
@@ -1449,6 +1454,172 @@ export function DashboardTab() {
                       />
                       <BengenAccountOrderInput
                         items={bg.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
+                        onChange={items => updatePerson('personB', { accountOrder: items })}
+                        personName={bName}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )
+          })()}
+
+          {/* Guyton-Klinger config */}
+          {whatIfs.drawdownStrategy.value.strategyType === 'gk' && (() => {
+            const gk = whatIfs.drawdownStrategy.value.gkConfig ?? DEFAULT_GK_CONFIG
+            const updateGk = (patch: Partial<typeof gk>) =>
+              updateWhatIf('drawdownStrategy', {
+                value: { ...whatIfs.drawdownStrategy.value, gkConfig: { ...gk, ...patch } },
+              })
+            const updatePerson = (person: 'personA' | 'personB', patch: Partial<GKPersonConfig>) =>
+              updateGk({ [person]: { ...gk[person], ...patch } })
+
+            return (
+              <div className="space-y-3 pt-1">
+                {/* Parameters */}
+                <div className="overflow-x-auto rounded border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Parameters</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600 w-52">Index by CPI</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={gk.inflationIndex === 'cpi'}
+                            onChange={v => updateGk({ inflationIndex: v ? 'cpi' : 'personal' })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Route surplus to HISA</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={gk.surplusToHisa ?? true}
+                            onChange={v => updateGk({ surplusToHisa: v })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Cover deficit from HISA</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={gk.deficitFromHisa ?? false}
+                            onChange={v => updateGk({ deficitFromHisa: v })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Apply 15-year rule</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={gk.apply15YearRule ?? true}
+                            onChange={v => updateGk({ apply15YearRule: v })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Year-1 Draw Rate</td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex gap-6">
+                            <NumberInput
+                              label={`${aName} (%)`}
+                              value={gk.personA.drawRatePct}
+                              onChange={v => updatePerson('personA', { drawRatePct: v })}
+                              min={0} max={20} step={0.25} decimals={2} size="sm"
+                            />
+                            <NumberInput
+                              label={`${bName} (%)`}
+                              value={gk.personB.drawRatePct}
+                              onChange={v => updatePerson('personB', { drawRatePct: v })}
+                              min={0} max={20} step={0.25} decimals={2} size="sm"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Guardrail settings */}
+                <div className="overflow-x-auto rounded border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Guardrail Settings</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600 w-52">Lower guardrail (%)</td>
+                        <td className="px-2 py-1.5">
+                          <NumberInput
+                            label=""
+                            value={gk.lowerGuardrailPct}
+                            onChange={v => updateGk({ lowerGuardrailPct: v })}
+                            min={0} max={100} step={5} decimals={0} size="sm"
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Upper guardrail (%)</td>
+                        <td className="px-2 py-1.5">
+                          <NumberInput
+                            label=""
+                            value={gk.upperGuardrailPct}
+                            onChange={v => updateGk({ upperGuardrailPct: v })}
+                            min={0} max={100} step={5} decimals={0} size="sm"
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Cut percentage (%)</td>
+                        <td className="px-2 py-1.5">
+                          <NumberInput
+                            label=""
+                            value={gk.cutPct}
+                            onChange={v => updateGk({ cutPct: v })}
+                            min={0} max={50} step={1} decimals={0} size="sm"
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Raise percentage (%)</td>
+                        <td className="px-2 py-1.5">
+                          <NumberInput
+                            label=""
+                            value={gk.raisePct}
+                            onChange={v => updateGk({ raisePct: v })}
+                            min={0} max={50} step={1} decimals={0} size="sm"
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Per-person account order */}
+                <div className="rounded border border-slate-200">
+                  <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700">Account Draw Order</span>
+                  </div>
+                  <div className="bg-white px-3 py-3">
+                    <div className="flex gap-20">
+                      <BengenAccountOrderInput
+                        items={gk.personA.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
+                        onChange={items => updatePerson('personA', { accountOrder: items })}
+                        personName={aName}
+                      />
+                      <BengenAccountOrderInput
+                        items={gk.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
                         onChange={items => updatePerson('personB', { accountOrder: items })}
                         personName={bName}
                       />

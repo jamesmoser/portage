@@ -208,7 +208,7 @@ export type PensionSplitMode = 'auto' | 'manual'
 
 // ─── Drawdown Strategies ──────────────────────────────────────────────────────
 
-export type DrawdownStrategyType = 'none' | 'spendGap' | 'fixedWithdrawal' | 'fixedPct' | 'bengen'
+export type DrawdownStrategyType = 'none' | 'spendGap' | 'fixedWithdrawal' | 'fixedPct' | 'bengen' | 'gk'
 
 // ─── Bengen Rule Strategy ─────────────────────────────────────────────────────
 
@@ -247,6 +247,37 @@ export interface BengenConfig {
   deficitFromHisa: boolean
   personA: BengenPersonConfig
   personB: BengenPersonConfig
+}
+
+// ─── Guyton-Klinger Guardrail Strategy ────────────────────────────────────────
+
+export interface GKPersonConfig {
+  /** % of year-1 portfolio to draw annually (e.g. 4.0 = 4%). */
+  drawRatePct: number
+  /** Ordered list of accounts to draw from, after RRIF minimum is netted. */
+  accountOrder: BengenAccountItem[]
+}
+
+export interface GKConfig {
+  /** Which inflation rate is used to index the withdrawal each year.
+   *  'personal' → constant in today's dollars; 'cpi' → tracks general inflation. */
+  inflationIndex:    'personal' | 'cpi'
+  /** When true, annual cash flow surplus is deposited into HISA. */
+  surplusToHisa:     boolean
+  /** When true, annual cash flow deficit is covered by HISA draws first. */
+  deficitFromHisa:   boolean
+  /** Gate 2 triggers when CWR > IWR × (1 + lowerGuardrailPct/100). Default 20 → 120% of IWR. */
+  lowerGuardrailPct: number
+  /** Gate 3 triggers when CWR < IWR × (1 − upperGuardrailPct/100). Default 20 → 80% of IWR. */
+  upperGuardrailPct: number
+  /** Gate 2 reduction: withdrawal is cut by this % when triggered. Default 10. */
+  cutPct:            number
+  /** Gate 3 raise: withdrawal is increased by this % when triggered. Default 10. */
+  raisePct:          number
+  /** When true, Gate 2 (Capital Preservation cut) is disabled in each person's final 15 years. */
+  apply15YearRule:   boolean
+  personA:           GKPersonConfig
+  personB:           GKPersonConfig
 }
 
 // ─── Spend-Gap Strategy ───────────────────────────────────────────────────────
@@ -329,6 +360,7 @@ export interface DrawdownStrategyConfig {
   fixedWithdrawal: FixedWithdrawalConfig
   spendGapConfig:  SpendGapConfig
   bengenConfig:    BengenConfig
+  gkConfig:        GKConfig
 }
 
 export interface WithdrawalStrategy {
@@ -341,6 +373,7 @@ export interface WithdrawalStrategy {
   drawdownFixedWithdrawal: FixedWithdrawalConfig
   spendGapConfig:          SpendGapConfig
   bengenConfig:            BengenConfig
+  gkConfig:                GKConfig
 }
 
 // ─── Market Profile ───────────────────────────────────────────────────────────

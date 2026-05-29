@@ -1,7 +1,7 @@
 // Default values for the full AppState — all monetary values in today's dollars.
 // Tax brackets use 2026 reference values and are indexed forward by CPI in the engine.
 
-import type { AppState, TaxSettings, WhatIfs, SpendGapPhaseConfig, SpendGapConfig, SpendGapDeficitItem, SpendGapSurplusItem, BengenAccountItem, BengenConfig } from './types'
+import type { AppState, TaxSettings, WhatIfs, SpendGapPhaseConfig, SpendGapConfig, SpendGapDeficitItem, SpendGapSurplusItem, BengenAccountItem, BengenConfig, GKConfig } from './types'
 import { todayStr, dateAtAge } from './dates'
 import { DEFAULT_MARKET_PROFILE } from './rateProfiles'
 
@@ -104,6 +104,19 @@ export const DEFAULT_BENGEN_CONFIG: BengenConfig = {
   personB: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
 }
 
+export const DEFAULT_GK_CONFIG: GKConfig = {
+  inflationIndex:    'personal',
+  surplusToHisa:     true,
+  deficitFromHisa:   false,
+  lowerGuardrailPct: 20,
+  upperGuardrailPct: 20,
+  cutPct:            10,
+  raisePct:          10,
+  apply15YearRule:   true,
+  personA: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
+  personB: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
+}
+
 export const DEFAULT_SPEND_GAP_CONFIG: SpendGapConfig = {
   stopContributionsWhenPartnerRetired: false,
   meltdownA: DEFAULT_SPEND_GAP_PHASE,
@@ -133,6 +146,7 @@ export const DEFAULT_WHATIFS: WhatIfs = {
       fixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
       spendGapConfig:  DEFAULT_SPEND_GAP_CONFIG,
       bengenConfig:    DEFAULT_BENGEN_CONFIG,
+      gkConfig:        DEFAULT_GK_CONFIG,
     },
   },
   marketProfile: { enabled: false, value: DEFAULT_MARKET_PROFILE },
@@ -327,6 +341,7 @@ export const DEFAULT_STATE: AppState = {
     drawdownFixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
     spendGapConfig:          DEFAULT_SPEND_GAP_CONFIG,
     bengenConfig:            DEFAULT_BENGEN_CONFIG,
+    gkConfig:                DEFAULT_GK_CONFIG,
   },
 
   scenarios: [],
