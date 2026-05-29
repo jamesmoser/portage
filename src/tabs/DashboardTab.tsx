@@ -13,7 +13,7 @@ import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../engine/dates'
 import { DateInput } from '../components/DateInput'
 import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem } from '../engine/types'
-import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS } from '../engine/defaults'
+import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS } from '../engine/defaults'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -619,7 +619,7 @@ export function DashboardTab() {
   const state = useStore()
   const {
     whatIfs, frozenMetrics, scenarios, activeScenarioId,
-    updateWhatIf, resetWhatIfs, freezeMetrics, clearFreeze,
+    updateWhatIf, resetWhatIfs, resetWhatIfsExceptDrawdown, freezeMetrics, clearFreeze,
     saveScenario, loadScenario, deleteScenario,
     personA, personB, cppA, cppB, oasA, oasB,
     returnRates, personalInflationRatePct, cpiRatePct, withdrawalStrategy,
@@ -1257,7 +1257,7 @@ export function DashboardTab() {
                 <div className="flex justify-end">
                   <button
                     className="btn-secondary text-xs"
-                    onClick={() => updateSg(DEFAULT_SPEND_GAP_CONFIG)}
+                    onClick={() => updateWhatIf('drawdownStrategy', DEFAULT_WHATIFS.drawdownStrategy)}
                   >
                     Reset to defaults
                   </button>
@@ -1347,7 +1347,7 @@ export function DashboardTab() {
       </SectionCard>
 
       {/* ── Base Plan Modifications Card ──────────────────────────────────── */}
-      <SectionCard title="Base Plan Modifications" width="full" onReset={resetWhatIfs} info={<>
+      <SectionCard title="Base Plan Modifications" width="full" onReset={resetWhatIfsExceptDrawdown} info={<>
         <p className="font-semibold text-slate-700 mb-2">Market — Return Profiles</p>
         <p className="mb-2">The return profile shapes how annual portfolio returns vary over the projection horizon. Peak and low are the max and min of your base plan tiers; mid is their average.</p>
         <ul className="space-y-1.5 mb-3">

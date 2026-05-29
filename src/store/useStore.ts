@@ -94,6 +94,7 @@ interface StoreActions {
   activeScenarioId: string | null
   updateWhatIf: <K extends keyof WhatIfs>(key: K, patch: Partial<WhatIfs[K]>) => void
   resetWhatIfs: () => void
+  resetWhatIfsExceptDrawdown: () => void
   freezeMetrics: (metrics: HeadlineMetrics) => void
   clearFreeze: () => void
   saveScenario: (name: string) => void
@@ -203,6 +204,12 @@ export const useStore = create<Store>()(
     resetWhatIfs: () => {
       set(s => ({ ...s, whatIfs: DEFAULT_WHATIFS, activeScenarioId: null }))
       saveWhatIfStorage(DEFAULT_WHATIFS, get().frozenMetrics, null)
+    },
+
+    resetWhatIfsExceptDrawdown: () => {
+      const updated = { ...DEFAULT_WHATIFS, drawdownStrategy: get().whatIfs.drawdownStrategy }
+      set(s => ({ ...s, whatIfs: updated, activeScenarioId: null }))
+      saveWhatIfStorage(updated, get().frozenMetrics, null)
     },
 
     freezeMetrics: (metrics: HeadlineMetrics) => {
