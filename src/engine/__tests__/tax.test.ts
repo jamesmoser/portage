@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { calculateTax, rrifMinFactor, optimizePensionSplit, type TaxInput } from '../tax'
 import { DEFAULT_TAX_SETTINGS } from '../defaults'
 
-// All tests use DEFAULT_TAX_SETTINGS (2024 Ontario + Federal) at yearsFromBase=0, cpiRatePct=2%.
+// All tests use DEFAULT_TAX_SETTINGS (2026 Ontario + Federal) at yearsFromBase=0, cpiRatePct=2%.
 // yearsFromBase=0 means the CPI factor is 1 — no bracket scaling — so we can verify
 // exact dollar amounts against hand-calculated reference values.
 
@@ -43,33 +43,33 @@ describe('zero income', () => {
 // ─── Bracket arithmetic ───────────────────────────────────────────────────────
 // Intent: tax is marginal — only the income above each threshold is taxed at the
 // higher rate. BPA reduces federal and Ontario tax at the lowest bracket rate.
-// Hand-calculated reference values verified against 2024 federal and Ontario tables.
+// Hand-calculated reference values verified against 2026 federal and Ontario tables.
 
 describe('federal and Ontario bracket calculations', () => {
   it('first federal and Ontario bracket — $30,000 employment, age 45', () => {
-    // Federal: 30000 × 15% = 4500; BPA credit = 15705 × 15% = 2355.75 → 2144.25
-    // Ontario: 30000 × 5.05% = 1515; BPA credit = 11865 × 5.05% = 599.18 → 915.82
-    // No surtax (Ontario basic 915.82 < 5315)
+    // Federal: 30000 × 14% = 4200; BPA credit = 16452 × 14% = 2303.28 → 1896.72
+    // Ontario: 30000 × 5.05% = 1515; BPA credit = 12989 × 5.05% = 655.94 → 859.06
+    // No surtax (Ontario basic 859.06 < 5818)
     const r = calc({ ...zero, employmentIncome: 30_000 })
-    expect(r.federalTax).toBeCloseTo(2144.25, 0)
-    expect(r.ontarioTax).toBeCloseTo(915.82, 0)
-    expect(r.totalTax).toBeCloseTo(3060.07, 0)
-    expect(r.netAfterTax).toBeCloseTo(26_939.93, 0)
+    expect(r.federalTax).toBeCloseTo(1_896.72, 0)
+    expect(r.ontarioTax).toBeCloseTo(859.06, 0)
+    expect(r.totalTax).toBeCloseTo(2_755.78, 0)
+    expect(r.netAfterTax).toBeCloseTo(27_244.22, 0)
   })
 
   it('second federal and Ontario bracket — $80,000 employment, age 45', () => {
-    // Federal: 55867×15% + (80000-55867)×20.5% = 8380.05 + 4947.27 = 13327.32
-    //          BPA credit = 2355.75 → 10971.57
-    // Ontario: 51446×5.05% + (80000-51446)×9.15% = 2598.02 + 2612.69 = 5210.71
-    //          BPA credit = 599.18 → basic = 4611.53; no surtax
+    // Federal: 58523×14% + (80000-58523)×20.5% = 8193.22 + 4402.79 = 12596.01
+    //          BPA credit = 16452×14% = 2303.28 → 10292.73
+    // Ontario: 53891×5.05% + (80000-53891)×9.15% = 2721.50 + 2388.97 = 5110.47
+    //          BPA credit = 12989×5.05% = 655.94 → basic = 4454.52; no surtax
     const r = calc({ ...zero, employmentIncome: 80_000 })
-    expect(r.federalTax).toBeCloseTo(10_971.57, 0)
-    expect(r.ontarioTax).toBeCloseTo(4_611.53, 0)
-    expect(r.totalTax).toBeCloseTo(15_583.10, 0)
+    expect(r.federalTax).toBeCloseTo(10_292.73, 0)
+    expect(r.ontarioTax).toBeCloseTo(4_454.52, 0)
+    expect(r.totalTax).toBeCloseTo(14_747.25, 0)
   })
 
   it('third federal bracket — $130,000 employment, age 45', () => {
-    // Into 26% federal bracket (above 111,733) and 11.16% Ontario bracket
+    // Into 26% federal bracket (above 117,045) and 11.16% Ontario bracket (above 107,785)
     const r = calc({ ...zero, employmentIncome: 130_000 })
     expect(r.marginalFederalRate).toBeCloseTo(0.26, 5)
     expect(r.marginalOntarioRate).toBeCloseTo(0.1116, 5)
@@ -98,8 +98,8 @@ describe('federal and Ontario bracket calculations', () => {
 
 // ─── Age amount ───────────────────────────────────────────────────────────────
 // Intent: people 65+ get an additional non-refundable credit (age amount) that
-// phases out as income rises above the threshold (~$42,335).
-// The credit is applied at 15% federal / 5.05% Ontario (lowest bracket rates).
+// phases out as income rises above the threshold (~$46,432 federal, ~$47,210 Ontario).
+// The credit is applied at 14% federal / 5.05% Ontario (lowest bracket rates).
 // Below 65: no age amount credit at all.
 
 describe('age amount', () => {
@@ -111,29 +111,30 @@ describe('age amount', () => {
   })
 
   it('full age amount when income is below phase-out threshold', () => {
-    // At $40,000 income (below $42,335 threshold), full age amount applies.
-    // Federal age credit: 8790 × 15% = 1318.50
-    // Ontario age credit: 5750 × 5.05% = 290.38
+    // At $40,000 income (below $46,432 federal / $47,210 Ontario threshold), full age amount applies.
+    // Federal age credit: 9209 × 14% = 1289.26
+    // Ontario age credit: 6342 × 5.05% = 320.27
     const r45 = calc({ ...zero, employmentIncome: 40_000, age: 45 })
     const r65 = calc({ ...zero, employmentIncome: 40_000, age: 65 })
     const reduction = r45.totalTax - r65.totalTax
-    expect(reduction).toBeCloseTo(1318.50 + 290.38, 0)
+    expect(reduction).toBeCloseTo(1289.26 + 320.27, 0)
   })
 
   it('age amount partially phases out above threshold', () => {
-    // At $60,000 income (above $42,335), age amount is reduced by 15% of the excess.
-    // Excess = 60000 - 42335 = 17665; reduction = 17665 × 15% = 2649.75
-    // Federal age amount = max(0, 8790 - 2649.75) = 6140.25; credit = 6140.25 × 15% = 921.04
-    // Ontario age amount = max(0, 5750 - 2649.75) = 3100.25; credit = 3100.25 × 5.05% = 156.56
+    // At $60,000 income (above $46,432 federal / $47,210 Ontario threshold).
+    // Federal: excess = 60000 - 46432 = 13568; reduction = 13568 × 15% = 2035.20
+    //   Federal age amount = max(0, 9209 - 2035.20) = 7173.80; credit = 7173.80 × 14% = 1004.33
+    // Ontario: excess = 60000 - 47210 = 12790; reduction = 12790 × 15% = 1918.50
+    //   Ontario age amount = max(0, 6342 - 1918.50) = 4423.50; credit = 4423.50 × 5.05% = 223.39
     const r45 = calc({ ...zero, employmentIncome: 60_000, age: 45 })
     const r65 = calc({ ...zero, employmentIncome: 60_000, age: 65 })
     const reduction = r45.totalTax - r65.totalTax
-    expect(reduction).toBeCloseTo(921.04 + 156.56, 0)
+    expect(reduction).toBeCloseTo(1004.33 + 223.39, 0)
   })
 
-  it('age amount fully phased out at high income (~$100,935+)', () => {
-    // Federal: 8790 / 0.15 = 58600; threshold 42335 + 58600 = 100935 → age amount = 0 above this
-    // Ontario: 5750 / 0.15 = 38333; threshold 42335 + 38333 = 80668 → Ontario age = 0 above this
+  it('age amount fully phased out at high income (~$107,825+ federal, ~$89,490+ Ontario)', () => {
+    // Federal: 9209 / 0.15 = 61393; threshold 46432 + 61393 = 107825 → age amount = 0 above this
+    // Ontario: 6342 / 0.15 = 42280; threshold 47210 + 42280 = 89490 → Ontario age = 0 above this
     const r45 = calc({ ...zero, employmentIncome: 120_000, age: 45 })
     const r65 = calc({ ...zero, employmentIncome: 120_000, age: 65 })
     // At $120,000, both age amounts are fully phased out → no difference
@@ -142,24 +143,24 @@ describe('age amount', () => {
 })
 
 // ─── Pension income credit ────────────────────────────────────────────────────
-// Intent: the first $2,000 of eligible pension income (federal) / $1,637 (Ontario)
+// Intent: the first $2,000 of eligible pension income (federal) / $1,796 (Ontario)
 // generates a non-refundable credit at the lowest bracket rate.
 // Eligible pension includes DB pension at any age and RRIF income.
 
 describe('pension income credit', () => {
   it('pension credit reduces tax relative to same employment income', () => {
     // $20,000 pension vs $20,000 employment — pension gets the credit, employment does not.
-    // Federal credit = min(20000, 2000) × 15% = $300
-    // Ontario credit = min(20000, 1637) × 5.05% = $82.67
+    // Federal credit = min(20000, 2000) × 14% = $280
+    // Ontario credit = min(20000, 1796) × 5.05% = $90.70
     const rEmp = calc({ ...zero, employmentIncome: 20_000, age: 45 })
     const rPen = calc({ ...zero, pensionIncome: 20_000, age: 45 })
     const reduction = rEmp.totalTax - rPen.totalTax
-    expect(reduction).toBeCloseTo(300 + 82.67, 0)
+    expect(reduction).toBeCloseTo(280 + 90.70, 0)
   })
 
-  it('pension credit is capped — no additional credit above $2,000 federal / $1,637 Ontario', () => {
-    // At $20,000 pension: credit = min(20000,2000)×15% + min(20000,1637)×5.05% = 300 + 82.67 = 382.67
-    // At $30,000 pension: credit should be the SAME $382.67 — both exceed the caps
+  it('pension credit is capped — no additional credit above $2,000 federal / $1,796 Ontario', () => {
+    // At $20,000 pension: credit = min(20000,2000)×14% + min(20000,1796)×5.05% = 280 + 90.70 = 370.70
+    // At $30,000 pension: credit should be the SAME $370.70 — both exceed the caps
     const rEmp20k = calc({ ...zero, employmentIncome: 20_000, age: 45 })
     const rPen20k = calc({ ...zero, pensionIncome:   20_000, age: 45 })
     const rEmp30k = calc({ ...zero, employmentIncome: 30_000, age: 45 })
@@ -169,7 +170,7 @@ describe('pension income credit', () => {
     // Both exceed both caps — credit is identical
     expect(credit20k).toBeCloseTo(credit30k, 0)
     // And it equals the maximum credit
-    expect(credit20k).toBeCloseTo(300 + 82.67, 0)
+    expect(credit20k).toBeCloseTo(280 + 90.70, 0)
   })
 })
 
@@ -219,12 +220,12 @@ describe('capital gains', () => {
   })
 
   it('effective tax rate on included amount matches general bracket expectations', () => {
-    // $100,000 gain → $50,000 included. Tax on $50,000 in first/second bracket.
+    // $100,000 gain → $50,000 included. Tax on $50,000 in first bracket.
     const r = calc({ ...zero, capitalGainsRealized: 100_000 })
-    // Federal: 50000×15% - BPA_credit = 7500 - 2355.75 = 5144.25
-    // Ontario: 50000×5.05% - BPA_credit = 2525 - 599.18 = 1925.82
-    expect(r.federalTax).toBeCloseTo(5144.25, 0)
-    expect(r.ontarioTax).toBeCloseTo(1925.82, 0)
+    // Federal: 50000×14% - BPA_credit = 7000 - 16452×14% = 7000 - 2303.28 = 4696.72
+    // Ontario: 50000×5.05% - BPA_credit = 2525 - 12989×5.05% = 2525 - 655.94 = 1869.06
+    expect(r.federalTax).toBeCloseTo(4_696.72, 0)
+    expect(r.ontarioTax).toBeCloseTo(1_869.06, 0)
   })
 
   it('applies 50% inclusion even above the high-rate threshold (threshold is $10M)', () => {
@@ -235,21 +236,21 @@ describe('capital gains', () => {
 })
 
 // ─── OAS clawback ─────────────────────────────────────────────────────────────
-// Intent: when net income exceeds ~$90,997, 15% of the excess is recovered as a
-// clawback. The clawback cannot exceed the total OAS actually received that year.
+// Intent: when net income exceeds ~$95,323 (2026), 15% of the excess is recovered
+// as a clawback. The clawback cannot exceed the total OAS actually received that year.
 
 describe('OAS clawback', () => {
   it('no clawback when net income is below threshold', () => {
-    // OAS = $8,556 (annual), employment = $80,000. Net = $88,556 < $90,997 threshold.
+    // OAS = $8,556 (annual), employment = $80,000. Net = $88,556 < $95,323 threshold.
     const r = calc({ ...zero, oasIncome: 8_556, employmentIncome: 80_000, age: 70 })
     expect(r.oasClawback).toBe(0)
   })
 
   it('clawback is 15% of excess above threshold', () => {
     // Employment = $100,000, OAS = $8,556. Net = $108,556.
-    // Excess = 108,556 - 90,997 = 17,559. Clawback = min(8,556, 17,559 × 15%) = min(8556, 2633.85) = 2633.85
+    // Excess = 108,556 - 95,323 = 13,233. Clawback = min(8,556, 13,233 × 15%) = 1984.95
     const r = calc({ ...zero, oasIncome: 8_556, employmentIncome: 100_000, age: 70 })
-    expect(r.oasClawback).toBeCloseTo(2_633.85, 0)
+    expect(r.oasClawback).toBeCloseTo(1_984.95, 0)
   })
 
   it('clawback is added to federal tax (recovery tax)', () => {
@@ -262,8 +263,8 @@ describe('OAS clawback', () => {
 
   it('clawback is capped at annual OAS received — cannot exceed total OAS', () => {
     // Employment = $160,000, OAS = $8,556. Net = $168,556.
-    // Formula gives: (168,556 - 90,997) × 15% = 77,559 × 15% = $11,633.85
-    // Cap: min($8,556, $11,633.85) = $8,556 (full clawback, but no more)
+    // Formula gives: (168,556 - 95,323) × 15% = 73,233 × 15% = $10,984.95
+    // Cap: min($8,556, $10,984.95) = $8,556 (full clawback, but no more)
     const r = calc({ ...zero, oasIncome: 8_556, employmentIncome: 160_000, age: 70 })
     expect(r.oasClawback).toBeLessThanOrEqual(8_556)
   })
@@ -276,39 +277,36 @@ describe('OAS clawback', () => {
 
 // ─── Ontario surtax ───────────────────────────────────────────────────────────
 // Intent: a two-tier surtax on Ontario basic tax (after credits, before surtax).
-// Tier 1: 20% of Ontario basic above $5,315
-// Tier 2: additional 36% of Ontario basic above $6,802
-// No surtax when Ontario basic ≤ $5,315.
+// Tier 1: 20% of Ontario basic above $5,818
+// Tier 2: additional 36% of Ontario basic above $7,446
+// No surtax when Ontario basic ≤ $5,818.
 
 describe('Ontario surtax', () => {
   it('no surtax when Ontario basic is below tier 1 threshold', () => {
-    // At $30,000 income, Ontario basic ≈ $915 — well below $5,315
+    // At $30,000 income, Ontario basic ≈ $859 — well below $5,818
     const r = calc({ ...zero, employmentIncome: 30_000 })
     // Verify no surtax by checking that ontarioTax ≈ the basic amount only
-    // Basic = 915.82, surtax = 0
-    expect(r.ontarioTax).toBeCloseTo(915.82, 0)
+    // Basic = 859.06, surtax = 0
+    expect(r.ontarioTax).toBeCloseTo(859.06, 0)
   })
 
-  it('tier 1 surtax only — Ontario basic between $5,315 and $6,802', () => {
-    // Engineered income to produce Ontario basic ≈ $5,500
-    // At $89,710 employment:
-    //   Ontario tax before credits: 51446×5.05% + (89710-51446)×9.15% = 2598.02 + 3501.16 = 6099.18
-    //   BPA credit = 599.18 → basic = 5500.00
-    //   Tier 1: (5500 - 5315) × 20% = 185 × 20% = $37.00
-    const r = calc({ ...zero, employmentIncome: 89_710 })
-    const ontBasic = r.ontarioTax  // before we can isolate basic from surtax
-    // We know surtax applies — Ontario tax should be > basic
-    // Basic ≈ 5500, surtax ≈ 37 → Ontario total ≈ 5537
-    expect(r.ontarioTax).toBeGreaterThan(5_315)
-    expect(r.ontarioTax).toBeLessThan(6_802 + 500)  // ballpark — not yet in tier 2 range
+  it('tier 1 surtax only — Ontario basic between $5,818 and $7,446', () => {
+    // Engineered income to produce Ontario basic ≈ $6,193
+    // At $99,000 employment:
+    //   Ontario tax before credits: 53891×5.05% + (99000-53891)×9.15% = 2721.50 + 4127.47 = 6848.97
+    //   BPA credit = 655.94 → basic = 6193.03
+    //   Tier 1: (6193.03 - 5818) × 20% = 375.03 × 20% = $75.01
+    const r = calc({ ...zero, employmentIncome: 99_000 })
+    expect(r.ontarioTax).toBeGreaterThan(5_818)
+    expect(r.ontarioTax).toBeLessThan(7_446 + 500)  // ballpark — not yet in tier 2 range
   })
 
-  it('tier 1 + tier 2 surtax — Ontario basic above $6,802', () => {
-    // At $110,000 employment income, Ontario basic ≈ $7,499
-    //   Tier 1: (7499 - 5315) × 20% = 2184 × 20% = $436.80
-    //   Tier 2: (7499 - 6802) × 36% = 697 × 36% = $251.00
-    //   Surtax ≈ $687.80 → Ontario total ≈ $7499 + $687.80 = $8,186.80
-    const r = calc({ ...zero, employmentIncome: 110_000 })
+  it('tier 1 + tier 2 surtax — Ontario basic above $7,446', () => {
+    // At $130,000 employment income, Ontario basic ≈ $9,476
+    //   Tier 1: (9476 - 5818) × 20% = 3658 × 20% = $731.60
+    //   Tier 2: (9476 - 7446) × 36% = 2030 × 36% = $730.80
+    //   Surtax ≈ $1,462 → Ontario total ≈ $10,938
+    const r = calc({ ...zero, employmentIncome: 130_000 })
     expect(r.ontarioTax).toBeGreaterThan(8_000)
     // Marginal rate is above 11.16% because of surtax on top
     expect(r.marginalOntarioRate).toBeCloseTo(0.1116, 5)  // base bracket rate, not incl. surtax
@@ -317,7 +315,7 @@ describe('Ontario surtax', () => {
   it('surtax increases Ontario tax meaningfully at high income', () => {
     // Confirm Ontario tax is higher with surtax than without (surtax applies)
     const r80  = calc({ ...zero, employmentIncome: 80_000 })  // no surtax
-    const r110 = calc({ ...zero, employmentIncome: 110_000 }) // tier 1+2 surtax
+    const r110 = calc({ ...zero, employmentIncome: 110_000 }) // tier 1 surtax
     // The Ontario rate jump at $110k vs $80k should be larger than just bracket rates
     const oRateAt80  = r80.ontarioTax  / r80.grossIncome
     const oRateAt110 = r110.ontarioTax / r110.grossIncome
@@ -353,9 +351,9 @@ describe('CPI indexing', () => {
     // (same income, same rate — just different threshold placement)
     const rNow    = calculateTax({ ...zero, employmentIncome: 40_000 }, S, 0,  2)
     const rFuture = calculateTax({ ...zero, employmentIncome: 40_000 }, S, 10, 2)
-    // Both are in the first bracket at these incomes
-    expect(rNow.marginalFederalRate).toBeCloseTo(0.15, 5)
-    expect(rFuture.marginalFederalRate).toBeCloseTo(0.15, 5)
+    // Both are in the first bracket at these incomes (2026 first bracket: 14%)
+    expect(rNow.marginalFederalRate).toBeCloseTo(0.14, 5)
+    expect(rFuture.marginalFederalRate).toBeCloseTo(0.14, 5)
   })
 })
 

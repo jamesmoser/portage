@@ -55,7 +55,7 @@ export interface OASSettings {
   estimatedMonthlyAt65: number                      // today's dollars — canonical value used by engine
   startDate: string                                 // first payment date (must be 65–70)
   inputMode: 'direct' | 'yearsOfResidency'          // how the estimate was derived
-  maxMonthlyBenefit: number                         // editable OAS max (default: 2024 max)
+  maxMonthlyBenefit: number                         // editable OAS max (default: 2026 max)
   yearsOfResidency: number                          // Canadian residency years after age 18
   gisEligible: boolean                              // include GIS supplement
   gisMonthlyAmount: number                          // GIS monthly amount (today's $, not means-tested)
