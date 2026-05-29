@@ -249,6 +249,33 @@ Live at the top of the What-If panel. Pattern: active scenario name + "Save As�
 
 ---
 
+## Version Bump Workflow
+
+**Trigger phrase:** "bump the version"
+
+When the user says this, follow these steps:
+
+1. **Ask what has changed** — request a plain-language description of features added, bugs fixed, and anything removed or changed since the last release.
+
+2. **Read the current version** from `package.json` and the last entry in `CHANGELOG.md`.
+
+3. **Suggest the new version number** using semver logic:
+   - `PATCH` (0.x.Y) — bug fixes only, no new features
+   - `MINOR` (0.X.0) — new features added, backwards compatible
+   - `MAJOR` (X.0.0) — breaking changes or a significant public milestone
+   - While in `0.x.x`, `MINOR` bumps are appropriate for most feature releases
+   - Explain your reasoning and ask the user to confirm or override
+
+4. **On confirmation**, make all four changes atomically:
+   - `package.json` — update `"version"` field
+   - `CHANGELOG.md` — prepend a new entry at the top (below the header), dated today, with sections `### Added`, `### Changed`, `### Fixed`, `### Removed` (omit empty sections)
+   - `README.md` — update the `**Version X.Y.Z**` line on line 5
+   - `src/App.tsx` — version is auto-imported from `package.json`, no change needed
+
+5. **Do not commit** — leave that to the user.
+
+---
+
 ## Annual Tax Year Update
 
 Run this each January when CRA and Ontario publish new parameters. Full procedure with the AI prompt to gather values is in `memory/annual-tax-update.md`.

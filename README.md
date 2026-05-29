@@ -46,7 +46,7 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 
 ### Withdrawal / Drawdown Strategies
 
-Four strategies control how account withdrawals are orchestrated each year. All strategies respect mandatory RRIF minimums.
+Six strategies control how account withdrawals are orchestrated each year. All strategies respect mandatory RRIF minimums.
 
 - **None** — no proactive draws; accounts grow until RRIF minimums force withdrawals. Spending shortfalls are not covered.
 - **Cover Spending Gap** — each year, any shortfall between net household income and spending is filled by drawing from accounts in a configured priority order, and any surplus is routed back into accounts. Operates in two phases per person:
@@ -54,19 +54,22 @@ Four strategies control how account withdrawals are orchestrated each year. All 
   - *RRIF phase* (after RRIF conversion): mandatory minimums drawn first; remaining deficit filled from configured accounts; surplus routed as configured
 - **Fixed Withdrawal** — explicit annual dollar amounts per person per account, CPI-indexed. Draws fire regardless of need; shortfalls and surpluses are not automatically managed.
 - **Fixed Percentage** — annual draw as a configurable percentage of balance with a floor minimum per account. Same approach — no automatic gap-filling.
+- **Bengen Rule** — sets a year-1 draw amount as a percentage of portfolio (e.g. 4%), then inflation-indexes that dollar amount each subsequent year regardless of portfolio performance. Account draw order is configurable per person. Deficit and surplus can optionally flow through HISA.
+- **Guyton-Klinger** — starts like Bengen (inflation-indexed % of year-1 portfolio), but applies guardrail adjustments: if the current withdrawal rate rises above the upper guardrail (portfolio underperformance), the draw is cut by a configurable %; if it falls below the lower guardrail (outperformance), the draw is raised. An optional 15-year rule disables cuts in the final 15 years of each person's plan.
 
 ### What-If Analysis (Dashboard)
 
 Overlay modifications on the base plan without changing it. All effective values update instantly; the base plan is untouched.
 
 - Portfolio return rate offset (shifts all tiers uniformly)
-- Market return profile (step, front-loaded, back-loaded, cyclical crest/trough, seeded noise) with outlook shift and amplitude scaling
-- Personal inflation rate and CPI rate
+- Market return profile (flat, step, front-loaded, back-loaded, cyclical crest/trough, seeded noise) with outlook shift and amplitude scaling
+- Personal inflation rate and CPI rate (with fixed-rate presets)
 - Longevity (planning end age) per person
 - Retirement date per person, with cascade toggles for pension start, RRSP/TFSA/non-reg contribution end dates
 - Layoff event with optional taxable severance per person
 - CPP and OAS start ages per person
 - Unexpected one-time expense
+- Lifestyle change — a permanent recurring offset (positive or negative) to lifestyle spending starting from a chosen date
 - Pension splitting mode and percentage
 - Drawdown strategy and all parameters
 
@@ -78,16 +81,22 @@ Use the **Freeze** button to lock the current key outcomes, then load a scenario
 
 ### Key Outcomes (Dashboard)
 
-Six headline metric tiles with frozen scenario deltas:
+Outcome tiles organized into four groups, all with frozen scenario deltas (▲/▼ vs baseline). Clicking any tile opens a year-by-year detail table.
 
-- Portfolio at last survivor's death
-- Total lifetime tax paid
-- Average effective tax rate
-- Peak portfolio value
-- Years with spending shortfall
-- Total shortfall amount
+**Portfolio** — total invested assets (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones:
+- At start, at Person A's retirement, at Person B's retirement, at peak, at Person A's death, at Person B's death
 
-Clicking any tile opens a year-by-year detail table.
+**Spending Shortfall** — gaps where spending exceeds all income and configured withdrawals:
+- Years with shortfall, average annual shortfall, peak shortfall year
+
+**Net Income** — after-tax household income available for spending:
+- Average, minimum, and maximum annual net income over the plan
+
+**Tax** — combined federal + Ontario income tax:
+- Lifetime total, average effective rate, peak year
+
+**Government Benefits** — CPP and OAS outcomes:
+- CPP and OAS total collected, OAS clawback paid, CPP and OAS vs age-65-start comparison
 
 ### Charts (Dashboard)
 

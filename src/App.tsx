@@ -8,7 +8,7 @@ import { AssumptionsTab } from './tabs/AssumptionsTab'
 import { IncomeTab }      from './tabs/IncomeTab'
 import { InvestmentsTab } from './tabs/InvestmentsTab'
 
-const APP_VERSION = '0.1.0'
+import { version as APP_VERSION } from '../package.json'
 
 // ─── AI Context Generator ─────────────────────────────────────────────────────
 
