@@ -110,14 +110,11 @@ const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, React.ReactNo
     <p className="mt-1.5">Draws are per person from their own accounts (RRSP/RRIF, Non-Reg, TFSA) in the configured order, with RRIF mandatory minimums always taken first and netted from the target. After the first death, the survivor draws the sum of both people's annual amounts from their combined accounts. There is no automatic gap-filling — any difference between the draw and spending appears directly as a cash flow surplus or deficit.</p>
   </>),
   spendGap: (<>
-    <p>Draws from investment accounts to cover the difference between spending and income. There are three phases:</p>
-    <p className="mt-1.5"><strong>Contribution (Pre-Retirement)</strong> — Follows the base plan. No proactive draws. Any spending deficit is flagged but not covered from registered accounts.</p>
-    <p className="mt-1.5"><strong>Meltdown (Retirement until RRIF conversion)</strong> — Proactively draws from RRSP to bring gross income up to the ceiling, reducing future RRIF forced withdrawals.</p>
-    <p className="mt-1.5"><strong>Forced RRIF Withdrawals (after RRIF conversion)</strong> — Draws the CRA minimum from RRIF. Additional draws above the minimum can be specified per account.</p>
-    <p className="mt-1.5">In draw phases, any spending deficit or surplus is routed through the specified account order and limits.</p>
+    <p>Draws exactly what is needed from investment accounts to cover the gap between spending and after-tax income each year. Pre-retirement follows the base plan with no proactive draws. From retirement until RRIF conversion, RRSP can be melted down proactively up to a gross income ceiling to reduce future forced minimums. After RRIF conversion, the CRA mandatory minimum is always withdrawn first; the deficit order covers any remaining shortfall.</p>
+    <p className="mt-1.5">In each phase, accounts are drawn in the configured order until the gap is covered. Each account can have a per-person annual cap; check No Limit to draw as much as needed. HISA is joint. When income exceeds spending, the surplus is deposited into accounts in the configured surplus order — each account fills to its limit before passing the remainder to the next; an account with no limit receives everything remaining. TFSA and Non-Reg surplus is split 50/50 between people (100% to survivor).</p>
   </>),
-  fixedWithdrawal: 'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
-  fixedPct:        'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
+  fixedWithdrawal: 'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year with personal inflation. Draws begin at each account owner\'s retirement date and are pro-rated in the first retirement year. After the first death, the higher of the two per-person amounts is used for each account type. RRSP/RRIF draws always respect mandatory RRIF minimums. Non-reg draws are pre-tax — capital gains above ACB are taxed each year. All draws are exact — no automatic gap-filling; any shortfall appears as a red bar in the cash flow chart.',
+  fixedPct:        'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor — the actual draw is max(rate × balance, floor), capped at the account balance. Draws begin at each account owner\'s retirement date and are pro-rated in the first retirement year and year of death. RRSP/RRIF draws always respect mandatory RRIF minimums regardless of the configured rate. Non-reg draws are pre-tax — capital gains above ACB are taxed each year. All draws are explicit — no automatic gap-filling; any shortfall appears as a red bar in the cash flow chart.',
 }
 
 const MARKET_PROFILE_OPTIONS: { value: string; label: string }[] = [
@@ -1351,11 +1348,6 @@ export function DashboardTab() {
                   </div>
                 </div>
 
-                <InfoPanel>
-                  <p><strong>Deficit Order</strong> — When income falls short of spending, accounts are drawn in sequence to cover the gap. Each account can have an annual limit (per person); check No Limit to draw as much as needed. HISA is joint. In Phase 3, mandatory RRIF minimums are always withdrawn first; the deficit order covers any remaining shortfall.</p>
-                  <p className="mt-1.5"><strong>Surplus Order</strong> — When income exceeds spending, the surplus is deposited into accounts in this order. Each account can have an annual limit; check No Limit to deposit all remaining surplus. An account with limit 0 and No Limit unchecked is skipped. TFSA and Non-Reg are split 50/50 A/B (100% to survivor).</p>
-                </InfoPanel>
-
                 <div className="flex justify-end">
                   <button
                     className="btn-secondary text-xs"
@@ -1484,10 +1476,6 @@ export function DashboardTab() {
                     prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
                 </div>
               </div>
-              <InfoPanel>
-                <p>Draws begin at each account owner's retirement date and are pro-rated in the first retirement year. HISA draws begin at the first retirement. Amounts inflate each year from time zero. All draws are exact — no automatic gap-filling. Any unmet shortfall appears as a red bar in the Cash Flow chart.</p>
-                <p className="mt-1.5">After the first death, the higher of the two per-person amounts is used for each account type, attributed to the survivor. RRSP/RRIF draws always respect mandatory RRIF minimums. Non-reg draws are pre-tax — capital gains on the gain above ACB are taxed each year.</p>
-              </InfoPanel>
             </div>
           )}
 
@@ -1518,10 +1506,6 @@ export function DashboardTab() {
                   </div>
                 </div>
               ))}
-              <InfoPanel>
-                <p>Each year: withdraw <strong>max(rate × balance, floor)</strong> from each account, capped at the account balance. Draws begin at each account owner's retirement date and are pro-rated in the first retirement year and year of death. HISA draws begin at the first retirement.</p>
-                <p className="mt-1.5">RRSP/RRIF draws always respect mandatory RRIF minimums regardless of the configured rate. Non-reg and HISA draws are pre-tax — capital gains on the gain above ACB are taxed each year. All draws are explicit — no automatic gap-filling from any account. Any unmet shortfall appears as a red bar in the Cash Flow chart.</p>
-              </InfoPanel>
             </div>
           )}
         </div>
