@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from './store/useStore'
-import type { AppState } from './engine/types'
+import type { AppState, SpendGapPhaseConfig, SpendGapSurplusItem, DrawdownStrategyConfig } from './engine/types'
 import portageIcon from './assets/portage-icon.png'
 
 import { DashboardTab }   from './tabs/DashboardTab'
@@ -10,227 +10,620 @@ import { InvestmentsTab } from './tabs/InvestmentsTab'
 
 const APP_VERSION = '0.1.0'
 
-// ─── AI Prompt Generator ──────────────────────────────────────────────────────
+// ─── AI Context Generator ─────────────────────────────────────────────────────
 
-function generateAIPrompt(): string {
-  const s = useStore.getState() as AppState
-  const aName  = s.personA.name || 'Person A'
-  const bName  = s.personB.name || 'Person B'
-  const refName = s.ageReferencePerson === 'personB' ? bName : aName
+function generateAIContext(): string {
+  const store  = useStore.getState()
+  const s      = store as unknown as AppState
+  const wi     = store.whatIfs
   const today  = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
-  const currency = (v: number) => `$${Math.round(v).toLocaleString('en-CA')}`
-  const pct    = (v: number) => `${v}%`
+  const aName  = s.personA.name  || 'Person A'
+  const bName  = s.personB.name  || 'Person B'
+  const refName = s.ageReferencePerson === 'personB' ? bName : aName
+
+  const c   = (v: number) => `$${Math.round(v).toLocaleString('en-CA')}`
+  const pct = (v: number) => `${v}%`
 
   const lines: string[] = []
-  const h  = (...s: string[]) => lines.push(...s)
+  const h  = (...ls: string[]) => lines.push(...ls)
   const br = () => lines.push('')
 
-  h('# Portage — Canadian Retirement Plan Briefing', `Generated: ${today}`)
+  // ── Local helpers ──────────────────────────────────────────────────────────
+
+  function ageBetween(birthDate: string, targetDate: string): string {
+    const b = new Date(birthDate + 'T00:00:00')
+    const t = new Date(targetDate + 'T00:00:00')
+    let years = t.getFullYear() - b.getFullYear()
+    let months = t.getMonth() - b.getMonth()
+    if (months < 0) { years--; months += 12 }
+    return months === 0 ? `${years}` : `${years}y ${months}m`
+  }
+
+  function approxDateFromAge(birthDate: string, decimalAge: number): string {
+    const b = new Date(birthDate + 'T00:00:00')
+    const totalMonths = Math.round(decimalAge * 12)
+    const y = Math.floor(totalMonths / 12)
+    const m = totalMonths % 12
+    return new Date(b.getFullYear() + y, b.getMonth() + m, 1).toISOString().slice(0, 10)
+  }
+
+  function cppEffective(monthly65: number, birthDate: string, startDate: string): number {
+    const b = new Date(birthDate + 'T00:00:00')
+    const age65 = new Date(b.getFullYear() + 65, b.getMonth(), 1)
+    const start = new Date(startDate + 'T00:00:00')
+    const months = (start.getFullYear() - age65.getFullYear()) * 12 + (start.getMonth() - age65.getMonth())
+    const factor = months < 0 ? Math.max(0.64, 1 + months * 0.006) : 1 + Math.min(months, 60) * 0.007
+    return monthly65 * factor
+  }
+
+  function oasEffective(monthly65: number, birthDate: string, startDate: string): number {
+    const b = new Date(birthDate + 'T00:00:00')
+    const age65 = new Date(b.getFullYear() + 65, b.getMonth(), 1)
+    const start = new Date(startDate + 'T00:00:00')
+    const months = (start.getFullYear() - age65.getFullYear()) * 12 + (start.getMonth() - age65.getMonth())
+    return monthly65 * (1 + Math.max(0, Math.min(60, months)) * 0.006)
+  }
+
+  // ── Compute effective values (base + active modifications) ─────────────────
+
+  const effRetireDateA = wi.retirementA?.enabled
+    ? approxDateFromAge(s.personA.birthDate, wi.retirementA.value.retirementAge)
+    : s.personA.retirementDate
+  const effRetireDateB = wi.retirementB?.enabled
+    ? approxDateFromAge(s.personB.birthDate, wi.retirementB.value.retirementAge)
+    : s.personB.retirementDate
+
+  const effCppStartA = wi.cppStartAgeA.enabled
+    ? approxDateFromAge(s.personA.birthDate, wi.cppStartAgeA.value) : s.cppA.startDate
+  const effCppStartB = wi.cppStartAgeB.enabled
+    ? approxDateFromAge(s.personB.birthDate, wi.cppStartAgeB.value) : s.cppB.startDate
+  const effOasStartA = wi.oasStartAgeA.enabled
+    ? approxDateFromAge(s.personA.birthDate, wi.oasStartAgeA.value) : s.oasA.startDate
+  const effOasStartB = wi.oasStartAgeB.enabled
+    ? approxDateFromAge(s.personB.birthDate, wi.oasStartAgeB.value) : s.oasB.startDate
+
+  const effLongevityA = wi.longevityA.enabled ? wi.longevityA.value : s.personA.planningEndAge
+  const effLongevityB = wi.longevityB.enabled ? wi.longevityB.value : s.personB.planningEndAge
+  const effInflation  = wi.inflationRate.enabled  ? wi.inflationRate.value  : s.personalInflationRatePct
+  const effCpi        = wi.cpiRate?.enabled        ? wi.cpiRate.value        : s.cpiRatePct
+  const effReturnOff  = wi.returnRateOffset.enabled ? wi.returnRateOffset.value : 0
+
+  const effPSMode = wi.pensionSplit.enabled ? wi.pensionSplit.value.mode : s.withdrawalStrategy.pensionSplitMode
+  const effPSPct  = wi.pensionSplit.enabled ? wi.pensionSplit.value.pct  : s.withdrawalStrategy.pensionSplitPct
+
+  const effDrawdown: DrawdownStrategyConfig =
+    (wi.drawdownStrategy.enabled && wi.drawdownStrategy.value.strategyType !== 'none')
+      ? wi.drawdownStrategy.value
+      : {
+          strategyType:    s.withdrawalStrategy.drawdownStrategy,
+          fixedPct:        s.withdrawalStrategy.drawdownFixedPct,
+          fixedWithdrawal: s.withdrawalStrategy.drawdownFixedWithdrawal,
+          spendGapConfig:  s.withdrawalStrategy.spendGapConfig,
+        }
+
+  const effRates = {
+    upTo55:     s.returnRates.upTo55     + effReturnOff,
+    from55to65: s.returnRates.from55to65 + effReturnOff,
+    from65to70: s.returnRates.from65to70 + effReturnOff,
+    from70plus: s.returnRates.from70plus + effReturnOff,
+  }
+
+  const cppEffA = cppEffective(s.cppA.estimatedMonthlyAt65, s.personA.birthDate, effCppStartA)
+  const cppEffB = cppEffective(s.cppB.estimatedMonthlyAt65, s.personB.birthDate, effCppStartB)
+  const oasEffA = oasEffective(s.oasA.estimatedMonthlyAt65, s.personA.birthDate, effOasStartA)
+  const oasEffB = oasEffective(s.oasB.estimatedMonthlyAt65, s.personB.birthDate, effOasStartB)
+
+  // Helpers for modification-aware display
+  const modVal = (modEnabled: boolean, eff: string, base: string) =>
+    modEnabled ? `**${eff}** *(base: ${base})*` : eff
+
+  // ── Drawdown strategy helpers ──────────────────────────────────────────────
+
+  const acctLabel = (a: string) =>
+    a === 'rrif' ? 'RRSP/RRIF (above minimum)' : a.toUpperCase()
+
+  function describePhase(phase: SpendGapPhaseConfig, personName: string, phaseLabel: string): void {
+    h(`**${personName} — ${phaseLabel}**`)
+    if (phase.grossIncomeCeiling > 0) {
+      h(`Proactive RRSP meltdown: draw up to a gross income ceiling of ${c(phase.grossIncomeCeiling)}/yr (today's $, CPI-indexed). This intentionally deregisters RRSP assets at lower marginal rates before mandatory RRIF minimums kick in.`)
+    } else {
+      h(`No proactive RRSP meltdown — RRSP/RRIF drawn only reactively to fill a spending gap.`)
+    }
+    if (phase.deficitItems.length > 0) {
+      h(`If a spending gap remains after all income, draw from accounts in this order:`)
+      h(`| Priority | Account | Annual Cap |`, `|---|---|---|`)
+      phase.deficitItems.forEach((item, i) => {
+        const cap = item.unlimited ? 'Unlimited' : item.cap === 0 ? 'Skip this account' : `${c(item.cap)}/yr max`
+        h(`| ${i + 1} | ${acctLabel(item.account)} | ${cap} |`)
+      })
+    }
+    br()
+  }
+
+  function describeSurplus(items: SpendGapSurplusItem[], label: string): void {
+    if (items.length === 0) {
+      h(`*${label}:* No surplus routing — excess income is not reinvested.`)
+      return
+    }
+    h(`*${label} — route surplus in this order:*`)
+    h(`| Priority | Account | Annual Limit |`, `|---|---|---|`)
+    items.forEach((item, i) => {
+      const isLast = i === items.length - 1
+      const limit = item.unlimited ? 'Unlimited'
+        : isLast ? 'Unlimited (receives all remaining)'
+        : item.limit === 0 ? 'Skip' : `${c(item.limit)}/yr`
+      h(`| ${i + 1} | ${item.account.toUpperCase()} | ${limit} |`)
+    })
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Document
+  // ══════════════════════════════════════════════════════════════════════════
+
+  h('# Portage — Canadian Retirement Plan Context')
+  h(`*Generated: ${today}*`)
   br()
-  h('All monetary values are in today\'s dollars. This document contains the complete base plan inputs for a Canadian retirement projection (Ontario). The model inflates nominal returns forward, deflates all outputs to today\'s purchasing power using the personal inflation rate, and calculates combined federal + Ontario income tax annually including OAS clawback.')
+  h('This document contains the complete inputs for a Canadian (Ontario) household retirement projection. All monetary values are in **today\'s dollars** — nominal future amounts are deflated using the personal inflation rate. Combined federal + Ontario income tax is calculated annually using 2024 bracket values, CPI-indexed forward.')
+  br()
+  h('> **How to use this context:** The plan has a *base plan* (the permanent foundation) and *current modifications* (temporary what-if overrides active at time of export). Effective values — base plan with modifications applied — are shown throughout, with the original base value noted in parentheses where a modification is active. **Reason from the effective values.** They represent what the simulation is currently computing.')
   br()
   h('---')
   br()
 
-  // ── Household ───────────────────────────────────────────────────────────────
-  h('## Household')
+  // ── 1. Household ────────────────────────────────────────────────────────────
+  h('## 1. Household')
   br()
   h(`| | ${aName} | ${bName} |`,
     `|---|---|---|`,
     `| Birth Date | ${s.personA.birthDate} | ${s.personB.birthDate} |`,
-    `| Retirement Date | ${s.personA.retirementDate} | ${s.personB.retirementDate} |`,
-    `| Planning Horizon | Age ${s.personA.planningEndAge} | Age ${s.personB.planningEndAge} |`)
+    `| Gender | ${s.personA.gender} | ${s.personB.gender} |`,
+    `| Retirement Date | ${modVal(!!wi.retirementA?.enabled, effRetireDateA, s.personA.retirementDate)} | ${modVal(!!wi.retirementB?.enabled, effRetireDateB, s.personB.retirementDate)} |`,
+    `| Approximate Retirement Age | ${ageBetween(s.personA.birthDate, effRetireDateA)} | ${ageBetween(s.personB.birthDate, effRetireDateB)} |`,
+    `| Planning Horizon | ${modVal(wi.longevityA.enabled, `Age ${effLongevityA}`, `Age ${s.personA.planningEndAge}`)} | ${modVal(wi.longevityB.enabled, `Age ${effLongevityB}`, `Age ${s.personB.planningEndAge}`)} |`)
   br()
-  h(`Age reference person (for spending phase triggers): **${refName}**`, 'Province: Ontario')
+  h(`- **Age reference person** (spending phase triggers, return rate tier transitions): **${refName}**`)
+  h(`- Province: **Ontario**`)
   br()
-
-  // ── Employment ──────────────────────────────────────────────────────────────
-  h('## Employment Income')
-  br()
-  h(`| Person | Annual | Real Growth |`,
-    `|---|---|---|`,
-    `| ${aName} | ${currency(s.employmentA.annualAmount)} | ${pct(s.employmentA.growthRatePct)}/yr |`,
-    `| ${bName} | ${currency(s.employmentB.annualAmount)} | ${pct(s.employmentB.growthRatePct)}/yr |`)
-  br()
-  h('Income is pro-rated to the month of retirement in the retirement year.')
+  h('---')
   br()
 
-  // ── DB Pension ──────────────────────────────────────────────────────────────
-  h('## Defined Benefit Pension')
+  // ── 2. Income Sources ────────────────────────────────────────────────────────
+  h('## 2. Income Sources')
+  br()
+
+  h('### 2.1 Employment Income')
+  br()
+  h(`| Person | Current Annual Income | Real Growth/yr | Retires |`,
+    `|---|---|---|---|`,
+    `| ${aName} | ${c(s.employmentA.annualAmount)} | ${pct(s.employmentA.growthRatePct)} | ${effRetireDateA} |`,
+    `| ${bName} | ${c(s.employmentB.annualAmount)} | ${pct(s.employmentB.growthRatePct)} | ${effRetireDateB} |`)
+  br()
+  h('Real growth is above personal inflation — 0% means income keeps pace with inflation. Income is pro-rated to the month of retirement in the retirement year; employment income stops the day before the retirement date.')
+  br()
+
+  h('### 2.2 Defined Benefit Pension')
   br()
   const pensions = [
     { name: aName, p: s.dbPensionA },
     { name: bName, p: s.dbPensionB },
   ].filter(x => x.p.enabled)
+  const noPension = [
+    { name: aName, p: s.dbPensionA },
+    { name: bName, p: s.dbPensionB },
+  ].filter(x => !x.p.enabled)
 
   if (pensions.length === 0) {
     h('Neither person has a DB pension.')
   } else {
     for (const { name, p } of pensions) {
-      h(`**${name}**${p.planName ? ` — ${p.planName}` : ''}`)
-      h(`- Benefit: ${currency(p.annualAmount)}/yr starting ${p.startDate}`)
+      h(`**${name}${p.planName ? ` — ${p.planName}` : ''}**`)
+      h(`- First payment date: ${p.startDate}`)
+      h(`- Annual benefit at start: ${c(p.annualAmount)} (today's dollars)`)
       const indexDesc = p.cpiIndexed
-        ? (p.cpiIndexingCapEnabled ? `CPI-indexed (cap ${p.cpiIndexingCap}%)` : 'CPI-indexed')
-        : `Fixed-indexed at ${p.indexingRatePct}%/yr`
+        ? (p.cpiIndexingCapEnabled ? `CPI-indexed, capped at ${p.cpiIndexingCap}%/yr` : 'Fully CPI-indexed')
+        : `Fixed at ${p.indexingRatePct}%/yr`
       h(`- Indexing: ${indexDesc}`)
       if (p.bridgeBenefitAmount > 0) {
-        h(`- Bridge benefit: ${currency(p.bridgeBenefitAmount)}/yr until ${p.bridgeBenefitEndDate}`)
+        h(`- Bridge benefit: ${c(p.bridgeBenefitAmount)}/yr additional until ${p.bridgeBenefitEndDate} (typically when CPP starts)`)
       }
-      h(`- Survivor benefit: ${p.survivorBenefitPct * 100}%`)
+      if (p.cppIntegration && p.cppIntegrationAmount > 0) {
+        h(`- CPP integration: pension reduces by ${c(p.cppIntegrationAmount)}/yr at age 65`)
+      }
+      h(`- Survivor benefit: ${Math.round(p.survivorBenefitPct * 100)}% of base pension continues to the surviving spouse`)
       br()
     }
   }
-
-  const noPension = [
-    { name: aName, p: s.dbPensionA },
-    { name: bName, p: s.dbPensionB },
-  ].filter(x => !x.p.enabled)
-  if (noPension.length > 0 && pensions.length > 0) {
+  if (noPension.length > 0) {
     h(`${noPension.map(x => x.name).join(' and ')} ${noPension.length === 1 ? 'has' : 'have'} no DB pension.`)
     br()
   }
 
-  // ── CPP ─────────────────────────────────────────────────────────────────────
-  h('## Canada Pension Plan (CPP)')
+  h('### 2.3 Canada Pension Plan (CPP)')
   br()
-  h(`| Person | Est. Monthly at 65 | Start Date |`,
-    `|---|---|---|`,
-    `| ${aName} | $${s.cppA.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${s.cppA.startDate} |`,
-    `| ${bName} | $${s.cppB.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${s.cppB.startDate} |`)
+  h(`| Person | Monthly at 65 | Effective Start Date | Start Age | Effective Monthly | Effective Annual |`,
+    `|---|---|---|---|---|---|`,
+    `| ${aName} | $${s.cppA.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${modVal(wi.cppStartAgeA.enabled, effCppStartA, s.cppA.startDate)} | ${ageBetween(s.personA.birthDate, effCppStartA)} | $${Math.round(cppEffA).toLocaleString('en-CA')} | ${c(cppEffA * 12)} |`,
+    `| ${bName} | $${s.cppB.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${modVal(wi.cppStartAgeB.enabled, effCppStartB, s.cppB.startDate)} | ${ageBetween(s.personB.birthDate, effCppStartB)} | $${Math.round(cppEffB).toLocaleString('en-CA')} | ${c(cppEffB * 12)} |`)
   br()
-  h('Early start (before 65): −0.6%/month. Deferred start (after 65): +0.7%/month, max at 70. Survivor benefit: 60% of deceased spouse\'s entitlement.')
-  br()
-
-  // ── OAS ─────────────────────────────────────────────────────────────────────
-  h('## Old Age Security (OAS)')
-  br()
-  h(`| Person | Est. Monthly at 65 | Start Date |`,
-    `|---|---|---|`,
-    `| ${aName} | $${s.oasA.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${s.oasA.startDate} |`,
-    `| ${bName} | $${s.oasB.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${s.oasB.startDate} |`)
-  br()
-  h('Deferral past 65: +0.6%/month (max +36% at 70). Clawback: 15% of net income above ~$90,997 (2024, CPI-indexed).')
+  h('CPP deferral: −0.6%/month before age 65 (max −36% at age 60), +0.7%/month after age 65 (max +42% at age 70). Survivor CPP: 60% of the deceased\'s entitlement paid to the surviving spouse (subject to CPP maximums).')
   br()
 
-  // ── Investments ─────────────────────────────────────────────────────────────
-  h('## Investment Accounts')
+  h('### 2.4 Old Age Security (OAS)')
   br()
-  h('### RRSP / RRIF')
+  const oasFacA = s.oasA.estimatedMonthlyAt65 > 0 ? `${(oasEffA / s.oasA.estimatedMonthlyAt65 * 100).toFixed(0)}%` : '100%'
+  const oasFacB = s.oasB.estimatedMonthlyAt65 > 0 ? `${(oasEffB / s.oasB.estimatedMonthlyAt65 * 100).toFixed(0)}%` : '100%'
+  h(`| Person | Monthly at 65 | Effective Start Date | Start Age | Deferral Factor | Effective Monthly | Effective Annual |`,
+    `|---|---|---|---|---|---|---|`,
+    `| ${aName} | $${s.oasA.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${modVal(wi.oasStartAgeA.enabled, effOasStartA, s.oasA.startDate)} | ${ageBetween(s.personA.birthDate, effOasStartA)} | ${oasFacA} | $${Math.round(oasEffA).toLocaleString('en-CA')} | ${c(oasEffA * 12)} |`,
+    `| ${bName} | $${s.oasB.estimatedMonthlyAt65.toLocaleString('en-CA')} | ${modVal(wi.oasStartAgeB.enabled, effOasStartB, s.oasB.startDate)} | ${ageBetween(s.personB.birthDate, effOasStartB)} | ${oasFacB} | $${Math.round(oasEffB).toLocaleString('en-CA')} | ${c(oasEffB * 12)} |`)
   br()
-  h(`| | ${aName} | ${bName} |`,
-    `|---|---|---|`,
-    `| Balance | ${currency(s.rrspA.balance)} | ${currency(s.rrspB.balance)} |`,
-    ...(s.rrspA.spousalBalance > 0 || s.rrspB.spousalBalance > 0
-      ? [`| Spousal RRSP | ${currency(s.rrspA.spousalBalance)} | ${currency(s.rrspB.spousalBalance)} |`]
-      : []),
-    `| Annual Contribution | ${currency(s.rrspA.annualContribution)} | ${currency(s.rrspB.annualContribution)} |`,
-    `| Contribution End | ${s.rrspA.contributionEndDate} | ${s.rrspB.contributionEndDate} |`,
-    `| RRIF Conversion | ${s.rrspA.rrifConversionDate} | ${s.rrspB.rrifConversionDate} |`)
-  br()
-  h('### TFSA')
-  br()
-  h(`| | ${aName} | ${bName} |`,
-    `|---|---|---|`,
-    `| Balance | ${currency(s.tfsaA.balance)} | ${currency(s.tfsaB.balance)} |`,
-    `| Annual Contribution | ${currency(s.tfsaA.annualContribution)} | ${currency(s.tfsaB.annualContribution)} |`)
-  br()
-  h('### Non-Registered')
-  br()
-  h(`| | ${aName} | ${bName} |`,
-    `|---|---|---|`,
-    `| Balance | ${currency(s.nonRegA.balance)} | ${currency(s.nonRegB.balance)} |`,
-    `| Adjusted Cost Base | ${currency(s.nonRegA.acb)} | ${currency(s.nonRegB.acb)} |`,
-    `| Annual Contribution | ${currency(s.nonRegA.annualContribution)} | ${currency(s.nonRegB.annualContribution)} |`,
-    ...(s.nonRegA.eligibleDivYieldPct > 0 || s.nonRegB.eligibleDivYieldPct > 0
-      ? [`| Eligible Div Yield | ${pct(s.nonRegA.eligibleDivYieldPct)} | ${pct(s.nonRegB.eligibleDivYieldPct)} |`]
-      : []),
-    ...(s.nonRegA.foreignIncomeYieldPct > 0 || s.nonRegB.foreignIncomeYieldPct > 0
-      ? [`| Foreign Income Yield | ${pct(s.nonRegA.foreignIncomeYieldPct)} | ${pct(s.nonRegB.foreignIncomeYieldPct)} |`]
-      : []))
-  br()
-  h('### HISA / Cash (Joint)')
-  br()
-  h(`- Balance: ${currency(s.cash.hisaBalance)}`,
-    `- Interest rate: ${pct(s.cash.hisaRatePct)}`,
-    `- Minimum floor: ${currency(s.cash.hisaMinBalance)}`)
+  h(`OAS deferral: +0.6%/month after age 65, maximum +36% at age 70. Clawback: 15% of net income above ~$90,997 (2024, CPI-indexed annually). OAS does not pass to a survivor — it stops at death.`)
+  const gisPeople = [
+    ...(s.oasA.gisEligible ? [`${aName}: $${s.oasA.gisMonthlyAmount}/month`] : []),
+    ...(s.oasB.gisEligible ? [`${bName}: $${s.oasB.gisMonthlyAmount}/month`] : []),
+  ]
+  if (gisPeople.length > 0) h(`GIS supplement (income-tested, not modelled precisely): ${gisPeople.join(', ')}`)
   br()
 
-  // ── Other Income ────────────────────────────────────────────────────────────
-  h('## Other Income')
+  h('### 2.5 Other Income')
   br()
   if (s.otherIncome.otherItems.length === 0) {
-    h('None.')
+    h('None configured.')
   } else {
-    h(`| Label | Annual | Attributed To | Taxable | Growth | Start | End |`,
+    h(`| Label | Annual | Attributed To | Taxable | Real Growth | Start | End |`,
       `|---|---|---|---|---|---|---|`)
     for (const item of s.otherIncome.otherItems) {
       const attr = item.attributedTo === 'personA' ? aName : item.attributedTo === 'personB' ? bName : 'Joint'
-      h(`| ${item.label} | ${currency(item.annualAmount)} | ${attr} | ${item.taxable ? 'Yes' : 'No'} | ${pct(item.growthRatePct)}/yr | ${item.startDate} | ${item.endDate} |`)
+      h(`| ${item.label} | ${c(item.annualAmount)} | ${attr} | ${item.taxable ? 'Yes' : 'No'} | ${pct(item.growthRatePct)}/yr | ${item.startDate} | ${item.endDate} |`)
     }
   }
   br()
+  h('---')
+  br()
 
-  // ── Spending ─────────────────────────────────────────────────────────────────
-  h('## Spending Plan')
+  // ── 3. Investment Accounts ──────────────────────────────────────────────────
+  h('## 3. Investment Accounts')
   br()
-  h(`### Phases (${refName}'s age as reference)`)
+  h(`All balances are in today's dollars as of ${today}. The simulation compounds at nominal return rates and deflates outputs to today's purchasing power.`)
   br()
-  h(`| Phase | Start Age | Annual | Real Growth |`,
+
+  h('### 3.1 RRSP / RRIF')
+  br()
+  const rrspRows: [string, string, string][] = [
+    ['Balance', c(s.rrspA.balance), c(s.rrspB.balance)],
+    ...(s.rrspA.spousalBalance > 0 || s.rrspB.spousalBalance > 0
+      ? [['Spousal RRSP Balance', c(s.rrspA.spousalBalance), c(s.rrspB.spousalBalance)] as [string,string,string]] : []),
+    ['Annual Contribution', c(s.rrspA.annualContribution), c(s.rrspB.annualContribution)],
+    ['Contributions End', s.rrspA.contributionEndDate, s.rrspB.contributionEndDate],
+    ['RRIF Conversion Date', s.rrspA.rrifConversionDate, s.rrspB.rrifConversionDate],
+    ['Use Spouse Age for RRIF Minimums', s.rrspA.useSpouseAgeForMinimums ? 'Yes' : 'No', s.rrspB.useSpouseAgeForMinimums ? 'Yes' : 'No'],
+    ...(s.rrspA.additionalWithdrawalAboveMinimum > 0 || s.rrspB.additionalWithdrawalAboveMinimum > 0
+      ? [['Extra Annual Draw Above Minimum', c(s.rrspA.additionalWithdrawalAboveMinimum), c(s.rrspB.additionalWithdrawalAboveMinimum)] as [string,string,string]] : []),
+    ...(s.rrspA.returnRateOverrideEnabled || s.rrspB.returnRateOverrideEnabled
+      ? [['Return Rate Override', s.rrspA.returnRateOverrideEnabled ? pct(s.rrspA.returnRateOverridePct) : '(portfolio rate)', s.rrspB.returnRateOverrideEnabled ? pct(s.rrspB.returnRateOverridePct) : '(portfolio rate)'] as [string,string,string]] : []),
+  ]
+  h(`| | ${aName} | ${bName} |`, `|---|---|---|`)
+  for (const [label, a, b] of rrspRows) h(`| ${label} | ${a} | ${b} |`)
+  br()
+  h('RRSP must convert to RRIF by Dec 31 of the year the holder turns 71. RRIF mandatory minimums are taxable withdrawals — roughly 5.3% at age 71, rising to 20% at 95. "Using spouse\'s age" for minimums reduces mandatory draws when the account holder is older.')
+  br()
+
+  h('### 3.2 TFSA')
+  br()
+  const tfsaRows: [string, string, string][] = [
+    ['Balance', c(s.tfsaA.balance), c(s.tfsaB.balance)],
+    ['Annual Contribution', c(s.tfsaA.annualContribution), c(s.tfsaB.annualContribution)],
+    ['Contributions End', s.tfsaA.contributionEndDate, s.tfsaB.contributionEndDate],
+    ...(s.tfsaA.returnRateOverrideEnabled || s.tfsaB.returnRateOverrideEnabled
+      ? [['Return Rate Override', s.tfsaA.returnRateOverrideEnabled ? pct(s.tfsaA.returnRateOverridePct) : '(portfolio rate)', s.tfsaB.returnRateOverrideEnabled ? pct(s.tfsaB.returnRateOverridePct) : '(portfolio rate)'] as [string,string,string]] : []),
+  ]
+  h(`| | ${aName} | ${bName} |`, `|---|---|---|`)
+  for (const [label, a, b] of tfsaRows) h(`| ${label} | ${a} | ${b} |`)
+  br()
+  h('TFSA withdrawals are completely tax-free. Contribution room is restored the following calendar year. No mandatory withdrawals — ideal for tax-free compounding and last-resort draws.')
+  br()
+
+  h('### 3.3 Non-Registered')
+  br()
+  const nrRows: [string, string, string][] = [
+    ['Balance', c(s.nonRegA.balance), c(s.nonRegB.balance)],
+    ['Adjusted Cost Base (ACB)', c(s.nonRegA.acb), c(s.nonRegB.acb)],
+    ['Annual Contribution', c(s.nonRegA.annualContribution), c(s.nonRegB.annualContribution)],
+    ['Contributions End', s.nonRegA.contributionEndDate, s.nonRegB.contributionEndDate],
+    ['Eligible Dividend Yield', pct(s.nonRegA.eligibleDivYieldPct), pct(s.nonRegB.eligibleDivYieldPct)],
+    ['Foreign Income Yield', pct(s.nonRegA.foreignIncomeYieldPct), pct(s.nonRegB.foreignIncomeYieldPct)],
+    ['Interest Yield', pct(s.nonRegA.interestYieldPct), pct(s.nonRegB.interestYieldPct)],
+    ...(s.nonRegA.returnRateOverrideEnabled || s.nonRegB.returnRateOverrideEnabled
+      ? [['Return Rate Override', s.nonRegA.returnRateOverrideEnabled ? pct(s.nonRegA.returnRateOverridePct) : '(portfolio rate)', s.nonRegB.returnRateOverrideEnabled ? pct(s.nonRegB.returnRateOverridePct) : '(portfolio rate)'] as [string,string,string]] : []),
+  ]
+  h(`| | ${aName} | ${bName} |`, `|---|---|---|`)
+  for (const [label, a, b] of nrRows) h(`| ${label} | ${a} | ${b} |`)
+  br()
+  h('Annual yields (dividends, foreign income, interest) are taxable in the year earned regardless of withdrawals. Capital gains arise on withdrawal, calculated via the ACB ratio. Eligible dividends are grossed up 38% then a federal credit of ~15% of the grossed-up amount applies.')
+  br()
+
+  h('### 3.4 HISA / Cash (Joint)')
+  br()
+  h(`| | Value |`, `|---|---|`,
+    `| Balance | ${c(s.cash.hisaBalance)} |`,
+    `| Interest Rate (nominal) | ${pct(s.cash.hisaRatePct)} |`,
+    `| Minimum Floor Target | ${c(s.cash.hisaMinBalance)} |`)
+  br()
+  h('Joint account used for liquidity and short-term surplus. Interest is taxable. The minimum floor is a planning target — years where the HISA falls below it signal a liquidity concern.')
+  br()
+  h('---')
+  br()
+
+  // ── 4. Spending Plan ────────────────────────────────────────────────────────
+  h('## 4. Spending Plan')
+  br()
+  h(`Phase start ages and additional spending items are anchored to **${refName}**'s birthday. All amounts are in today's dollars.`)
+  br()
+
+  h('### 4.1 Lifestyle Phases')
+  br()
+  h(`| Phase | ${refName}'s Start Age | Annual Amount | Real Growth/yr |`,
     `|---|---|---|---|`)
   for (const phase of s.spendingPhases) {
-    const startLabel = phase.linkedToFirstDeath ? 'Linked to first death' : String(phase.startAge)
-    h(`| ${phase.label} | ${startLabel} | ${currency(phase.annualAmount)} | ${phase.growthRatePct >= 0 ? '+' : ''}${pct(phase.growthRatePct)}/yr |`)
+    const startLabel = phase.linkedToFirstDeath
+      ? `First death (${aName} or ${bName})`
+      : `Age ${phase.startAge}`
+    const growthDesc = phase.growthRatePct === 0
+      ? '0% (constant real purchasing power)'
+      : `${phase.growthRatePct > 0 ? '+' : ''}${pct(phase.growthRatePct)}/yr`
+    h(`| ${phase.label} | ${startLabel} | ${c(phase.annualAmount)} | ${growthDesc} |`)
   }
+  br()
+  h('Real growth is above personal inflation. Negative real growth means spending declines in purchasing power over time — typical for slow-go and no-go retirement phases as activity decreases.')
   br()
 
   if (s.additionalSpending.length > 0) {
-    h('### Additional Spending')
+    h('### 4.2 Additional Spending')
     br()
-    h(`| Label | Amount | ${refName}'s Age | Type |`,
-      `|---|---|---|---|`)
+    h(`| Label | Amount | ${refName}'s Age | Type |`, `|---|---|---|---|`)
     for (const item of s.additionalSpending) {
-      h(`| ${item.label} | ${currency(item.amount)} | ${item.startAge} | ${item.recurring ? 'Recurring' : 'One-time'} |`)
+      h(`| ${item.label} | ${c(item.amount)} | ${item.startAge} | ${item.recurring ? 'Recurring from that age' : 'One-time in that year'} |`)
     }
     br()
   }
 
-  // ── Assumptions ─────────────────────────────────────────────────────────────
-  h('## Key Assumptions')
-  br()
-  h(`- **Personal inflation**: ${pct(s.personalInflationRatePct)} — deflates all outputs to today's purchasing power`,
-    `- **CPI**: ${pct(s.cpiRatePct)} — indexes DB pension, CPP, OAS, and tax brackets forward`,
-    `- **Portfolio returns (nominal)**: ${pct(s.returnRates.upTo55)} (to 55) / ${pct(s.returnRates.from55to65)} (55–65) / ${pct(s.returnRates.from65to70)} (65–70) / ${pct(s.returnRates.from70plus)} (70+)`,
-    `- **Tax**: Ontario 2024 combined federal + provincial rates, CPI-indexed forward`,
-    `- **Capital gains inclusion**: ${pct(s.taxSettings.capitalGainsInclusionRate * 100)} on all gains`,
-    `- **Pension splitting**: ${s.withdrawalStrategy.pensionSplitMode === 'auto' ? 'Auto-optimized each year' : `Manual at ${s.withdrawalStrategy.pensionSplitPct}%`}`)
-  br()
-
-  // ── Analysis Request ─────────────────────────────────────────────────────────
   h('---')
   br()
-  h('## Analysis Request')
+
+  // ── 5. Key Assumptions ──────────────────────────────────────────────────────
+  h('## 5. Key Assumptions')
   br()
-  h('You are reviewing a Canadian retirement plan for an Ontario household. Please provide a thorough analysis covering:')
+
+  h('### 5.1 Portfolio Return Rates (Nominal)')
   br()
-  h('1. **Sustainability** — Does the plan appear sustainable to both planning horizons given the spending phases and income sources?',
-    `2. **Key risks** — Longevity (${bName} to age ${s.personB.planningEndAge}), sequence of returns, inflation mismatch, RRSP/RRIF concentration, OAS clawback exposure`,
-    '3. **Government benefits timing** — Are the CPP and OAS start ages well-chosen given the planning horizons and spending gap between retirement and benefit start?',
-    '4. **RRSP/RRIF management** — What are the RRIF forced withdrawal implications at conversion? Is proactive RRSP meltdown advisable before conversion?',
-    '5. **Tax efficiency** — Pension splitting opportunities, capital gains management, account withdrawal sequencing, bracket management',
-    '6. **Spending plan critique** — Are the phase amounts and transitions realistic? Is the survivor phase adequately funded?',
-    '7. **Priority scenarios to stress-test** — Which combinations of variables represent the most important risks to model?')
+  h(`Returns are tiered by **${refName}**'s age. The effective real return is the nominal rate minus the personal inflation rate — this is approximately what the portfolio grows by in today's dollars.`)
+  br()
+  const showOff = effReturnOff !== 0
+  h(`| ${refName}'s Age Band | Effective Nominal Return | Approx. Real Return |`,
+    `|---|---|---|`,
+    `| Up to 55 | ${showOff ? `**${pct(effRates.upTo55)}** *(base: ${pct(s.returnRates.upTo55)})*` : pct(s.returnRates.upTo55)} | ~${(effRates.upTo55 - effInflation).toFixed(1)}%/yr |`,
+    `| 55 to 65 | ${showOff ? `**${pct(effRates.from55to65)}** *(base: ${pct(s.returnRates.from55to65)})*` : pct(s.returnRates.from55to65)} | ~${(effRates.from55to65 - effInflation).toFixed(1)}%/yr |`,
+    `| 65 to 70 | ${showOff ? `**${pct(effRates.from65to70)}** *(base: ${pct(s.returnRates.from65to70)})*` : pct(s.returnRates.from65to70)} | ~${(effRates.from65to70 - effInflation).toFixed(1)}%/yr |`,
+    `| 70+ | ${showOff ? `**${pct(effRates.from70plus)}** *(base: ${pct(s.returnRates.from70plus)})*` : pct(s.returnRates.from70plus)} | ~${(effRates.from70plus - effInflation).toFixed(1)}%/yr |`)
+  br()
+
+  h('### 5.2 Inflation Rates')
+  br()
+  h(`| Rate | Effective Value | Role in Model |`,
+    `|---|---|---|`,
+    `| Personal Inflation | ${modVal(wi.inflationRate.enabled, pct(effInflation), pct(s.personalInflationRatePct))} | Deflates all output to today's purchasing power |`,
+    `| CPI | ${modVal(!!wi.cpiRate?.enabled, pct(effCpi), pct(s.cpiRatePct))} | Indexes DB pension, CPP/OAS amounts, and tax brackets forward each year |`)
+  br()
+
+  h('### 5.3 Tax Framework')
+  br()
+  const cgRate = s.taxSettings.capitalGainsInclusionRate * 100
+  const psDesc = effPSMode === 'auto'
+    ? `Auto-optimized each year — the model allocates up to 50% of eligible pension income from ${aName} to ${bName} to minimize combined tax`
+    : `Manual — ${pct(effPSPct)} of eligible pension income allocated from ${aName} to ${bName}`
+  h(`- **Jurisdiction:** Ontario + Federal combined, 2024 bracket values, CPI-indexed forward annually`,
+    `- **Capital gains inclusion:** ${pct(cgRate)} of net realized gains included in taxable income (${100 - cgRate}% exempt)`,
+    `- **Eligible dividends:** Grossed up 38%; federal dividend tax credit ~15.0% of grossed-up amount; Ontario credit ~10.0%`,
+    `- **Pension income splitting:** ${psDesc}${wi.pensionSplit.enabled ? ` *(base: ${s.withdrawalStrategy.pensionSplitMode === 'auto' ? 'auto' : `manual ${pct(s.withdrawalStrategy.pensionSplitPct)}`})*` : ''}`,
+    `- **OAS clawback:** 15% of net income above ~$90,997 (2024, CPI-indexed annually)`,
+    `- **Ontario surtax:** 20% surcharge on Ontario tax above $5,315; additional 36% surcharge on Ontario tax above $6,802 (2024)`)
+  br()
+  h('---')
+  br()
+
+  // ── 6. Drawdown Strategy ────────────────────────────────────────────────────
+  h('## 6. Drawdown Strategy')
+  br()
+
+  if (wi.drawdownStrategy.enabled) {
+    h('*Note: The drawdown strategy is currently set via a modification (what-if override) on top of the base plan.*')
+    br()
+  }
+
+  const ds = effDrawdown
+
+  if (ds.strategyType === 'none') {
+    h('**No proactive drawdown strategy is configured.**')
+    br()
+    h('The simulation draws only mandatory RRIF minimums after each person\'s RRIF conversion date. Any shortfall between net household income and spending is not covered from the portfolio — the plan relies entirely on its income streams (employment, DB pension, CPP, OAS, other income). Any annual income surplus is not automatically reinvested.')
+
+  } else if (ds.strategyType === 'spendGap') {
+    h('**Strategy: Cover Spending Gap**')
+    br()
+    h('Each year, the engine calculates total net household income (after tax and OAS clawback). If it falls short of total spending, the deficit is filled by drawing from investment accounts in a defined priority order. If income exceeds spending, the surplus is routed into accounts in a defined order. The strategy has two operating phases per person: *meltdown* (retired, before RRIF conversion) and *RRIF* (after conversion, when mandatory minimums apply).')
+    br()
+
+    describePhase(ds.spendGapConfig.meltdownA, aName, 'Meltdown Phase (retired, pre-RRIF)')
+    describePhase(ds.spendGapConfig.meltdownB, bName, 'Meltdown Phase (retired, pre-RRIF)')
+
+    describePhase(ds.spendGapConfig.rrifA, aName, 'RRIF Phase (after RRIF conversion)')
+    describePhase(ds.spendGapConfig.rrifB, bName, 'RRIF Phase (after RRIF conversion)')
+
+    h('**Surplus Routing**')
+    br()
+    describeSurplus(ds.spendGapConfig.surplusMeltdownItems, 'Meltdown phase')
+    br()
+    describeSurplus(ds.spendGapConfig.surplusRrifItems, 'RRIF phase')
+    br()
+    if (ds.spendGapConfig.stopContributionsWhenPartnerRetired) {
+      h('*Contributions for each person stop when their partner retires.*')
+      br()
+    }
+
+  } else if (ds.strategyType === 'fixedWithdrawal') {
+    h('**Strategy: Fixed Annual Withdrawals**')
+    br()
+    h('A fixed annual dollar amount (today\'s dollars, CPI-indexed forward) is withdrawn from each account each year, regardless of income or spending needs. These withdrawals are in addition to mandatory RRIF minimums.')
+    br()
+    const fw = ds.fixedWithdrawal
+    h(`| Account | ${aName} | ${bName} |`,
+      `|---|---|---|`,
+      `| RRSP / RRIF | ${c(fw.rrspAmountA)} | ${c(fw.rrspAmountB)} |`,
+      `| TFSA | ${c(fw.tfsaAmountA)} | ${c(fw.tfsaAmountB)} |`,
+      `| Non-Registered | ${c(fw.nonRegAmountA)} | ${c(fw.nonRegAmountB)} |`,
+      `| HISA (joint) | ${c(fw.hisaAmount)} | — |`)
+    br()
+
+  } else if (ds.strategyType === 'fixedPct') {
+    h('**Strategy: Fixed Percentage of Balance**')
+    br()
+    h('A fixed percentage of each account\'s end-of-prior-year balance is withdrawn annually, with a floor minimum. These withdrawals are in addition to mandatory RRIF minimums.')
+    br()
+    const fp = ds.fixedPct
+    h(`| Account | % of Balance | Annual Minimum |`,
+      `|---|---|---|`,
+      `| RRSP / RRIF | ${pct(fp.rrspPct)} | ${c(fp.rrspMin)} |`,
+      `| TFSA | ${pct(fp.tfsaPct)} | ${c(fp.tfsaMin)} |`,
+      `| Non-Registered | ${pct(fp.nonRegPct)} | ${c(fp.nonRegMin)} |`,
+      `| HISA | ${pct(fp.hisaPct)} | ${c(fp.hisaMin)} |`)
+    br()
+  }
+
+  h('---')
+  br()
+
+  // ── 7. Current Modifications ────────────────────────────────────────────────
+  h('## 7. Current Modifications')
+  br()
+
+  const mods: string[] = []
+
+  if (wi.retirementA?.enabled) {
+    const cfg = wi.retirementA.value
+    const cascades = [cfg.cascadePension && 'DB pension', cfg.cascadeRrsp && 'RRSP contributions', cfg.cascadeTfsa && 'TFSA contributions', cfg.cascadeNonReg && 'non-reg contributions'].filter(Boolean).join(', ') || 'none'
+    mods.push(`**${aName} Retirement Age:** Changed to age ${cfg.retirementAge} (~${effRetireDateA}). Base: ${s.personA.retirementDate}. Cascaded dates: ${cascades}.`)
+  }
+  if (wi.retirementB?.enabled) {
+    const cfg = wi.retirementB.value
+    const cascades = [cfg.cascadePension && 'DB pension', cfg.cascadeRrsp && 'RRSP contributions', cfg.cascadeTfsa && 'TFSA contributions', cfg.cascadeNonReg && 'non-reg contributions'].filter(Boolean).join(', ') || 'none'
+    mods.push(`**${bName} Retirement Age:** Changed to age ${cfg.retirementAge} (~${effRetireDateB}). Base: ${s.personB.retirementDate}. Cascaded dates: ${cascades}.`)
+  }
+  if (wi.longevityA.enabled)
+    mods.push(`**${aName} Planning Horizon:** Age ${wi.longevityA.value} (base: age ${s.personA.planningEndAge}).`)
+  if (wi.longevityB.enabled)
+    mods.push(`**${bName} Planning Horizon:** Age ${wi.longevityB.value} (base: age ${s.personB.planningEndAge}).`)
+  if (wi.cppStartAgeA.enabled)
+    mods.push(`**${aName} CPP Start Age:** Age ${wi.cppStartAgeA.value} (~${effCppStartA}). Base: ${s.cppA.startDate}. Effective monthly: $${Math.round(cppEffA).toLocaleString('en-CA')} vs. base $${s.cppA.estimatedMonthlyAt65.toLocaleString('en-CA')} at 65.`)
+  if (wi.cppStartAgeB.enabled)
+    mods.push(`**${bName} CPP Start Age:** Age ${wi.cppStartAgeB.value} (~${effCppStartB}). Base: ${s.cppB.startDate}. Effective monthly: $${Math.round(cppEffB).toLocaleString('en-CA')} vs. base $${s.cppB.estimatedMonthlyAt65.toLocaleString('en-CA')} at 65.`)
+  if (wi.oasStartAgeA.enabled)
+    mods.push(`**${aName} OAS Start Age:** Age ${wi.oasStartAgeA.value} (~${effOasStartA}). Base: ${s.oasA.startDate}. Effective monthly: $${Math.round(oasEffA).toLocaleString('en-CA')} vs. base $${s.oasA.estimatedMonthlyAt65.toLocaleString('en-CA')} at 65 (${oasFacA} of base).`)
+  if (wi.oasStartAgeB.enabled)
+    mods.push(`**${bName} OAS Start Age:** Age ${wi.oasStartAgeB.value} (~${effOasStartB}). Base: ${s.oasB.startDate}. Effective monthly: $${Math.round(oasEffB).toLocaleString('en-CA')} vs. base $${s.oasB.estimatedMonthlyAt65.toLocaleString('en-CA')} at 65 (${oasFacB} of base).`)
+  if (wi.inflationRate.enabled)
+    mods.push(`**Personal Inflation:** ${pct(wi.inflationRate.value)} (base: ${pct(s.personalInflationRatePct)}). All real returns and today's-dollar outputs shift accordingly.`)
+  if (wi.cpiRate?.enabled)
+    mods.push(`**CPI Rate:** ${pct(wi.cpiRate.value)} (base: ${pct(s.cpiRatePct)}). Affects DB pension indexing, CPP/OAS benefit growth, and tax bracket indexing.`)
+  if (wi.returnRateOffset.enabled && wi.returnRateOffset.value !== 0) {
+    const sign = wi.returnRateOffset.value > 0 ? '+' : ''
+    mods.push(`**Portfolio Returns:** All tiers shifted by ${sign}${pct(wi.returnRateOffset.value)}. Effective: ${pct(effRates.upTo55)} / ${pct(effRates.from55to65)} / ${pct(effRates.from65to70)} / ${pct(effRates.from70plus)} (base: ${pct(s.returnRates.upTo55)} / ${pct(s.returnRates.from55to65)} / ${pct(s.returnRates.from65to70)} / ${pct(s.returnRates.from70plus)}).`)
+  }
+  if (wi.pensionSplit.enabled) {
+    const v = wi.pensionSplit.value
+    mods.push(`**Pension Splitting:** ${v.mode === 'auto' ? 'Auto-optimized' : `Manual at ${pct(v.pct)}`} (base: ${s.withdrawalStrategy.pensionSplitMode === 'auto' ? 'auto' : `manual ${pct(s.withdrawalStrategy.pensionSplitPct)}`}).`)
+  }
+  if (wi.drawdownStrategy.enabled)
+    mods.push(`**Drawdown Strategy:** Overridden to "${wi.drawdownStrategy.value.strategyType}" (see Section 6 for full details). Base plan strategy: "${s.withdrawalStrategy.drawdownStrategy}".`)
+  if (wi.marketProfile?.enabled) {
+    const mp = wi.marketProfile.value
+    const names: Record<string, string> = { step: 'Step (base tiers)', frontLoaded: 'Front-loaded', backLoaded: 'Back-loaded', cyclicalCrest: 'Cyclical (crest start)', cyclicalTrough: 'Cyclical (trough start)', noise: 'Random noise' }
+    mods.push(`**Market Profile:** ${names[mp.profileType] ?? mp.profileType}, outlook offset ${mp.outlookOffset > 0 ? '+' : ''}${mp.outlookOffset}%, amplitude ${mp.beta}×.`)
+  }
+  if (wi.layoffA?.enabled) {
+    const { date, severance } = wi.layoffA.value
+    mods.push(`**${aName} Layoff:** Employment ends ${date}${severance > 0 ? ` with ${c(severance)} taxable severance` : ''}. Retirement and contribution end dates adjusted.`)
+  }
+  if (wi.layoffB?.enabled) {
+    const { date, severance } = wi.layoffB.value
+    mods.push(`**${bName} Layoff:** Employment ends ${date}${severance > 0 ? ` with ${c(severance)} taxable severance` : ''}. Retirement and contribution end dates adjusted.`)
+  }
+  if (wi.unexpectedExpense?.enabled && wi.unexpectedExpense.value.amount > 0) {
+    const { date, amount } = wi.unexpectedExpense.value
+    mods.push(`**Unexpected Expense:** One-time household spending of ${c(amount)} in ${date.slice(0, 4)}.`)
+  }
+
+  if (mods.length === 0) {
+    h('No modifications are currently active. The simulation reflects the base plan only.')
+  } else {
+    h(`${mods.length} modification${mods.length > 1 ? 's are' : ' is'} currently active. All effective values in Sections 1–6 already incorporate these changes. The base plan values are noted in parentheses for reference.`)
+    br()
+    for (const mod of mods) h(`- ${mod}`)
+  }
+  br()
+  h('---')
+  br()
+
+  // ── 8. Canadian Rules Reference ─────────────────────────────────────────────
+  h('## 8. Key Canadian Rules Built Into This Model')
+  br()
+  h(`- **CPP:** Max ~$1,364/month base + ~$130/month CPP2 (2024). Deferral: −0.6%/month before 65, +0.7%/month after (cap −36% at 60, +42% at 70). Survivor: 60% of deceased's entitlement to the survivor.`,
+    `- **OAS:** Max ~$713/month at 65 (2024). Deferral: +0.6%/month past 65, max +36% at 70. Clawback: 15% above ~$90,997 net income. No survivor OAS.`,
+    `- **RRIF minimums:** CRA table by age — ~5.3% at 71, ~6.8% at 75, ~10.2% at 85, ~20.0% at 95+. All mandatory withdrawals are fully taxable.`,
+    `- **Pension income splitting:** Up to 50% of eligible pension income (DB pension, RRIF withdrawals after age 65) may be allocated to a lower-income spouse for tax purposes.`,
+    `- **TFSA:** Tax-free growth and withdrawals. Contribution room ($7,000/yr in 2024, indexed) restored in the following calendar year.`,
+    `- **Capital gains:** ${pct(cgRate)} of net gains included in income (${100 - cgRate}% exempt). Gains triggered on withdrawal at the ACB ratio.`,
+    `- **Ontario surtax:** Applied to Ontario tax itself — 20% above $5,315 and 36% above $6,802 of Ontario tax owing (2024).`)
+  br()
+  h('---')
+  br()
+
+  // ── 9. How to Use ────────────────────────────────────────────────────────────
+  h('## 9. How to Use This Context')
+  br()
+  h('You have a complete picture of this retirement plan. Some productive ways to engage:')
+  br()
+  h('**Questions this context can support:**',
+    `- Is this plan sustainable to both planning horizons (${aName} to ${effLongevityA}, ${bName} to ${effLongevityB})?`,
+    `- What is the approximate income gap between retirement and government benefits start?`,
+    `- How do RRIF mandatory minimums grow over time and what is their tax cost?`,
+    `- Is there OAS clawback risk given the income and drawdown structure?`,
+    `- Is the CPP/OAS timing well-chosen relative to the spending plan and planning horizons?`)
+  br()
+  h('**Hypotheticals you can model qualitatively:**',
+    `- "What if CPP is delayed to age 67?" — apply the deferral factor (+16.8% of base monthly), assess break-even crossover against planning horizon`,
+    `- "What if personal inflation rises to 4%?" — all return tiers lose ~2 pp of real return; spending phases cost more in nominal terms`,
+    `- "What if ${aName} retires 2 years earlier?" — reduced employment income, earlier pension start if cascaded, shorter RRSP accumulation`,
+    `- "What if the portfolio earns 1% less across all tiers?" — trace the compounding effect on account balances over 30+ years`,
+    `- "What is the tax cost of not doing an RRSP meltdown before RRIF conversion?"`)
+  br()
+  h('**When running a hypothetical:**',
+    '1. State the assumption change explicitly',
+    '2. Identify which effective parameters change and by how much',
+    '3. Walk through first-order impacts: income, tax, portfolio balance',
+    '4. Note second-order effects: OAS clawback, RRIF minimum sizing, pension splitting eligibility, survivor income adequacy',
+    '5. Give a qualitative assessment of sustainability under the modified assumption')
   br()
 
   return lines.join('\n')
 }
 
-function downloadAIPrompt() {
-  const md   = generateAIPrompt()
+function downloadAIContext() {
+  const md   = generateAIContext()
   const blob = new Blob([md], { type: 'text/markdown' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `portage-ai-prompt-${new Date().toISOString().slice(0, 10)}.md`
+  a.download = `portage-ai-context-${new Date().toISOString().slice(0, 10)}.md`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -445,11 +838,11 @@ export default function App() {
               {/* Tools */}
               <div>
                 <p className="px-4 pt-1 pb-1 text-[11px] font-bold" style={{ color: iconColor }}>Tools</p>
-                <button className={menuItemClass} onClick={() => { downloadAIPrompt(); closeMenu() }}>
+                <button className={menuItemClass} onClick={() => { downloadAIContext(); closeMenu() }}>
                   <svg className={menuIcon} fill="none" viewBox="0 0 24 24" stroke={iconColor} strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
                   </svg>
-                  Generate AI Prompt
+                  Export AI Context
                 </button>
               </div>
 
