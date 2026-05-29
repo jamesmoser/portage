@@ -652,10 +652,12 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
         : isRrifA ? sgConfig.rrifA.deficitItems : []
       const phaseItemsB: SpendGapDeficitItem[] = inMeltdownB ? sgConfig.meltdownB.deficitItems
         : isRrifB ? sgConfig.rrifB.deficitItems : []
-      const capMapA = new Map<SpendGapAccountType, number>()
-      const capMapB = new Map<SpendGapAccountType, number>()
-      for (const item of phaseItemsA) capMapA.set(item.account, item.cap)
-      for (const item of phaseItemsB) capMapB.set(item.account, item.cap)
+      type CapEntry = { cap: number; unlimited: boolean }
+      const capMapA = new Map<SpendGapAccountType, CapEntry>()
+      const capMapB = new Map<SpendGapAccountType, CapEntry>()
+      // backward compat: if unlimited is undefined (old saved data), treat cap===0 as unlimited
+      for (const item of phaseItemsA) capMapA.set(item.account, { cap: item.cap, unlimited: item.unlimited ?? (item.cap === 0) })
+      for (const item of phaseItemsB) capMapB.set(item.account, { cap: item.cap, unlimited: item.unlimited ?? (item.cap === 0) })
 
       const acctOrder: SpendGapAccountType[] = []
       const seenAccts = new Set<SpendGapAccountType>()
@@ -669,8 +671,10 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       for (const acct of acctOrder) {
         if (gap_nom <= 0) break
         // Per-person cap: 0 = no cap (unlimited draw from that person's account).
-        const capA_nom = (capMapA.get(acct) ?? 0) > 0 ? capMapA.get(acct)! * inflFactor : Infinity
-        const capB_nom = (capMapB.get(acct) ?? 0) > 0 ? capMapB.get(acct)! * inflFactor : Infinity
+        const entryA = capMapA.get(acct)
+        const entryB = capMapB.get(acct)
+        const capA_nom = (!entryA || entryA.unlimited) ? Infinity : entryA.cap * inflFactor
+        const capB_nom = (!entryB || entryB.unlimited) ? Infinity : entryB.cap * inflFactor
 
         if (acct === 'hisa') {
           // Joint account — use A's cap when A is active, else B's.
@@ -751,12 +755,11 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
         : []
       if (gap_nom <= 0 && activeSurplusItems.length > 0) {
         let surplusRemaining = Math.max(0, totalNetNom + proactiveExtra - spending_nom)
-        const lastIdx = activeSurplusItems.length - 1
-        for (let si = 0; si <= lastIdx && surplusRemaining > 0.01; si++) {
+        for (let si = 0; si < activeSurplusItems.length && surplusRemaining > 0.01; si++) {
           const item = activeSurplusItems[si]
-          const isLast = si === lastIdx
-          const limit_nom = (!isLast && item.limit > 0) ? item.limit * inflFactor : Infinity
-          if (!isLast && item.limit === 0) continue  // skip non-last with limit=0
+          const isUnlimited = item.unlimited ?? false
+          if (!isUnlimited && item.limit === 0) continue  // skip: no draw from this account
+          const limit_nom = isUnlimited ? Infinity : item.limit * inflFactor
           const alloc = Math.min(surplusRemaining, limit_nom)
           if (alloc <= 0) continue
           const acct = item.account as SpendGapSurplusAccountType

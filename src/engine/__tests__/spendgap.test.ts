@@ -2,12 +2,19 @@ import { describe, it, expect } from 'vitest'
 import { runProjection } from '../projection'
 import { DEFAULT_STATE, DEFAULT_SURPLUS_ITEMS } from '../defaults'
 import { dateAtAge } from '../dates'
-import type { AppState, SpendGapAccountType, SpendGapDeficitItem } from '../types'
+import type { AppState, SpendGapAccountType, SpendGapDeficitItem, SpendGapSurplusItem } from '../types'
 
 // Convenience: build deficit items with no cap (unlimited draws in order)
 function items(...accounts: SpendGapAccountType[]): SpendGapDeficitItem[] {
-  return accounts.map(account => ({ account, cap: 0 }))
+  return accounts.map(account => ({ account, unlimited: true, cap: 0 }))
 }
+
+// Convenience: surplus items routing all surplus to HISA (unlimited)
+const SURPLUS_TO_HISA: SpendGapSurplusItem[] = [
+  { account: 'tfsa',   unlimited: false, limit: 0 },
+  { account: 'nonReg', unlimited: false, limit: 0 },
+  { account: 'hisa',   unlimited: true,  limit: 0 },
+]
 
 const CY = new Date().getFullYear()
 
@@ -41,6 +48,8 @@ interface SgParams {
   meltdownBItems?: SpendGapDeficitItem[]
   rrifAItems?: SpendGapDeficitItem[]
   rrifBItems?: SpendGapDeficitItem[]
+  surplusMeltdownItems?: SpendGapSurplusItem[]
+  surplusRrifItems?: SpendGapSurplusItem[]
 }
 
 function sgState(p: SgParams = {}): AppState {
@@ -149,8 +158,8 @@ function sgState(p: SgParams = {}): AppState {
           grossIncomeCeiling: 0,
           deficitItems: p.rrifBItems ?? items('tfsa', 'nonReg', 'hisa'),
         },
-        surplusMeltdownItems: DEFAULT_SURPLUS_ITEMS,
-        surplusRrifItems:     DEFAULT_SURPLUS_ITEMS,
+        surplusMeltdownItems: p.surplusMeltdownItems ?? DEFAULT_SURPLUS_ITEMS,
+        surplusRrifItems:     p.surplusRrifItems     ?? DEFAULT_SURPLUS_ITEMS,
       },
     },
   }
@@ -295,8 +304,8 @@ describe('spendGap — meltdown tax recomputation', () => {
 
   it('surplus is deployed to HISA when meltdown net income exceeds spending', () => {
     // 80k draw → net income ≈ 57k (after ~28% combined tax); spending = 50k.
-    // Surplus routing (default: HISA last) deploys the remainder to HISA → cashFlow = 0.
-    const { d } = run({ rrspBalA: 500_000, meltdownACeiling: 80_000, spending: 50_000 })
+    // Surplus routing with HISA unlimited deploys the remainder to HISA → cashFlow = 0.
+    const { d } = run({ rrspBalA: 500_000, meltdownACeiling: 80_000, spending: 50_000, surplusMeltdownItems: SURPLUS_TO_HISA })
     expect(d.totalHouseholdNet).toBeGreaterThan(d.householdSpending)
     expect(d.cashFlow).toBeCloseTo(0, 0)
     expect(d.hisa).toBeGreaterThan(0)
@@ -583,8 +592,8 @@ describe('spendGap — cashFlow accounting for non-taxable draws', () => {
   it('meltdown draw surplus is deployed to HISA when spending is zero', () => {
     // After meltdown draw, engine reruns tax → totalNetNom reflects after-tax income.
     // Unlike RRIF extra draws, meltdown draws are included in the tax pass.
-    // spending = 0 → all after-tax income is surplus; routed to HISA by default.
-    const { d } = run({ rrspBalA: 500_000, meltdownACeiling: 80_000, spending: 0 })
+    // spending = 0 → all after-tax income is surplus; routed to HISA via explicit surplus config.
+    const { d } = run({ rrspBalA: 500_000, meltdownACeiling: 80_000, spending: 0, surplusMeltdownItems: SURPLUS_TO_HISA })
     expect(d.cashFlow).toBeCloseTo(0, 0)
     expect(d.hisa).toBeGreaterThan(0)
   })
@@ -603,12 +612,12 @@ describe('spendGap — per-account deficit caps', () => {
       nonRegBalA: 100_000, nonRegAcbA: 100_000,
       spending: 50_000,
       meltdownAItems: [
-        { account: 'tfsa',   cap: 20_000 },
-        { account: 'nonReg', cap: 0 },
+        { account: 'tfsa',   unlimited: false, cap: 20_000 },
+        { account: 'nonReg', unlimited: true,  cap: 0 },
       ],
       meltdownBItems: [
-        { account: 'tfsa',   cap: 20_000 },
-        { account: 'nonReg', cap: 0 },
+        { account: 'tfsa',   unlimited: false, cap: 20_000 },
+        { account: 'nonReg', unlimited: true,  cap: 0 },
       ],
     })
     expect(d.tfsaWithdrawalA).toBeCloseTo(20_000, 0)
@@ -616,13 +625,13 @@ describe('spendGap — per-account deficit caps', () => {
     expect(warnings).toHaveLength(0)
   })
 
-  it('cap=0 (unlimited) draws the full gap from TFSA without moving to nonReg', () => {
-    // gap = 50k; TFSA cap = 0 (unlimited) → draws 50k from TFSA; nonReg untouched.
+  it('unlimited=true draws the full gap from TFSA without moving to nonReg', () => {
+    // gap = 50k; TFSA unlimited → draws 50k from TFSA; nonReg untouched.
     const { d } = run({
       tfsaBalA: 100_000,
       nonRegBalA: 100_000, nonRegAcbA: 100_000,
       spending: 50_000,
-      // default items: tfsa(cap=0), nonReg(cap=0), hisa(cap=0)
+      // default items: tfsa(unlimited), nonReg(unlimited), hisa(unlimited)
     })
     expect(d.tfsaWithdrawalA).toBeCloseTo(50_000, 0)
     expect(d.nonRegWithdrawalA).toBeCloseTo(0, 0)
@@ -639,12 +648,12 @@ describe('spendGap — per-account deficit caps', () => {
       nonRegBalA: 50_000, nonRegAcbA: 50_000,
       spending: 30_000,
       meltdownAItems: [
-        { account: 'tfsa',   cap: 15_000 },
-        { account: 'nonReg', cap: 0 },
+        { account: 'tfsa',   unlimited: false, cap: 15_000 },
+        { account: 'nonReg', unlimited: true,  cap: 0 },
       ],
       meltdownBItems: [
-        { account: 'tfsa',   cap: 10_000 },
-        { account: 'nonReg', cap: 0 },
+        { account: 'tfsa',   unlimited: false, cap: 10_000 },
+        { account: 'nonReg', unlimited: true,  cap: 0 },
       ],
     })
     expect(d.tfsaWithdrawalA).toBeCloseTo(15_000, 0)   // A capped at 15k
@@ -661,8 +670,8 @@ describe('spendGap — per-account deficit caps', () => {
       tfsaBalA: 100_000, tfsaBalB: 100_000,
       nonRegBalA: 100_000, nonRegAcbA: 100_000,
       spending: 50_000,
-      meltdownAItems: [{ account: 'nonReg', cap: 0 }],
-      meltdownBItems: [{ account: 'tfsa', cap: 20_000 }, { account: 'nonReg', cap: 0 }],
+      meltdownAItems: [{ account: 'nonReg', unlimited: true,  cap: 0 }],
+      meltdownBItems: [{ account: 'tfsa',   unlimited: false, cap: 20_000 }, { account: 'nonReg', unlimited: true, cap: 0 }],
     })
     expect(d.nonRegWithdrawalA).toBeCloseTo(50_000, 0)
     expect(d.tfsaWithdrawalA + d.tfsaWithdrawalB).toBeCloseTo(0, 0)
@@ -674,8 +683,8 @@ describe('spendGap — per-account deficit caps', () => {
       hisaBal: 100_000,
       tfsaBalA: 100_000,
       spending: 30_000,
-      meltdownAItems: [{ account: 'hisa', cap: 10_000 }, { account: 'tfsa', cap: 0 }],
-      meltdownBItems: [{ account: 'hisa', cap: 10_000 }, { account: 'tfsa', cap: 0 }],
+      meltdownAItems: [{ account: 'hisa', unlimited: false, cap: 10_000 }, { account: 'tfsa', unlimited: true, cap: 0 }],
+      meltdownBItems: [{ account: 'hisa', unlimited: false, cap: 10_000 }, { account: 'tfsa', unlimited: true, cap: 0 }],
     })
     expect(d.hisa).toBeCloseTo(90_000, 0)        // 100k - 10k drawn
     expect(d.tfsaWithdrawalA).toBeCloseTo(20_000, 0)

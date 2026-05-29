@@ -425,25 +425,30 @@ function MetricCard({ label, value, sub, frozen, betterWhenHigher = true, onClic
 // changes — which would drop focus mid-keystroke in the cap NumberInputs.
 
 const ACCT_LABELS: Record<SpendGapAccountType, string> = {
-  tfsa: 'TFSA', nonReg: 'Non-Reg', hisa: 'HISA', rrif: 'RRSP/RRIF',
+  tfsa: 'TFSA', nonReg: 'Non-Reg', hisa: 'HISA', rrif: 'RRIF',
 }
 
 function DeficitOrderInput({
   phase,
   allowRrif,
   onChange,
+  personName,
 }: {
   phase: SpendGapPhaseConfig
   allowRrif: boolean
   onChange: (items: SpendGapDeficitItem[]) => void
+  personName?: string
 }) {
   const baseAccts: SpendGapAccountType[] = ['tfsa', 'nonReg', 'hisa']
   const allAccts: SpendGapAccountType[] = allowRrif ? [...baseAccts, 'rrif'] : baseAccts
   const existingAccts = phase.deficitItems.map(i => i.account).filter(a => allAccts.includes(a))
   const missingAccts = allAccts.filter(a => !existingAccts.includes(a))
+  // Normalize: backward-compat — old items without unlimited field treat cap===0 as unlimited
   const items: SpendGapDeficitItem[] = [
-    ...phase.deficitItems.filter(i => allAccts.includes(i.account)),
-    ...missingAccts.map(account => ({ account, cap: 0 })),
+    ...phase.deficitItems
+      .filter(i => allAccts.includes(i.account))
+      .map(i => ({ ...i, unlimited: i.unlimited ?? (i.cap === 0) })),
+    ...missingAccts.map(account => ({ account, unlimited: true, cap: 0 })),
   ]
   const move = (idx: number, dir: -1 | 1) => {
     const next = [...items]
@@ -452,45 +457,65 @@ function DeficitOrderInput({
     ;[next[idx], next[swap]] = [next[swap], next[idx]]
     onChange(next)
   }
+  const setUnlimited = (idx: number, unlimited: boolean) => {
+    onChange(items.map((item, i) => i === idx ? { ...item, unlimited } : item))
+  }
   const setCap = (idx: number, cap: number) => {
     onChange(items.map((item, i) => i === idx ? { ...item, cap } : item))
   }
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1 text-xs text-slate-400 pb-0.5">
-        <span className="w-5 shrink-0" />
-        <span className="flex-1" />
-        <span className="w-6 text-center shrink-0" />
-        <span className="w-6 text-center shrink-0" />
-        <span className="w-20 text-center shrink-0">Cap/yr ($)</span>
+    <div className="space-y-2.5">
+      {/* Person name + column headers */}
+      <div className="flex items-end gap-3 text-sm">
+        <div className="w-10 shrink-0" />
+        <div className="flex-1 font-medium text-slate-600">{personName}</div>
+        <span className="w-16 text-center text-sm font-semibold text-slate-500 shrink-0">No Limit</span>
+        <span className="w-20 text-center text-sm font-semibold text-slate-500 shrink-0">Limit ($)</span>
       </div>
+      {/* Account rows */}
       {items.map((item, i) => (
-        <div key={item.account} className="flex items-center gap-1">
-          <span className="w-5 text-right text-slate-400 text-xs shrink-0">{i + 1}.</span>
+        <div key={item.account} className="flex items-center gap-3">
+          {/* Arrows on left */}
+          <div className="flex gap-1.5 w-10 shrink-0">
+            <button
+              className="text-slate-400 hover:text-slate-600 disabled:opacity-25 text-sm leading-none"
+              onClick={() => move(i, -1)}
+              disabled={i === 0}
+              title="Move up"
+            >▲</button>
+            <button
+              className="text-slate-400 hover:text-slate-600 disabled:opacity-25 text-sm leading-none"
+              onClick={() => move(i, 1)}
+              disabled={i === items.length - 1}
+              title="Move down"
+            >▼</button>
+          </div>
+          {/* Account name */}
           <span className="flex-1 text-sm text-slate-700">{ACCT_LABELS[item.account]}</span>
-          <button
-            className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
-            onClick={() => move(i, -1)}
-            disabled={i === 0}
-            title="Move up"
-          >▲</button>
-          <button
-            className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
-            onClick={() => move(i, 1)}
-            disabled={i === items.length - 1}
-            title="Move down"
-          >▼</button>
-          <div className="w-20 shrink-0">
-            <NumberInput
-              label=""
-              value={item.cap}
-              onChange={v => setCap(i, v)}
-              min={0} max={500_000} step={5_000} decimals={0} size="sm"
+          {/* No limit toggle */}
+          <div className="w-16 flex justify-center shrink-0">
+            <input
+              type="checkbox"
+              checked={item.unlimited}
+              onChange={e => setUnlimited(i, e.target.checked)}
+              style={{ accentColor: '#7B1515' }}
+              className="w-4 h-4 cursor-pointer"
             />
+          </div>
+          {/* Cap input — fixed height so row height never changes */}
+          <div className="w-20 h-8 flex items-center justify-center shrink-0">
+            {item.unlimited
+              ? <span className="font-bold text-sm" style={{ color: '#7B1515' }}>∞</span>
+              : <NumberInput
+                  label=""
+                  value={item.cap}
+                  onChange={v => setCap(i, v)}
+                  min={0} max={500_000} step={5_000} decimals={0} size="sm"
+                />
+            }
           </div>
         </div>
       ))}
-      <p className="text-xs text-slate-400 pt-0.5">0 = unlimited</p>
     </div>
   )
 }
@@ -513,11 +538,11 @@ function SurplusOrderInput({
   const allAccts: SpendGapSurplusAccountType[] = ['tfsa', 'nonReg', 'hisa']
   const existingAccts = items.map(i => i.account)
   const missingAccts = allAccts.filter(a => !existingAccts.includes(a))
+  // Normalize: backward-compat — old items without unlimited field default to false
   const resolved: SpendGapSurplusItem[] = [
-    ...items.filter(i => allAccts.includes(i.account)),
-    ...missingAccts.map(account => ({ account, limit: 0 })),
+    ...items.filter(i => allAccts.includes(i.account)).map(i => ({ ...i, unlimited: i.unlimited ?? false })),
+    ...missingAccts.map(account => ({ account, unlimited: false, limit: 0 })),
   ]
-  const lastIdx = resolved.length - 1
   const move = (idx: number, dir: -1 | 1) => {
     const next = [...resolved]
     const swap = idx + dir
@@ -525,51 +550,65 @@ function SurplusOrderInput({
     ;[next[idx], next[swap]] = [next[swap], next[idx]]
     onChange(next)
   }
+  const setUnlimited = (idx: number, unlimited: boolean) => {
+    onChange(resolved.map((item, i) => i === idx ? { ...item, unlimited } : item))
+  }
   const setLimit = (idx: number, limit: number) => {
     onChange(resolved.map((item, i) => i === idx ? { ...item, limit } : item))
   }
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1 text-xs text-slate-400 pb-0.5">
-        <span className="w-5 shrink-0" />
-        <span className="flex-1" />
-        <span className="w-6 text-center shrink-0" />
-        <span className="w-6 text-center shrink-0" />
-        <span className="w-24 text-center shrink-0">Limit/yr ($)</span>
+    <div className="space-y-2.5">
+      {/* Column headers */}
+      <div className="flex items-end gap-3 text-sm">
+        <div className="w-10 shrink-0" />
+        <div className="w-24" />
+        <span className="w-16 text-center text-sm font-semibold text-slate-500 shrink-0">No Limit</span>
+        <span className="w-20 text-center text-sm font-semibold text-slate-500 shrink-0">Limit ($)</span>
       </div>
-      {resolved.map((item, i) => {
-        const isLast = i === lastIdx
-        return (
-          <div key={item.account} className="flex items-center gap-1">
-            <span className="w-5 text-right text-slate-400 text-xs shrink-0">{i + 1}.</span>
-            <span className="flex-1 text-sm text-slate-700">{SURPLUS_ACCT_LABELS[item.account]}</span>
+      {/* Account rows */}
+      {resolved.map((item, i) => (
+        <div key={item.account} className="flex items-center gap-3">
+          {/* Arrows on left */}
+          <div className="flex gap-1.5 w-10 shrink-0">
             <button
-              className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
+              className="text-slate-400 hover:text-slate-600 disabled:opacity-25 text-sm leading-none"
               onClick={() => move(i, -1)}
               disabled={i === 0}
               title="Move up"
             >▲</button>
             <button
-              className="text-slate-400 hover:text-slate-700 disabled:opacity-25 text-xs w-6 text-center shrink-0"
+              className="text-slate-400 hover:text-slate-600 disabled:opacity-25 text-sm leading-none"
               onClick={() => move(i, 1)}
-              disabled={isLast}
+              disabled={i === resolved.length - 1}
               title="Move down"
             >▼</button>
-            <div className="w-24 shrink-0">
-              {isLast
-                ? <span className="text-xs text-slate-400 pl-2">— remainder</span>
-                : <NumberInput
-                    label=""
-                    value={item.limit}
-                    onChange={v => setLimit(i, v)}
-                    min={0} max={500_000} step={5_000} decimals={0} size="sm"
-                  />
-              }
-            </div>
           </div>
-        )
-      })}
-      <p className="text-xs text-slate-400 pt-0.5">0 = skip (unless last). Last always receives remainder.</p>
+          {/* Account name */}
+          <span className="w-24 text-sm text-slate-700">{SURPLUS_ACCT_LABELS[item.account]}</span>
+          {/* No limit toggle */}
+          <div className="w-16 flex justify-center shrink-0">
+            <input
+              type="checkbox"
+              checked={item.unlimited ?? false}
+              onChange={e => setUnlimited(i, e.target.checked)}
+              style={{ accentColor: '#7B1515' }}
+              className="w-4 h-4 cursor-pointer"
+            />
+          </div>
+          {/* Limit input — fixed height so row height never changes */}
+          <div className="w-20 h-8 flex items-center justify-center shrink-0">
+            {item.unlimited
+              ? <span className="font-bold text-sm" style={{ color: '#7B1515' }}>∞</span>
+              : <NumberInput
+                  label=""
+                  value={item.limit}
+                  onChange={v => setLimit(i, v)}
+                  min={0} max={500_000} step={5_000} decimals={0} size="sm"
+                />
+            }
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -1156,25 +1195,27 @@ export function DashboardTab() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
-                      <p className="text-sm font-medium text-slate-600 mb-2">Deficit Order</p>
-                      <div className="flex gap-8">
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1.5">{aName}</p>
-                          <DeficitOrderInput phase={sg.meltdownA} allowRrif={false} onChange={items => updatePhase('meltdownA', { deficitItems: items })} />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1.5">{bName}</p>
-                          <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} />
+                    <div className="rounded border border-slate-200">
+                      <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700">Deficit Order</span>
+                      </div>
+                      <div className="bg-white px-3 py-3">
+                        <div className="flex gap-20">
+                          <DeficitOrderInput phase={sg.meltdownA} allowRrif={false} onChange={items => updatePhase('meltdownA', { deficitItems: items })} personName={aName} />
+                          <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} personName={bName} />
                         </div>
                       </div>
                     </div>
-                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
-                      <p className="text-sm font-medium text-slate-600 mb-2">Surplus Order</p>
-                      <SurplusOrderInput
-                        items={sg.surplusMeltdownItems ?? DEFAULT_SURPLUS_ITEMS}
-                        onChange={items => updateSg({ surplusMeltdownItems: items })}
-                      />
+                    <div className="rounded border border-slate-200">
+                      <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700">Surplus Order</span>
+                      </div>
+                      <div className="bg-white px-3 py-3">
+                        <SurplusOrderInput
+                          items={sg.surplusMeltdownItems ?? DEFAULT_SURPLUS_ITEMS}
+                          onChange={items => updateSg({ surplusMeltdownItems: items })}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1183,33 +1224,34 @@ export function DashboardTab() {
                 <p className="text-sm font-semibold text-slate-600 pt-1">Phase 3 — RRIF Forced Minimums</p>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
-                      <p className="text-sm font-medium text-slate-600 mb-2">Deficit Order</p>
-                      <div className="flex gap-8">
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1.5">{aName}</p>
-                          <DeficitOrderInput phase={sg.rrifA} allowRrif={true} onChange={items => updatePhase('rrifA', { deficitItems: items })} />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1.5">{bName}</p>
-                          <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} />
+                    <div className="rounded border border-slate-200">
+                      <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700">Deficit Order</span>
+                      </div>
+                      <div className="bg-white px-3 py-3">
+                        <div className="flex gap-20">
+                          <DeficitOrderInput phase={sg.rrifA} allowRrif={true} onChange={items => updatePhase('rrifA', { deficitItems: items })} personName={aName} />
+                          <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} personName={bName} />
                         </div>
                       </div>
                     </div>
-                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
-                      <p className="text-sm font-medium text-slate-600 mb-2">Surplus Order</p>
-                      <SurplusOrderInput
-                        items={sg.surplusRrifItems ?? DEFAULT_SURPLUS_ITEMS}
-                        onChange={items => updateSg({ surplusRrifItems: items })}
-                      />
+                    <div className="rounded border border-slate-200">
+                      <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700">Surplus Order</span>
+                      </div>
+                      <div className="bg-white px-3 py-3">
+                        <SurplusOrderInput
+                          items={sg.surplusRrifItems ?? DEFAULT_SURPLUS_ITEMS}
+                          onChange={items => updateSg({ surplusRrifItems: items })}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <InfoPanel>
-                  <p><strong>Gross Income Ceiling</strong> — Each year in Phase 2, the engine draws enough RRSP to bring each person's gross income up to this ceiling (today's $, CPI-indexed). Set 0 to disable proactive draws for that person.</p>
-                  <p className="mt-1.5"><strong>Deficit Order</strong> — Accounts drawn in sequence to cover any remaining spending gap. Cap/yr limits each person's annual draw from their own account (today's $, CPI-indexed); 0 = unlimited. HISA is joint. In Phase 3, mandatory RRIF minimums are always withdrawn first; the deficit order covers any shortfall above the minimum.</p>
-                  <p className="mt-1.5"><strong>Surplus Order</strong> — When income exceeds spending, the surplus is deposited into accounts in this order. Each non-last account fills up to its annual limit; 0 = skip (unless last). The last account always receives all remaining surplus. TFSA and Non-Reg are split 50/50 A/B (100% to survivor).</p>
+                  <p><strong>Deficit Order</strong> — When income falls short of spending, accounts are drawn in sequence to cover the gap. Each account can have an annual limit (per person); check No Limit to draw as much as needed. HISA is joint. In Phase 3, mandatory RRIF minimums are always withdrawn first; the deficit order covers any remaining shortfall.</p>
+                  <p className="mt-1.5"><strong>Surplus Order</strong> — When income exceeds spending, the surplus is deposited into accounts in this order. Each account can have an annual limit; check No Limit to deposit all remaining surplus. An account with limit 0 and No Limit unchecked is skipped. TFSA and Non-Reg are split 50/50 A/B (100% to survivor).</p>
                 </InfoPanel>
 
                 <div className="flex justify-end">

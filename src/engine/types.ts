@@ -216,7 +216,10 @@ export type SpendGapAccountType = 'tfsa' | 'nonReg' | 'hisa' | 'rrif'
 
 export interface SpendGapDeficitItem {
   account: SpendGapAccountType
-  /** Max household draw per year from this account (today's $, CPI-indexed). 0 = unlimited. */
+  /** When true, draw as much as needed from this account (cap is ignored).
+   *  When false, draw at most `cap` per year (cap = 0 means no draw from this account). */
+  unlimited: boolean
+  /** Max household draw per year from this account (today's $, CPI-indexed). Ignored when unlimited = true. */
   cap: number
 }
 
@@ -224,8 +227,10 @@ export type SpendGapSurplusAccountType = 'tfsa' | 'nonReg' | 'hisa'
 
 export interface SpendGapSurplusItem {
   account: SpendGapSurplusAccountType
+  /** When true, routes all remaining surplus to this account (ignores limit). Default false. */
+  unlimited?: boolean
   /** Max household deposit per year into this account (today's $, CPI-indexed).
-   *  0 = skip this account (except the last item, which always receives all remaining surplus). */
+   *  0 = skip this account. Ignored when unlimited is true. */
   limit: number
 }
 

@@ -72,17 +72,17 @@ const retireA = dateAtAge(birthA, 55)
 const retireB = dateAtAge(birthB, 53)
 
 export const DEFAULT_DEFICIT_ITEMS: SpendGapDeficitItem[] = [
-  { account: 'tfsa',   cap: 0 },
-  { account: 'nonReg', cap: 0 },
-  { account: 'hisa',   cap: 0 },
+  { account: 'tfsa',   unlimited: true, cap: 0 },
+  { account: 'nonReg', unlimited: true, cap: 0 },
+  { account: 'hisa',   unlimited: true, cap: 0 },
 ]
 
-// Default surplus routing: TFSA and Non-Reg with limit=0 (skipped unless last),
-// HISA last (receives all remaining surplus).
+// Default surplus routing: all accounts with unlimited=false and limit=0 → no reinvestment by default.
+// Users can enable unlimited on any account to route surplus there, or set a positive limit to cap it.
 export const DEFAULT_SURPLUS_ITEMS: SpendGapSurplusItem[] = [
-  { account: 'tfsa',   limit: 0 },
-  { account: 'nonReg', limit: 0 },
-  { account: 'hisa',   limit: 0 },
+  { account: 'tfsa',   unlimited: false, limit: 0 },
+  { account: 'nonReg', unlimited: false, limit: 0 },
+  { account: 'hisa',   unlimited: false, limit: 0 },
 ]
 
 const DEFAULT_SPEND_GAP_PHASE: SpendGapPhaseConfig = {
