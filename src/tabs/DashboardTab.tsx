@@ -1125,6 +1125,7 @@ export function DashboardTab() {
 
       {/* ── Drawdown Strategy Card ────────────────────────────────────────── */}
       <SectionCard title="Drawdown Strategy" width="full"
+        onReset={() => updateWhatIf('drawdownStrategy', DEFAULT_WHATIFS.drawdownStrategy)}
         info={
           <div className="space-y-2 text-sm">
             <p>The drawdown strategy is the heart of the retirement simulation. It tells the engine <em>how</em> to move money each year — which accounts to draw from, in what order, and how to handle surpluses — given the income, spending, and account balances from the base plan.</p>
