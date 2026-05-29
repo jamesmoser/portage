@@ -12,7 +12,7 @@ import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../engine/dates'
 import { DateInput } from '../components/DateInput'
-import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem, GKPersonConfig } from '../engine/types'
+import type { AppState, HeadlineMetrics, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem, GKPersonConfig } from '../engine/types'
 import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG, DEFAULT_GK_CONFIG } from '../engine/defaults'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
@@ -66,10 +66,6 @@ function hexTint(hex: string, alpha: number): string {
   return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${alpha})`
 }
 
-const PENSION_SPLIT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'auto',   label: 'Auto (optimized)' },
-  { value: 'manual', label: 'Manual' },
-]
 
 const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[] = [
   { value: 'none',            label: 'None' },
@@ -188,7 +184,7 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
   enabled: boolean
   onToggle: (v: boolean) => void
   label: string
-  baseLabel: string
+  baseLabel?: string
   children?: React.ReactNode
 }) {
   return (
@@ -206,14 +202,18 @@ function WhatIfRow({ enabled, onToggle, label, baseLabel, children }: {
       {enabled ? (
         <div className="flex items-center gap-2 flex-wrap">
           {children}
-          <span className="text-xs text-slate-400">
-            instead of <span className="font-medium text-slate-500">{baseLabel}</span>
-          </span>
+          {baseLabel && (
+            <span className="text-xs text-slate-400">
+              instead of <span className="font-medium text-slate-500">{baseLabel}</span>
+            </span>
+          )}
         </div>
       ) : (
-        <span className="text-xs text-slate-400">
-          Base: <span className="font-medium text-slate-500">{baseLabel}</span>
-        </span>
+        baseLabel ? (
+          <span className="text-xs text-slate-400">
+            Base: <span className="font-medium text-slate-500">{baseLabel}</span>
+          </span>
+        ) : null
       )}
     </div>
   )
@@ -715,9 +715,6 @@ export function DashboardTab() {
     ageReferencePerson,
   } = state
 
-  const basePensionSplitLabel = withdrawalStrategy.pensionSplitMode === 'auto'
-    ? 'Auto'
-    : `Manual (${withdrawalStrategy.pensionSplitPct}%)`
 
   const aName = personA.name || 'Person A'
   const bName = personB.name || 'Person B'
@@ -1720,7 +1717,11 @@ export function DashboardTab() {
         <p className="font-semibold text-slate-700 mb-1">Outlook</p>
         <p className="mb-2">Shifts the entire curve up or down by a fixed number of percentage points. Applied after beta scaling.</p>
         <p className="font-semibold text-slate-700 mb-1">Beta</p>
-        <p>Scales the amplitude of the curve around the midpoint. β=1: unchanged. β=2: swings twice as wide (same average, higher peaks, lower troughs). β=0: flat line at mid.</p>
+        <p className="mb-3">Scales the amplitude of the curve around the midpoint. β=1: unchanged. β=2: swings twice as wide (same average, higher peaks, lower troughs). β=0: flat line at mid.</p>
+        <p className="font-semibold text-slate-700 mb-1">Manual Pension Income Splitting</p>
+        <p className="mb-1">When this modification is <strong>off</strong>, the engine auto-optimizes pension splitting each year: it tests every integer percentage from 0–50% and picks whichever split minimizes the combined household tax bill. This is the default and is usually the tax-efficient choice.</p>
+        <p className="mb-1">When <strong>on</strong>, you fix the split at the entered percentage for every year it is eligible. The percentage represents the share of {aName || 'Person A'}'s eligible pension income transferred to {bName || 'Person B'} for tax purposes — the maximum allowed by CRA is 50%.</p>
+        <p>Eligible income includes DB pension payments and RRIF withdrawals once {aName || 'Person A'} is age 65 or older. The split has no effect before pension or RRIF income exists, or in years when both people are in the same marginal bracket.</p>
       </>}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-3">
@@ -1983,20 +1984,14 @@ export function DashboardTab() {
                 onToggle={v => updateWhatIf('pensionSplit', {
                   enabled: v,
                   value: v
-                    ? { mode: withdrawalStrategy.pensionSplitMode, pct: withdrawalStrategy.pensionSplitPct }
+                    ? { mode: 'manual', pct: whatIfs.pensionSplit.value.pct }
                     : whatIfs.pensionSplit.value,
                 })}
-                label="Pension Income Splitting"
-                baseLabel={basePensionSplitLabel}
+                label="Manual Pension Splitting"
               >
-                <SelectInput label="" value={whatIfs.pensionSplit.value.mode}
-                  onChange={v => updateWhatIf('pensionSplit', { value: { ...whatIfs.pensionSplit.value, mode: v as PensionSplitMode } })}
-                  options={PENSION_SPLIT_OPTIONS} />
-                {whatIfs.pensionSplit.value.mode === 'manual' && (
-                  <NumberInput label="" value={whatIfs.pensionSplit.value.pct}
-                    onChange={v => updateWhatIf('pensionSplit', { value: { ...whatIfs.pensionSplit.value, pct: v } })}
-                    suffix="%" min={0} max={50} step={1} decimals={0} size="sm" />
-                )}
+                <NumberInput label="Split (%)" value={whatIfs.pensionSplit.value.pct}
+                  onChange={v => updateWhatIf('pensionSplit', { value: { ...whatIfs.pensionSplit.value, pct: v } })}
+                  min={0} max={50} step={1} decimals={0} size="sm" />
               </WhatIfRow>
             </WhatIfSection>
 
