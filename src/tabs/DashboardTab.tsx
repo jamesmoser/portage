@@ -762,7 +762,7 @@ export function DashboardTab() {
     const refBirth = effectiveState.ageReferencePerson === 'personB'
       ? effectiveState.personB.birthDate
       : effectiveState.personA.birthDate
-    const mv = whatIfs.marketProfile?.value ?? DEFAULT_MARKET_PROFILE
+    const mv = whatIfs.marketProfile?.enabled ? (whatIfs.marketProfile.value ?? DEFAULT_MARKET_PROFILE) : DEFAULT_MARKET_PROFILE
     const baseSchedule = generateRateSchedule(
       effectiveState.returnRates,
       { ...DEFAULT_MARKET_PROFILE, profileType: 'step' },
