@@ -619,7 +619,7 @@ export function DashboardTab() {
   const state = useStore()
   const {
     whatIfs, frozenMetrics, scenarios, activeScenarioId,
-    updateWhatIf, resetWhatIfs, resetWhatIfsExceptDrawdown, freezeMetrics, clearFreeze,
+    updateWhatIf, resetWhatIfsExceptDrawdown, freezeMetrics, clearFreeze,
     saveScenario, loadScenario, deleteScenario,
     personA, personB, cppA, cppB, oasA, oasB,
     returnRates, personalInflationRatePct, cpiRatePct, withdrawalStrategy,
@@ -719,16 +719,14 @@ export function DashboardTab() {
 
   // ── Scenario controls state ────────────────────────────────────────────────
 
-  const [savingAs, setSavingAs]   = useState(false)
-  const [saveName, setSaveName]   = useState('')
-  const [showLoad, setShowLoad]   = useState(false)
-  const activeScenario = scenarios.find(s => s.id === activeScenarioId)
+  const [savingScenario, setSavingScenario] = useState(false)
+  const [saveName, setSaveName]             = useState('')
 
   function handleSave() {
     const name = saveName.trim()
     if (!name) return
     saveScenario(name)
-    setSavingAs(false)
+    setSavingScenario(false)
     setSaveName('')
   }
 
@@ -1057,69 +1055,68 @@ export function DashboardTab() {
             <p><strong>Reset All</strong> clears all what-if toggles and returns to a clean base plan view without deleting your saved scenarios. The saved scenarios remain available in the Load menu.</p>
           </div>
         }>
-        <div className="overflow-x-auto rounded border border-slate-200">
-          <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
-            <span className="text-sm font-medium text-slate-700">Saved Scenarios</span>
-          </div>
-          <div className="px-3 py-3 flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">Active:</span>
-              {activeScenario
-                ? <span className="text-sm font-semibold text-slate-700">{activeScenario.name}</span>
-                : <span className="text-sm text-slate-400 italic">None loaded</span>
-              }
-            </div>
-
-            {savingAs ? (
-              <div className="flex items-center gap-1">
+        <div className="space-y-3">
+          {/* Save controls */}
+          <div className="flex items-center gap-2">
+            {savingScenario ? (
+              <>
                 <input
-                  className="input-field text-xs py-1 w-44"
+                  className="input-field text-sm py-1 w-52"
                   placeholder="Scenario name…"
                   value={saveName}
                   autoFocus
                   onChange={e => setSaveName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setSavingAs(false) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSave()
+                    if (e.key === 'Escape') { setSavingScenario(false); setSaveName('') }
+                  }}
                 />
-                <button className="btn-primary text-xs py-1 px-2" onClick={handleSave}>Save</button>
-                <button className="btn-secondary text-xs py-1 px-2" onClick={() => setSavingAs(false)}>Cancel</button>
-              </div>
+                <button className="btn-primary" onClick={handleSave}>Save</button>
+                <button className="btn-secondary" onClick={() => { setSavingScenario(false); setSaveName('') }}>Cancel</button>
+              </>
             ) : (
-              <button className="btn-primary" onClick={() => { setSavingAs(true); setSaveName(activeScenario?.name ?? '') }}>
-                Save As…
-              </button>
+              <button className="btn-primary" onClick={() => setSavingScenario(true)}>Save Scenario</button>
             )}
-
-            {scenarios.length > 0 && (
-              <div className="relative">
-                <button className="btn-secondary" onClick={() => setShowLoad(o => !o)}>
-                  Load ▾
-                </button>
-                {showLoad && (
-                  <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-20">
-                    {scenarios.map(s => (
-                      <div key={s.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-50">
-                        <button
-                          className="text-sm text-slate-700 text-left flex-1 truncate"
-                          onClick={() => { loadScenario(s.id); setShowLoad(false) }}
-                        >
-                          {s.name}
-                        </button>
-                        <button
-                          className="text-xs text-slate-400 hover:text-red-600 ml-2 shrink-0"
-                          onClick={() => deleteScenario(s.id)}
-                          title="Delete scenario"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <button className="btn-secondary" onClick={resetWhatIfs}>Reset All</button>
           </div>
+
+          {/* Scenario list */}
+          {scenarios.length === 0 ? (
+            <p className="text-sm text-slate-400 italic">No saved scenarios. Configure the drawdown strategy and modifications, then save.</p>
+          ) : (
+            <div className="overflow-x-auto rounded border border-slate-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">Name</th>
+                    <th className="px-3 py-2 text-left font-medium text-slate-500 whitespace-nowrap">Saved</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {scenarios.map(s => {
+                    const isActive = s.id === activeScenarioId
+                    return (
+                      <tr key={s.id} className={isActive ? 'bg-amber-50' : 'hover:bg-slate-50/50'}>
+                        <td className="px-3 py-2 font-medium text-slate-700">
+                          {s.name}
+                          {isActive && <span className="ml-2 text-xs text-amber-600 font-normal">active</span>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-400 whitespace-nowrap">
+                          {new Date(s.savedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </td>
+                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-2">
+                            <button className="btn-primary" onClick={() => loadScenario(s.id)}>Load</button>
+                            <button className="btn-danger" onClick={() => deleteScenario(s.id)} aria-label="Delete">✕</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </SectionCard>
 

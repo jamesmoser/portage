@@ -197,8 +197,8 @@ export const useStore = create<Store>()(
     updateWhatIf: (key, patch) => {
       const current  = get().whatIfs
       const updated  = { ...current, [key]: { ...current[key], ...patch } } as WhatIfs
-      set(s => ({ ...s, whatIfs: updated }))
-      saveWhatIfStorage(updated, get().frozenMetrics, get().activeScenarioId)
+      set(s => ({ ...s, whatIfs: updated, activeScenarioId: null }))
+      saveWhatIfStorage(updated, get().frozenMetrics, null)
     },
 
     resetWhatIfs: () => {
@@ -211,6 +211,7 @@ export const useStore = create<Store>()(
       set(s => ({ ...s, whatIfs: updated, activeScenarioId: null }))
       saveWhatIfStorage(updated, get().frozenMetrics, null)
     },
+
 
     freezeMetrics: (metrics: HeadlineMetrics) => {
       set(s => ({ ...s, frozenMetrics: metrics }))
@@ -226,19 +227,8 @@ export const useStore = create<Store>()(
 
     saveScenario: (name: string) => {
       const currentWhatIfs = get().whatIfs
-      const existingIdx    = get().scenarios.findIndex(s => s.name === name)
-      let scenarios: Scenario[]
-      let id: string
-
-      if (existingIdx >= 0) {
-        id        = get().scenarios[existingIdx].id
-        scenarios = get().scenarios.map((s, i) =>
-          i === existingIdx ? { ...s, whatIfs: currentWhatIfs, savedAt: new Date().toISOString() } : s)
-      } else {
-        id        = crypto.randomUUID()
-        scenarios = [...get().scenarios, { id, name, whatIfs: currentWhatIfs, savedAt: new Date().toISOString() }]
-      }
-
+      const id        = crypto.randomUUID()
+      const scenarios = [...get().scenarios, { id, name, whatIfs: currentWhatIfs, savedAt: new Date().toISOString() }]
       set(s => ({ ...s, scenarios, activeScenarioId: id }))
       const full = get()
       const appState = Object.fromEntries(
@@ -251,8 +241,11 @@ export const useStore = create<Store>()(
     loadScenario: (id: string) => {
       const scenario = get().scenarios.find(s => s.id === id)
       if (!scenario) return
-      set(s => ({ ...s, whatIfs: scenario.whatIfs, activeScenarioId: id }))
-      saveWhatIfStorage(scenario.whatIfs, get().frozenMetrics, id)
+      // deepMerge against defaults so any new WhatIfs fields added after the scenario was saved
+      // get their default values rather than being undefined.
+      const whatIfs = deepMerge(DEFAULT_WHATIFS, scenario.whatIfs) as WhatIfs
+      set(s => ({ ...s, whatIfs, activeScenarioId: id }))
+      saveWhatIfStorage(whatIfs, get().frozenMetrics, id)
     },
 
     deleteScenario: (id: string) => {

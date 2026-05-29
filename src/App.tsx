@@ -7,12 +7,17 @@ import { AssumptionsTab } from './tabs/AssumptionsTab'
 import { IncomeTab }      from './tabs/IncomeTab'
 import { InvestmentsTab } from './tabs/InvestmentsTab'
 
-const TABS = [
-  { id: 'dashboard',   label: 'Dashboard',   Component: DashboardTab   },
+const DASHBOARD_TABS = [
+  { id: 'dashboard', label: 'Dashboard', Component: DashboardTab },
+]
+
+const INPUT_TABS = [
   { id: 'assumptions', label: 'Assumptions', Component: AssumptionsTab },
   { id: 'income',      label: 'Income',      Component: IncomeTab      },
   { id: 'investments', label: 'Investments', Component: InvestmentsTab },
 ]
+
+const ALL_TABS = [...DASHBOARD_TABS, ...INPUT_TABS]
 
 export default function App() {
   const { exportJSON, importJSON, resetToDefaults, lastSaved } = useStore()
@@ -21,7 +26,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const ActiveComponent = TABS.find(t => t.id === activeTab)?.Component ?? (() => null)
+  const ActiveComponent = ALL_TABS.find(t => t.id === activeTab)?.Component ?? (() => null)
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -42,7 +47,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <img src={portageIcon} alt="Portage" className="h-[50px] w-[50px] rounded-full" />
           <div>
-            <h1 className="font-display text-[19px] font-bold text-white tracking-tight">Portage</h1>
+            <h1 className="font-display text-[23px] font-bold text-white tracking-tight">Portage</h1>
             <p className="text-[11px] text-red-200 mt-0.5">Canadian Retirement Wealth Planner</p>
           </div>
         </div>
@@ -103,21 +108,46 @@ export default function App() {
 
       {/* ── Tab strip ── */}
       <nav className="px-5 shrink-0" style={{ backgroundColor: '#6B1010' }}>
-        <div className="flex items-end gap-0.5 pt-2.5 overflow-x-auto scrollbar-hide">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-t-lg transition-all duration-100
-                ${activeTab === t.id
-                  ? 'text-slate-900 shadow-sm'
-                  : 'text-red-200 hover:text-white hover:bg-white/10'
-                }`}
-              style={activeTab === t.id ? { backgroundColor: '#f2f3f5' } : undefined}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-end justify-between pt-2.5 overflow-x-auto scrollbar-hide">
+          {/* Dashboard — left */}
+          <div className="flex items-end gap-0.5">
+            {DASHBOARD_TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`w-32 py-2 text-sm font-medium text-center whitespace-nowrap rounded-t-lg transition-all duration-100
+                  ${activeTab === t.id
+                    ? 'text-slate-900 shadow-sm'
+                    : 'text-red-200 hover:text-white hover:bg-white/10'
+                  }`}
+                style={activeTab === t.id ? { backgroundColor: '#f2f3f5' } : undefined}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Base plan inputs — right */}
+          <div className="flex items-end gap-0.5">
+            <span className="self-center pr-2 text-sm font-medium text-red-300 whitespace-nowrap">
+              Base Plan
+            </span>
+            <div className="self-stretch w-px bg-white/20 mb-1 mr-1" />
+            {INPUT_TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`w-32 py-2 text-sm font-medium text-center whitespace-nowrap rounded-t-lg transition-all duration-100
+                  ${activeTab === t.id
+                    ? 'text-slate-900 shadow-sm'
+                    : 'text-red-200 hover:text-white hover:bg-white/10'
+                  }`}
+                style={activeTab === t.id ? { backgroundColor: '#f2f3f5' } : undefined}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
 
