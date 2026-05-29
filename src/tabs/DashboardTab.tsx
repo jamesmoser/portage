@@ -73,7 +73,7 @@ const PENSION_SPLIT_OPTIONS: { value: string; label: string }[] = [
 
 const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[] = [
   { value: 'none',            label: 'None' },
-  { value: 'spendGap',        label: 'Spend-Gap Only' },
+  { value: 'spendGap',        label: 'Cover Spending Gap' },
   { value: 'fixedWithdrawal', label: 'Fixed Withdrawals' },
   { value: 'fixedPct',        label: 'Fixed Percentage' },
 ]
@@ -102,11 +102,17 @@ const PORTFOLIO_DEFS: { key: PortfolioKey; label: string; color: string }[] = [
   { key: 'hisa',   label: 'HISA/Cash', color: '#94a3b8' },
 ]
 
-const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, string> = {
-  none:             'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
-  spendGap:         'Three-phase drawdown: (1) Contribution — no proactive draws pre-retirement. (2) Meltdown — retired, pre-RRIF: proactively draw RRSP up to a gross income ceiling to reduce future RRIF forced withdrawals. (3) RRIF — mandatory minimum plus optional extra draws. In all phases, a deficit is covered from accounts in the configured order.',
-  fixedWithdrawal:  'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
-  fixedPct:         'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
+const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, React.ReactNode> = {
+  none: 'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
+  spendGap: (<>
+    <p>Draws from investment accounts to cover the difference between spending and income. There are three phases:</p>
+    <p className="mt-1.5"><strong>Contribution (Pre-Retirement)</strong> — Follows the base plan. No proactive draws. Any spending deficit is flagged but not covered from registered accounts.</p>
+    <p className="mt-1.5"><strong>Meltdown (Retirement until RRIF conversion)</strong> — Proactively draws from RRSP to bring gross income up to the ceiling, reducing future RRIF forced withdrawals.</p>
+    <p className="mt-1.5"><strong>Forced RRIF Withdrawals (after RRIF conversion)</strong> — Draws the CRA minimum from RRIF. Additional draws above the minimum can be specified per account.</p>
+    <p className="mt-1.5">In draw phases, any spending deficit or surplus is routed through the specified account order and limits.</p>
+  </>),
+  fixedWithdrawal: 'Withdraw a fixed annual dollar amount from each account each year, regardless of spending need. Amounts are in today\'s dollars and inflate each year. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
+  fixedPct:        'Withdraw a fixed percentage of each account\'s balance each year, with an optional dollar floor. Any shortfall beyond the scheduled draws is not covered. RRSP/RRIF draws respect mandatory RRIF minimums.',
 }
 
 const MARKET_PROFILE_OPTIONS: { value: string; label: string }[] = [
@@ -1099,14 +1105,12 @@ export function DashboardTab() {
                     />
                   </td>
                 </tr>
-                <tr>
-                  <td colSpan={2} className="px-3 py-2 text-xs text-slate-500">
-                    {DRAWDOWN_STRATEGY_DESCRIPTIONS[whatIfs.drawdownStrategy.value.strategyType]}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
+          <InfoPanel>
+            {DRAWDOWN_STRATEGY_DESCRIPTIONS[whatIfs.drawdownStrategy.value.strategyType]}
+          </InfoPanel>
 
           {/* Spend-Gap config */}
           {whatIfs.drawdownStrategy.value.strategyType === 'spendGap' && (() => {
@@ -1135,124 +1139,77 @@ export function DashboardTab() {
                   />
                 </div>
 
-                {/* Phase tables */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  {/* Meltdown Phase */}
-                  <div className="overflow-x-auto rounded border border-slate-200">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">
-                            Phase 2 — RRSP Meltdown
-                          </th>
-                        </tr>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
-                          <th className="px-3 py-2 text-left font-medium">Parameter</th>
-                          <th className="px-3 py-2 font-medium">{aName}</th>
-                          <th className="px-3 py-2 font-medium">{bName}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        <tr className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2 text-slate-600">Gross Income Ceiling ($)</td>
-                          <td className="px-2 py-1.5">
-                            <NumberInput label=""
-                              value={sg.meltdownA.grossIncomeCeiling}
-                              onChange={v => updatePhase('meltdownA', { grossIncomeCeiling: v })}
-                              prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <NumberInput label=""
-                              value={sg.meltdownB.grossIncomeCeiling}
-                              onChange={v => updatePhase('meltdownB', { grossIncomeCeiling: v })}
-                              prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-slate-50/50 align-top">
-                          <td className="px-3 py-2 text-slate-600">Deficit Order</td>
-                          <td className="px-3 py-2">
-                            <DeficitOrderInput phase={sg.meltdownA} allowRrif={false} onChange={items => updatePhase('meltdownA', { deficitItems: items })} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {/* Phase 2 — Meltdown */}
+                <p className="text-sm font-semibold text-slate-600 pt-1">Phase 2 — RRSP Meltdown</p>
+                <div className="space-y-2">
+                  <div className="flex items-end gap-8 p-3 border border-slate-200 rounded bg-slate-50">
+                    <span className="text-sm text-slate-600 w-36 shrink-0 pb-[3px]">Gross Income Ceiling</span>
+                    <div className="flex gap-6">
+                      <NumberInput label={aName}
+                        value={sg.meltdownA.grossIncomeCeiling}
+                        onChange={v => updatePhase('meltdownA', { grossIncomeCeiling: v })}
+                        prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                      <NumberInput label={bName}
+                        value={sg.meltdownB.grossIncomeCeiling}
+                        onChange={v => updatePhase('meltdownB', { grossIncomeCeiling: v })}
+                        prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                    </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
+                      <p className="text-sm font-medium text-slate-600 mb-2">Deficit Order</p>
+                      <div className="flex gap-8">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1.5">{aName}</p>
+                          <DeficitOrderInput phase={sg.meltdownA} allowRrif={false} onChange={items => updatePhase('meltdownA', { deficitItems: items })} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1.5">{bName}</p>
+                          <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
+                      <p className="text-sm font-medium text-slate-600 mb-2">Surplus Order</p>
+                      <SurplusOrderInput
+                        items={sg.surplusMeltdownItems ?? DEFAULT_SURPLUS_ITEMS}
+                        onChange={items => updateSg({ surplusMeltdownItems: items })}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                  {/* RRIF Phase */}
-                  <div className="overflow-x-auto rounded border border-slate-200">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">
-                            Phase 3 — RRIF Forced Minimums
-                          </th>
-                        </tr>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
-                          <th className="px-3 py-2 text-left font-medium">Parameter</th>
-                          <th className="px-3 py-2 font-medium">{aName}</th>
-                          <th className="px-3 py-2 font-medium">{bName}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        <tr className="hover:bg-slate-50/50 align-top">
-                          <td className="px-3 py-2 text-slate-600">Deficit Order</td>
-                          <td className="px-3 py-2">
-                            <DeficitOrderInput phase={sg.rrifA} allowRrif={true} onChange={items => updatePhase('rrifA', { deficitItems: items })} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {/* Phase 3 — RRIF */}
+                <p className="text-sm font-semibold text-slate-600 pt-1">Phase 3 — RRIF Forced Minimums</p>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
+                      <p className="text-sm font-medium text-slate-600 mb-2">Deficit Order</p>
+                      <div className="flex gap-8">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1.5">{aName}</p>
+                          <DeficitOrderInput phase={sg.rrifA} allowRrif={true} onChange={items => updatePhase('rrifA', { deficitItems: items })} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1.5">{bName}</p>
+                          <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3 border border-slate-200 rounded bg-slate-50">
+                      <p className="text-sm font-medium text-slate-600 mb-2">Surplus Order</p>
+                      <SurplusOrderInput
+                        items={sg.surplusRrifItems ?? DEFAULT_SURPLUS_ITEMS}
+                        onChange={items => updateSg({ surplusRrifItems: items })}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <InfoPanel>
-                  <p><strong>Phase 1 (Contribution)</strong> — Both working. No proactive RRSP draws. Any spending shortfall is flagged but not covered from registered accounts.</p>
-                  <p className="mt-1.5"><strong>Phase 2 (Meltdown)</strong> — Retired, before RRIF conversion. Each year the engine draws enough RRSP to bring each person's pre-split gross income up to the ceiling (in today's $, CPI-indexed). Set 0 to disable proactive draws for that person. If the ceiling draw doesn't fully cover the spending gap, the deficit accounts fill the rest.</p>
-                  <p className="mt-1.5"><strong>Phase 3 (RRIF)</strong> — After RRIF conversion. Mandatory CRA minimums are always withdrawn first. The deficit account order governs which accounts fill any remaining spending gap.</p>
-                  <p className="mt-1.5"><strong>Cap/yr</strong> — limits each person's annual draw from their own account (today's $, CPI-indexed). 0 = unlimited. For TFSA and Non-Reg, A's cap limits A's account and B's cap limits B's account independently — the total draw is the sum of what each person can contribute before the engine moves to the next account. HISA is joint: A's cap applies when A is in an active phase, otherwise B's.</p>
-                </InfoPanel>
-
-                {/* Surplus routing */}
-                <div className="overflow-x-auto rounded border border-slate-200 mt-2">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Surplus Routing</th>
-                      </tr>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
-                        <th className="px-3 py-2 text-left font-medium">Deposit order</th>
-                        <th className="px-3 py-2 font-medium">Phase 2 — Meltdown</th>
-                        <th className="px-3 py-2 font-medium">Phase 3 — RRIF</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      <tr className="hover:bg-slate-50/50 align-top">
-                        <td className="px-3 py-2 text-slate-600 w-1/3" />
-                        <td className="px-3 py-2">
-                          <SurplusOrderInput
-                            items={sg.surplusMeltdownItems ?? DEFAULT_SURPLUS_ITEMS}
-                            onChange={items => updateSg({ surplusMeltdownItems: items })}
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <SurplusOrderInput
-                            items={sg.surplusRrifItems ?? DEFAULT_SURPLUS_ITEMS}
-                            onChange={items => updateSg({ surplusRrifItems: items })}
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <InfoPanel>
-                  <p><strong>Surplus routing</strong> — When income exceeds spending and contributions, the remaining surplus is deposited into accounts in the order shown. Each non-last account fills up to its annual limit (today's $, CPI-indexed); set to 0 to skip it. The last account always receives all remaining surplus. If either person is in Phase 3, the Phase 3 order is used; otherwise the Phase 2 order applies. TFSA and Non-Reg deposits are split 50/50 between Person A and Person B (or 100% to the survivor). Surplus contributions appear in the TFSA/Non-Reg/HISA columns of the Spending table.</p>
+                  <p><strong>Gross Income Ceiling</strong> — Each year in Phase 2, the engine draws enough RRSP to bring each person's gross income up to this ceiling (today's $, CPI-indexed). Set 0 to disable proactive draws for that person.</p>
+                  <p className="mt-1.5"><strong>Deficit Order</strong> — Accounts drawn in sequence to cover any remaining spending gap. Cap/yr limits each person's annual draw from their own account (today's $, CPI-indexed); 0 = unlimited. HISA is joint. In Phase 3, mandatory RRIF minimums are always withdrawn first; the deficit order covers any shortfall above the minimum.</p>
+                  <p className="mt-1.5"><strong>Surplus Order</strong> — When income exceeds spending, the surplus is deposited into accounts in this order. Each non-last account fills up to its annual limit; 0 = skip (unless last). The last account always receives all remaining surplus. TFSA and Non-Reg are split 50/50 A/B (100% to survivor).</p>
                 </InfoPanel>
 
                 <div className="flex justify-end">
