@@ -1,7 +1,7 @@
 // Default values for the full AppState — all monetary values in today's dollars.
 // Tax brackets use 2026 reference values and are indexed forward by CPI in the engine.
 
-import type { AppState, TaxSettings, WhatIfs, SpendGapPhaseConfig, SpendGapConfig, SpendGapDeficitItem, SpendGapSurplusItem } from './types'
+import type { AppState, TaxSettings, WhatIfs, SpendGapPhaseConfig, SpendGapConfig, SpendGapDeficitItem, SpendGapSurplusItem, BengenAccountItem, BengenConfig } from './types'
 import { todayStr, dateAtAge } from './dates'
 import { DEFAULT_MARKET_PROFILE } from './rateProfiles'
 
@@ -90,6 +90,18 @@ const DEFAULT_SPEND_GAP_PHASE: SpendGapPhaseConfig = {
   deficitItems: DEFAULT_DEFICIT_ITEMS,
 }
 
+export const DEFAULT_BENGEN_ACCOUNT_ORDER: BengenAccountItem[] = [
+  { account: 'rrsp',   unlimited: true, cap: 0 },
+  { account: 'nonReg', unlimited: true, cap: 0 },
+  { account: 'tfsa',   unlimited: true, cap: 0 },
+]
+
+export const DEFAULT_BENGEN_CONFIG: BengenConfig = {
+  inflationIndex: 'personal',
+  personA: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
+  personB: { drawRatePct: 4.0, accountOrder: DEFAULT_BENGEN_ACCOUNT_ORDER },
+}
+
 export const DEFAULT_SPEND_GAP_CONFIG: SpendGapConfig = {
   stopContributionsWhenPartnerRetired: false,
   meltdownA: DEFAULT_SPEND_GAP_PHASE,
@@ -118,6 +130,7 @@ export const DEFAULT_WHATIFS: WhatIfs = {
       fixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0, hisaPct: 0, hisaMin: 0 },
       fixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
       spendGapConfig:  DEFAULT_SPEND_GAP_CONFIG,
+      bengenConfig:    DEFAULT_BENGEN_CONFIG,
     },
   },
   marketProfile: { enabled: false, value: DEFAULT_MARKET_PROFILE },
@@ -311,6 +324,7 @@ export const DEFAULT_STATE: AppState = {
     drawdownFixedPct:        { rrspPct: 4, rrspMin: 0, tfsaPct: 4, tfsaMin: 0, nonRegPct: 4, nonRegMin: 0, hisaPct: 0, hisaMin: 0 },
     drawdownFixedWithdrawal: { rrspAmountA: 0, rrspAmountB: 0, tfsaAmountA: 0, tfsaAmountB: 0, nonRegAmountA: 0, nonRegAmountB: 0, hisaAmount: 0 },
     spendGapConfig:          DEFAULT_SPEND_GAP_CONFIG,
+    bengenConfig:            DEFAULT_BENGEN_CONFIG,
   },
 
   scenarios: [],

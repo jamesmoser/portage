@@ -208,7 +208,38 @@ export type PensionSplitMode = 'auto' | 'manual'
 
 // ─── Drawdown Strategies ──────────────────────────────────────────────────────
 
-export type DrawdownStrategyType = 'none' | 'spendGap' | 'fixedWithdrawal' | 'fixedPct'
+export type DrawdownStrategyType = 'none' | 'spendGap' | 'fixedWithdrawal' | 'fixedPct' | 'bengen'
+
+// ─── Bengen Rule Strategy ─────────────────────────────────────────────────────
+
+export type BengenAccountType = 'rrsp' | 'tfsa' | 'nonReg'
+
+export interface BengenAccountItem {
+  account: BengenAccountType
+  /** When true, draw as much as needed from this account (cap is ignored). */
+  unlimited: boolean
+  /** Max draw per year from this account (today's $, personal-inflation-indexed).
+   *  Applies after mandatory RRIF minimum has been netted from the total target.
+   *  Ignored when unlimited = true. */
+  cap: number
+}
+
+export interface BengenPersonConfig {
+  /** % of year-1 portfolio to draw annually (e.g. 4.0 = 4%). */
+  drawRatePct: number
+  /** Ordered list of accounts to draw from, after RRIF minimum is netted. */
+  accountOrder: BengenAccountItem[]
+}
+
+export interface BengenConfig {
+  /** Which inflation rate is used to index the year-1 draw amount each year.
+   *  'personal' → draw is constant in today's dollars.
+   *  'cpi'      → draw tracks general inflation (historically accurate; declines
+   *               in real terms when personal inflation > CPI). */
+  inflationIndex: 'personal' | 'cpi'
+  personA: BengenPersonConfig
+  personB: BengenPersonConfig
+}
 
 // ─── Spend-Gap Strategy ───────────────────────────────────────────────────────
 
@@ -289,6 +320,7 @@ export interface DrawdownStrategyConfig {
   fixedPct:        DrawdownConfig
   fixedWithdrawal: FixedWithdrawalConfig
   spendGapConfig:  SpendGapConfig
+  bengenConfig:    BengenConfig
 }
 
 export interface WithdrawalStrategy {
@@ -300,6 +332,7 @@ export interface WithdrawalStrategy {
   drawdownFixedPct:        DrawdownConfig
   drawdownFixedWithdrawal: FixedWithdrawalConfig
   spendGapConfig:          SpendGapConfig
+  bengenConfig:            BengenConfig
 }
 
 // ─── Market Profile ───────────────────────────────────────────────────────────

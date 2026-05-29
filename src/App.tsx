@@ -99,6 +99,7 @@ function generateAIContext(): string {
           fixedPct:        s.withdrawalStrategy.drawdownFixedPct,
           fixedWithdrawal: s.withdrawalStrategy.drawdownFixedWithdrawal,
           spendGapConfig:  s.withdrawalStrategy.spendGapConfig,
+          bengenConfig:    s.withdrawalStrategy.bengenConfig,
         }
 
   const effRates = {

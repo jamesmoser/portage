@@ -96,6 +96,7 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
         drawdownFixedPct:        ds.fixedPct,
         drawdownFixedWithdrawal: ds.fixedWithdrawal,
         spendGapConfig:          ds.spendGapConfig,
+        bengenConfig:            ds.bengenConfig,
       },
     }
   }

@@ -120,6 +120,14 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
   const oasFactorA = oasFactor(state.oasA.startDate, state.personA.birthDate)
   const oasFactorB = oasFactor(state.oasB.startDate, state.personB.birthDate)
 
+  // ── Bengen Rule — year-1 reference captures (set on first retirement year) ──
+  // yearOneNomDrawX = nominal annual draw target established at retirement.
+  // yearOneInflX / yearOneCpiX = inflation factors at that point, used to compute
+  // the per-year adjustment ratio without re-deriving the reference year.
+  let yearOneNomDrawA = -1, yearOneNomDrawB = -1
+  let yearOneInflA    = 1,  yearOneInflB    = 1
+  let yearOneCpiA     = 1,  yearOneCpiB     = 1
+
   const baseYear = currentYear
 
   for (let year = currentYear; year <= endYear; year++) {
@@ -188,7 +196,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     // endMo   = death month in death year, 12 otherwise.
     // frac    = (endMo - startMo + 1) / 12
     let drawFracA = 1, drawFracB = 1, drawFracHisa = 1
-    if (withdrawalStrategy.drawdownStrategy === 'fixedWithdrawal' || withdrawalStrategy.drawdownStrategy === 'fixedPct') {
+    if (withdrawalStrategy.drawdownStrategy === 'fixedWithdrawal' || withdrawalStrategy.drawdownStrategy === 'fixedPct' || withdrawalStrategy.drawdownStrategy === 'bengen') {
       const retYA = getYear(state.personA.retirementDate)
       const retMoA = parseInt(state.personA.retirementDate.substring(5, 7), 10)
       const deathMoA = parseInt(deathDateA.substring(5, 7), 10)
@@ -239,6 +247,99 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
         const target = Math.max(rawAmt * inflFactor * drawFracB, isRrifB ? rrifMinB : 0)
         rrifB_nom = Math.min(target, rrspB)
         if (!isRrifB) rrspB = Math.max(0, rrspB - rrifB_nom)
+      }
+    }
+    // ── Bengen Rule — pre-compute all account draws for this year ──────────────
+    // Draws are allocated in three stages: RRSP/RRIF here (sets rrifX_nom), non-reg
+    // in the pre-tax section below, TFSA in the gap section.  All amounts are stored
+    // here so each downstream section just reads the pre-computed values.
+    let bengenNonRegDrawA = 0, bengenNonRegDrawB = 0
+    let bengenTfsaDrawA   = 0, bengenTfsaDrawB   = 0
+
+    if (withdrawalStrategy.drawdownStrategy === 'bengen') {
+      const bg = withdrawalStrategy.bengenConfig
+      const aRetired = onOrAfter(dateStr, state.personA.retirementDate)
+      const bRetired = onOrAfter(dateStr, state.personB.retirementDate)
+
+      // Capture year-1 reference on first retirement year (BOY nominal portfolio,
+      // before any draws in that year).
+      if (aAlive && aRetired && yearOneNomDrawA < 0) {
+        yearOneNomDrawA = (bg.personA.drawRatePct / 100) * (rrspA + tfsaA + nonRegA)
+        yearOneInflA    = inflFactor
+        yearOneCpiA     = cpiFactorForYear
+      }
+      if (bAlive && bRetired && yearOneNomDrawB < 0) {
+        yearOneNomDrawB = (bg.personB.drawRatePct / 100) * (rrspB + tfsaB + nonRegB)
+        yearOneInflB    = inflFactor
+        yearOneCpiB     = cpiFactorForYear
+      }
+
+      // Annual nominal draw targets (inflation-adjusted from year-1 reference, prorated
+      // in the first and final year via drawFracA/B).
+      const adjA = yearOneNomDrawA >= 0
+        ? (bg.inflationIndex === 'personal' ? inflFactor / yearOneInflA : cpiFactorForYear / yearOneCpiA)
+        : 0
+      const adjB = yearOneNomDrawB >= 0
+        ? (bg.inflationIndex === 'personal' ? inflFactor / yearOneInflB : cpiFactorForYear / yearOneCpiB)
+        : 0
+      const annualA = yearOneNomDrawA >= 0 ? yearOneNomDrawA * adjA * drawFracA : 0
+      const annualB = yearOneNomDrawB >= 0 ? yearOneNomDrawB * adjB * drawFracB : 0
+
+      // Survivor combination: the surviving spouse draws both people's targets.
+      // After death the survivor's accounts already include the rolled-over assets.
+      const targetA_nom = aAlive ? (bAlive ? annualA : annualA + annualB) : 0
+      const targetB_nom = bAlive ? (aAlive ? annualB : annualA + annualB) : 0
+
+      // Distribute target for one person across their ordered accounts.
+      // Returns how much extra to draw from RRSP/RRIF above the mandatory min,
+      // and how much to stage for TFSA / non-reg.
+      const allocate = (
+        target: number,
+        order: typeof bg.personA.accountOrder,
+        rrifMand: number,
+        rrspBal: number, tfsaBal: number, nonRegBal: number,
+      ) => {
+        let rem = Math.max(0, target - rrifMand)
+        let rrifExtra = 0, tfsaDraw = 0, nonRegDraw = 0
+        for (const item of order) {
+          if (rem <= 0) break
+          const cap = item.unlimited ? Infinity : item.cap * inflFactor
+          if (item.account === 'rrsp') {
+            const avail = Math.max(0, rrspBal - rrifMand)
+            const draw = Math.min(rem, cap, avail)
+            rrifExtra += draw; rem -= draw
+          } else if (item.account === 'tfsa') {
+            const draw = Math.min(rem, cap, tfsaBal)
+            tfsaDraw += draw; rem -= draw
+          } else if (item.account === 'nonReg') {
+            const draw = Math.min(rem, cap, nonRegBal)
+            nonRegDraw += draw; rem -= draw
+          }
+        }
+        return { rrifExtra, tfsaDraw, nonRegDraw }
+      }
+
+      if (aAlive && targetA_nom > 0) {
+        const rrifMand = isRrifA ? rrifMinA : 0
+        const alloc = allocate(targetA_nom, bg.personA.accountOrder, rrifMand, rrspA, tfsaA, nonRegA)
+        rrifA_nom = rrifMand + alloc.rrifExtra
+        bengenTfsaDrawA   = alloc.tfsaDraw
+        bengenNonRegDrawA = alloc.nonRegDraw
+        // Reduce RRSP balance for pre-RRIF extra draws (RRIF balance is reduced by the
+        // engine's grow() step; pre-RRIF draws must be deducted manually like fixedPct).
+        if (!isRrifA && alloc.rrifExtra > 0) rrspA = Math.max(0, rrspA - alloc.rrifExtra)
+      } else if (!aAlive || targetA_nom <= 0) {
+        // No Bengen draw for A: RRIF minimum is still mandatory, so leave rrifA_nom as-is.
+        // (already set to rrifMinA + rrifAddA at top of year)
+      }
+
+      if (bAlive && targetB_nom > 0) {
+        const rrifMand = isRrifB ? rrifMinB : 0
+        const alloc = allocate(targetB_nom, bg.personB.accountOrder, rrifMand, rrspB, tfsaB, nonRegB)
+        rrifB_nom = rrifMand + alloc.rrifExtra
+        bengenTfsaDrawB   = alloc.tfsaDraw
+        bengenNonRegDrawB = alloc.nonRegDraw
+        if (!isRrifB && alloc.rrifExtra > 0) rrspB = Math.max(0, rrspB - alloc.rrifExtra)
       }
     }
     // 'spendGap': rrifA/B_nom stays at mandatory minimum + additionalWithdrawalAboveMinimum
@@ -490,6 +591,22 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       }
       if (bAlive) {
         proNonRegWithdrawB = Math.min(Math.max(fp.nonRegPct / 100 * nonRegB * drawFracB, fp.nonRegMin * inflFactor * drawFracB), nonRegB)
+        const acbRatio = nonRegB > 0 ? nonRegAcbB / nonRegB : 0
+        proNonRegGainB = proNonRegWithdrawB * (1 - acbRatio)
+        if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (proNonRegWithdrawB / nonRegB)
+        nonRegB -= proNonRegWithdrawB
+      }
+    } else if (withdrawalStrategy.drawdownStrategy === 'bengen') {
+      // Pre-computed amounts are already capped to available balance.
+      if (aAlive && bengenNonRegDrawA > 0) {
+        proNonRegWithdrawA = Math.min(bengenNonRegDrawA, nonRegA)
+        const acbRatio = nonRegA > 0 ? nonRegAcbA / nonRegA : 0
+        proNonRegGainA = proNonRegWithdrawA * (1 - acbRatio)
+        if (nonRegA > 0) nonRegAcbA -= nonRegAcbA * (proNonRegWithdrawA / nonRegA)
+        nonRegA -= proNonRegWithdrawA
+      }
+      if (bAlive && bengenNonRegDrawB > 0) {
+        proNonRegWithdrawB = Math.min(bengenNonRegDrawB, nonRegB)
         const acbRatio = nonRegB > 0 ? nonRegAcbB / nonRegB : 0
         proNonRegGainB = proNonRegWithdrawB * (1 - acbRatio)
         if (nonRegB > 0) nonRegAcbB -= nonRegAcbB * (proNonRegWithdrawB / nonRegB)
@@ -801,6 +918,24 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       const hisaDraw = Math.min(Math.max(fp.hisaPct / 100 * hisa * drawFracHisa, fp.hisaMin * inflFactor * drawFracHisa), hisa)
       hisa -= hisaDraw; hisaWithdraw_nom += hisaDraw
       proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB + hisaDraw
+      gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
+
+    } else if (withdrawalStrategy.drawdownStrategy === 'bengen') {
+      // Bengen Rule: all draws are explicit — no automatic gap-fill.
+      // RRSP/RRIF draws set above (rrifX_nom); non-reg drawn pre-tax.  TFSA drawn here.
+      if (aAlive && bengenTfsaDrawA > 0) {
+        tfsaWithdrawA = Math.min(bengenTfsaDrawA, tfsaA)
+        tfsaA -= tfsaWithdrawA
+      }
+      if (bAlive && bengenTfsaDrawB > 0) {
+        tfsaWithdrawB = Math.min(bengenTfsaDrawB, tfsaB)
+        tfsaB -= tfsaWithdrawB
+      }
+      nonRegWithdrawA = proNonRegWithdrawA
+      nonRegWithdrawB = proNonRegWithdrawB
+      // RRIF/RRSP draws are already in totalNetNom via taxA/B.netAfterTax.
+      // TFSA and non-reg draws are additional cash not in totalNetNom.
+      proactiveExtra = tfsaWithdrawA + tfsaWithdrawB + nonRegWithdrawA + nonRegWithdrawB
       gap_nom = Math.max(0, spending_nom - totalNetNom - proactiveExtra)
 
     } else {

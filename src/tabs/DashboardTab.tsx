@@ -12,8 +12,8 @@ import { runProjection } from '../engine/projection'
 import { mergeWhatIfs, computeHeadlineMetrics } from '../engine/whatifs'
 import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../engine/dates'
 import { DateInput } from '../components/DateInput'
-import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem } from '../engine/types'
-import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS } from '../engine/defaults'
+import type { AppState, HeadlineMetrics, PensionSplitMode, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem } from '../engine/types'
+import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG } from '../engine/defaults'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,9 +73,10 @@ const PENSION_SPLIT_OPTIONS: { value: string; label: string }[] = [
 
 const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[] = [
   { value: 'none',            label: 'None' },
-  { value: 'spendGap',        label: 'Cover Spending Gap' },
   { value: 'fixedWithdrawal', label: 'Fixed Withdrawals' },
   { value: 'fixedPct',        label: 'Fixed Percentage' },
+  { value: 'bengen',          label: 'Bengen Rule' },
+  { value: 'spendGap',        label: 'Cover Spending Gap' },
 ]
 
 // ─── Income chart filter constants ────────────────────────────────────────────
@@ -104,6 +105,10 @@ const PORTFOLIO_DEFS: { key: PortfolioKey; label: string; color: string }[] = [
 
 const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, React.ReactNode> = {
   none: 'No account withdrawals of any kind. Portfolios grow undisturbed. All spending is shown as a shortfall. Useful as an analytical baseline to understand how your portfolio grows before any drawdown decisions are made.',
+  bengen: (<>
+    <p>The Bengen Rule (commonly called the 4% rule): in year 1 of retirement, withdraw a fixed percentage of the total portfolio. Each subsequent year draw that same nominal amount adjusted for inflation — constant in today's dollars when indexing by personal inflation, or slowly declining when indexing by CPI (matching the original research). Toggle <em>Index by CPI</em> on to use the historical convention.</p>
+    <p className="mt-1.5">Draws are per person from their own accounts (RRSP/RRIF, Non-Reg, TFSA) in the configured order, with RRIF mandatory minimums always taken first and netted from the target. After the first death, the survivor draws the sum of both people's annual amounts from their combined accounts. There is no automatic gap-filling — any difference between the draw and spending appears directly as a cash flow surplus or deficit.</p>
+  </>),
   spendGap: (<>
     <p>Draws from investment accounts to cover the difference between spending and income. There are three phases:</p>
     <p className="mt-1.5"><strong>Contribution (Pre-Retirement)</strong> — Follows the base plan. No proactive draws. Any spending deficit is flagged but not covered from registered accounts.</p>
@@ -604,6 +609,86 @@ function SurplusOrderInput({
                   label=""
                   value={item.limit}
                   onChange={v => setLimit(i, v)}
+                  min={0} max={500_000} step={5_000} decimals={0} size="sm"
+                />
+            }
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── BengenAccountOrderInput ──────────────────────────────────────────────────
+// Top-level component for stable identity — no remount on state changes.
+
+const BENGEN_ACCT_LABELS: Record<BengenAccountItem['account'], string> = {
+  rrsp: 'RRSP / RRIF', tfsa: 'TFSA', nonReg: 'Non-Reg',
+}
+
+function BengenAccountOrderInput({
+  items,
+  onChange,
+  personName,
+}: {
+  items: BengenAccountItem[]
+  onChange: (items: BengenAccountItem[]) => void
+  personName?: string
+}) {
+  const allAccts: BengenAccountItem['account'][] = ['rrsp', 'tfsa', 'nonReg']
+  const existingAccts = items.map(i => i.account).filter(a => allAccts.includes(a))
+  const missingAccts  = allAccts.filter(a => !existingAccts.includes(a))
+  const resolved: BengenAccountItem[] = [
+    ...items.filter(i => allAccts.includes(i.account)).map(i => ({ ...i, unlimited: i.unlimited ?? true })),
+    ...missingAccts.map(account => ({ account, unlimited: true, cap: 0 })),
+  ]
+  const move = (idx: number, dir: -1 | 1) => {
+    const next = [...resolved]
+    const swap = idx + dir
+    if (swap < 0 || swap >= next.length) return
+    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    onChange(next)
+  }
+  const setUnlimited = (idx: number, unlimited: boolean) =>
+    onChange(resolved.map((item, i) => i === idx ? { ...item, unlimited } : item))
+  const setCap = (idx: number, cap: number) =>
+    onChange(resolved.map((item, i) => i === idx ? { ...item, cap } : item))
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-end gap-3 text-sm">
+        <div className="w-10 shrink-0" />
+        <div className="flex-1 font-medium text-slate-600">{personName}</div>
+        <span className="w-16 text-center text-sm font-semibold text-slate-500 shrink-0">No Limit</span>
+        <span className="w-20 text-center text-sm font-semibold text-slate-500 shrink-0">Limit ($)</span>
+      </div>
+      {resolved.map((item, i) => (
+        <div key={item.account} className="flex items-center gap-3">
+          <div className="flex gap-1.5 w-10 shrink-0">
+            <button
+              className="text-slate-400 hover:text-slate-600 disabled:opacity-25 text-sm leading-none"
+              onClick={() => move(i, -1)} disabled={i === 0} title="Move up"
+            >▲</button>
+            <button
+              className="text-slate-400 hover:text-slate-600 disabled:opacity-25 text-sm leading-none"
+              onClick={() => move(i, 1)} disabled={i === resolved.length - 1} title="Move down"
+            >▼</button>
+          </div>
+          <span className="flex-1 text-sm text-slate-700">{BENGEN_ACCT_LABELS[item.account]}</span>
+          <div className="w-16 flex justify-center shrink-0">
+            <input
+              type="checkbox"
+              checked={item.unlimited}
+              onChange={e => setUnlimited(i, e.target.checked)}
+              style={{ accentColor: '#7B1515' }}
+              className="w-4 h-4 cursor-pointer"
+            />
+          </div>
+          <div className="w-20 h-8 flex items-center justify-center shrink-0">
+            {item.unlimited
+              ? <span className="font-bold text-sm" style={{ color: '#7B1515' }}>∞</span>
+              : <NumberInput
+                  label="" value={item.cap} onChange={v => setCap(i, v)}
                   min={0} max={500_000} step={5_000} decimals={0} size="sm"
                 />
             }
@@ -1128,9 +1213,10 @@ export function DashboardTab() {
           <div className="space-y-2 text-sm">
             <p>The drawdown strategy is the heart of the retirement simulation. It tells the engine <em>how</em> to move money each year — which accounts to draw from, in what order, and how to handle surpluses — given the income, spending, and account balances from the base plan.</p>
             <p><strong>No Strategy</strong> — The engine runs the base plan as-is: income flows in, contributions flow out, and the gap (if any) is shown as a cash flow shortfall. No withdrawals are made from investment accounts. Use this to see what your base plan income looks like before any drawdown decisions are layered on.</p>
-            <p><strong>Fixed Percentage</strong> — Each year, a fixed percentage of each account balance is withdrawn, with a floor amount to ensure a minimum draw. Straightforward, predictable, but not responsive to spending needs. Useful for modelling a specific withdrawal rate policy (e.g. 4% rule).</p>
-            <p><strong>Fixed Withdrawal</strong> — A fixed dollar amount is withdrawn from each account each year. Easy to understand, but the real value of withdrawals declines over time with inflation unless adjusted manually via the Base Plan Modifications.</p>
-            <p><strong>Cover Spending Gap</strong> — The most sophisticated strategy. The engine calculates the annual spending shortfall (spending minus after-tax income) and draws from accounts in your configured order to exactly cover it. Surplus income is optionally redirected into accounts. This strategy minimizes unnecessary draws, maximizes tax efficiency through proactive RRSP meltdown, and can be configured with per-account annual limits to control the pace of drawdown.</p>
+            <p><strong>Fixed Percentage</strong> — Each year, a fixed percentage of each account balance is withdrawn, with a floor amount to ensure a minimum draw. Straightforward, predictable, but not responsive to spending needs.</p>
+            <p><strong>Fixed Withdrawal</strong> — A fixed dollar amount is withdrawn from each account each year. Easy to understand, but the real value of withdrawals declines over time with inflation unless adjusted manually.</p>
+            <p><strong>Bengen Rule</strong> — The classic 4% rule. In year 1 of retirement, withdraw a configured % of total portfolio. Each subsequent year draw that same amount indexed for inflation, creating a constant real draw. Shows surplus or deficit directly in cash flow — no gap-filling.</p>
+            <p><strong>Cover Spending Gap</strong> — The most sophisticated strategy. Draws exactly what is needed to cover spending, routes surplus back into accounts, and supports proactive RRSP meltdown. Maximizes tax efficiency and configurability.</p>
             <p>The configuration panels below the strategy selector only appear when relevant to the selected strategy type. Use the reset button to restore all strategy settings to defaults.</p>
           </div>
         }>
@@ -1278,6 +1364,85 @@ export function DashboardTab() {
                     Reset to defaults
                   </button>
                 </div>
+              </div>
+            )
+          })()}
+
+          {/* Bengen Rule config */}
+          {whatIfs.drawdownStrategy.value.strategyType === 'bengen' && (() => {
+            const bg = whatIfs.drawdownStrategy.value.bengenConfig ?? DEFAULT_BENGEN_CONFIG
+            const updateBg = (patch: Partial<typeof bg>) =>
+              updateWhatIf('drawdownStrategy', {
+                value: { ...whatIfs.drawdownStrategy.value, bengenConfig: { ...bg, ...patch } },
+              })
+            const updatePerson = (person: 'personA' | 'personB', patch: Partial<BengenPersonConfig>) =>
+              updateBg({ [person]: { ...bg[person], ...patch } })
+
+            return (
+              <div className="space-y-3 pt-1">
+                {/* Annual adjustment selector */}
+                <div className="overflow-x-auto rounded border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Parameters</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600 w-44">Index by CPI</td>
+                        <td className="px-2 py-1.5">
+                          <ToggleInput
+                            label=""
+                            value={bg.inflationIndex === 'cpi'}
+                            onChange={v => updateBg({ inflationIndex: v ? 'cpi' : 'personal' })}
+                          />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-600">Year-1 Draw Rate (%)</td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex gap-6">
+                            <NumberInput
+                              label={`${aName} (%)`}
+                              value={bg.personA.drawRatePct}
+                              onChange={v => updatePerson('personA', { drawRatePct: v })}
+                              min={0} max={20} step={0.25} decimals={2} size="sm"
+                            />
+                            <NumberInput
+                              label={`${bName} (%)`}
+                              value={bg.personB.drawRatePct}
+                              onChange={v => updatePerson('personB', { drawRatePct: v })}
+                              min={0} max={20} step={0.25} decimals={2} size="sm"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Per-person account order */}
+                <div className="rounded border border-slate-200">
+                  <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700">Account Draw Order</span>
+                  </div>
+                  <div className="bg-white px-3 py-3">
+                    <div className="flex gap-20">
+                      <BengenAccountOrderInput
+                        items={bg.personA.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
+                        onChange={items => updatePerson('personA', { accountOrder: items })}
+                        personName={aName}
+                      />
+                      <BengenAccountOrderInput
+                        items={bg.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
+                        onChange={items => updatePerson('personB', { accountOrder: items })}
+                        personName={bName}
+                      />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )
           })()}
