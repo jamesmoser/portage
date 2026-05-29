@@ -306,6 +306,7 @@ export interface WithdrawalStrategy {
 
 export type MarketProfileType =
   | 'step'           // base plan tiers (default)
+  | 'flat'           // single fixed nominal return rate every year
   | 'frontLoaded'    // starts at peak, falls linearly to low
   | 'backLoaded'     // starts at low, rises linearly to peak
   | 'cyclicalCrest'  // cosine wave — starts at peak
@@ -314,6 +315,7 @@ export type MarketProfileType =
 
 export interface MarketProfileConfig {
   profileType:       MarketProfileType
+  flatRate:          number   // nominal % used when profileType === 'flat'
   outlookOffset:     number   // ±% shift applied to all rates (e.g. +2 shifts curve up 2 pp)
   beta:              number   // amplitude multiplier: 1 = no change, 2 = double swing, 0.5 = half swing
   cyclePeriodYears:  number   // cycle length in years (cyclical profiles only)

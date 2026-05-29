@@ -117,6 +117,7 @@ const DRAWDOWN_STRATEGY_DESCRIPTIONS: Record<DrawdownStrategyType, React.ReactNo
 
 const MARKET_PROFILE_OPTIONS: { value: string; label: string }[] = [
   { value: 'step',           label: 'Base' },
+  { value: 'flat',           label: 'Flat' },
   { value: 'frontLoaded',    label: 'Front-Loaded' },
   { value: 'backLoaded',     label: 'Back-Loaded' },
   { value: 'cyclicalCrest',  label: 'Cyclical Crest' },
@@ -1435,41 +1436,56 @@ export function DashboardTab() {
                     {/* Sub-controls — only when enabled */}
                     {mEnabled && (
                       <div className="border-t border-slate-100">
-                        <WhatIfSlider
-                          label="Outlook"
-                          min={-10} max={10} step={0.5} baseValue={0}
-                          value={mValue.outlookOffset}
-                          enabled={mValue.outlookOffset !== 0}
-                          onChange={v => setMarketProfile({ outlookOffset: v })}
-                          valueSuffix="%"
-                        />
-                        <WhatIfSlider
-                          label="Beta"
-                          min={0.1} max={10} step={0.1} baseValue={1}
-                          value={mValue.beta}
-                          enabled={mValue.beta !== 1}
-                          onChange={v => setMarketProfile({ beta: v })}
-                          valueSuffix="x"
-                        />
-                        {isCyclical && (
-                          <WhatIfSlider
-                            label="Cycle Period"
-                            min={1} max={20} step={1} baseValue={10}
-                            value={mValue.cyclePeriodYears}
-                            enabled={mValue.cyclePeriodYears !== 10}
-                            onChange={v => setMarketProfile({ cyclePeriodYears: v })}
-                            valueSuffix="yr"
-                          />
-                        )}
-                        {mValue.profileType === 'noise' && (
-                          <div className="px-3 py-2 border-t border-slate-100">
-                            <button
-                              className="btn-primary"
-                              onClick={() => setMarketProfile({ noiseSeed: Math.floor(Math.random() * 99999) })}
-                            >
-                              Re-roll
-                            </button>
+                        {mValue.profileType === 'flat' ? (
+                          <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-100">
+                            <span className="text-sm text-slate-600 w-24 shrink-0">Flat Rate (%)</span>
+                            <NumberInput
+                              label=""
+                              value={mValue.flatRate}
+                              onChange={v => setMarketProfile({ flatRate: v })}
+                              min={0} max={30} step={0.25}
+                              size="sm"
+                            />
                           </div>
+                        ) : (
+                          <>
+                            <WhatIfSlider
+                              label="Outlook"
+                              min={-10} max={10} step={0.5} baseValue={0}
+                              value={mValue.outlookOffset}
+                              enabled={mValue.outlookOffset !== 0}
+                              onChange={v => setMarketProfile({ outlookOffset: v })}
+                              valueSuffix="%"
+                            />
+                            <WhatIfSlider
+                              label="Beta"
+                              min={0.1} max={10} step={0.1} baseValue={1}
+                              value={mValue.beta}
+                              enabled={mValue.beta !== 1}
+                              onChange={v => setMarketProfile({ beta: v })}
+                              valueSuffix="x"
+                            />
+                            {isCyclical && (
+                              <WhatIfSlider
+                                label="Cycle Period"
+                                min={1} max={20} step={1} baseValue={10}
+                                value={mValue.cyclePeriodYears}
+                                enabled={mValue.cyclePeriodYears !== 10}
+                                onChange={v => setMarketProfile({ cyclePeriodYears: v })}
+                                valueSuffix="yr"
+                              />
+                            )}
+                            {mValue.profileType === 'noise' && (
+                              <div className="px-3 py-2 border-t border-slate-100">
+                                <button
+                                  className="btn-primary"
+                                  onClick={() => setMarketProfile({ noiseSeed: Math.floor(Math.random() * 99999) })}
+                                >
+                                  Re-roll
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

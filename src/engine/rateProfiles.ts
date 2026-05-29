@@ -48,6 +48,8 @@ export function generateRateSchedule(
   return Array.from({ length: n }, (_, i) => {
     let pct: number
     switch (profileType) {
+      case 'flat':
+        return config.flatRate / 100
       case 'step':
         pct = stepRate(i)
         break
@@ -77,6 +79,7 @@ export function generateRateSchedule(
 
 export const DEFAULT_MARKET_PROFILE: MarketProfileConfig = {
   profileType:      'step',
+  flatRate:         6,
   outlookOffset:    0,
   beta:             1,
   cyclePeriodYears: 10,
