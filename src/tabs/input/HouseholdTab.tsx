@@ -26,11 +26,12 @@ function PersonCard({
   return (
     <SectionCard title={`Personal Data - ${displayName}`} width="half" personColor={person.color} onReset={onReset}
       info={
-        <div className="space-y-2">
-          <p>All dates in the plan are stored and calculated as exact calendar dates — ages are a display convenience only.</p>
-          <p><strong>Retirement Date</strong> is the first full day of retirement. Income ceases the day before.</p>
-          <p><strong>Age at Death</strong> accepts one decimal place. The value maps directly to a date: 88.0 is the exact 88th birthday, 88.5 is halfway between the 88th and 89th birthdays, 88.9 is near the end of age 88. Income and spending are pro-rated to the month of death.</p>
-          <p>When an age is entered anywhere in the plan, it converts to a date using this person's birth date: 55.0 → their 55th birthday, 55.5 → six months after their 55th birthday, and so on.</p>
+        <div className="space-y-2 text-sm">
+          <p>This card defines the fundamental parameters the engine uses to frame this person's working life and retirement. Get these right first — everything else in the plan is anchored to these dates.</p>
+          <p><strong>Retirement Date</strong> — The first full day this person is retired. Employment income stops the day before. If you're already retired, use today's date (or your actual retirement date). The retirement-year income is automatically pro-rated to the number of months worked.</p>
+          <p><strong>Age at Death</strong> — The planning horizon end, not a prediction. Use a conservatively long estimate (90–95) to stress-test longevity risk — running out of money at 88 when you live to 95 is the risk you're planning against. The plan stops modelling income and spending after this age. Decimals are supported: 92.5 means six months after the 92nd birthday.</p>
+          <p><strong>Gender</strong> — Currently informational; used for display purposes. Future versions may use actuarial mortality tables for probability-weighted analysis.</p>
+          <p>The stats panel at the bottom shows your current age, retirement age, and years in retirement — a quick sanity check that dates are entered correctly.</p>
         </div>
       }>
       <div className="grid grid-cols-2 gap-3">
@@ -117,11 +118,11 @@ export function HouseholdTab() {
       <SectionCard title="Age Reference" width="full"
         onReset={() => update('ageReferencePerson', DEFAULT_STATE.ageReferencePerson)}
         info={
-          <div className="space-y-2">
-            <p>The age reference person determines how age-based thresholds are applied throughout the plan — for example, portfolio return rate tiers, spending phase transitions, and one-time spending items.</p>
-            <p>All ages in the plan use a consistent decimal convention: 55.0 is the exact 55th birthday of the relevant person, 55.5 is six months later, and so on. There are no exceptions — Age at Death, spending phase starts, and one-time item ages all follow the same rule.</p>
-            <p>Ages that reference this person (e.g. spending phase start ages, one-time spending) convert using the <em>reference person's</em> birth date. Ages specific to an individual (Age at Death, CPP start) always use that person's own birth date.</p>
-            <p>Typically set to the older spouse, so age-tiered return rates reflect the household's shifting risk profile over time.</p>
+          <div className="space-y-2 text-sm">
+            <p>The age reference person provides the "clock" for age-based thresholds throughout the plan: portfolio return rate tier transitions (e.g. shifting to conservative returns at 65), spending phase start ages, and ages for one-time additional spending items all measure against this person's birthday.</p>
+            <p>Typically set to the <strong>older spouse</strong>, so the return rate glide path reflects the couple's overall portfolio risk profile advancing with the older person's age. This is the most conservative assumption.</p>
+            <p>Ages that are person-specific — Age at Death, CPP start age, OAS start age — always use that individual's own birth date regardless of this setting.</p>
+            <p>All age inputs throughout the tool use a decimal convention: 55.0 = exact 55th birthday, 55.5 = six months after the 55th birthday. This applies to spending phase starts, one-time item ages, and any other age-based input.</p>
           </div>
         }>
         <div className="flex items-center gap-4">

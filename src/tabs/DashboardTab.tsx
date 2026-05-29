@@ -1049,7 +1049,14 @@ export function DashboardTab() {
 
       {/* ── Scenario Card ─────────────────────────────────────────────────── */}
       <SectionDivider title="Scenarios" />
-      <SectionCard title="Scenario" width="full">
+      <SectionCard title="Scenario" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Scenarios let you save and compare named what-if configurations. Each scenario captures the complete state of the Drawdown Strategy and Base Plan Modifications — allowing you to switch between fundamentally different plans (e.g. "Retire at 55 — RRSP meltdown" vs "Retire at 58 — conservative") and see the impact on key outcomes.</p>
+            <p><strong>Workflow:</strong> Configure the drawdown strategy and any base plan modifications you want, then click <strong>Save As…</strong> to name and save the current configuration. To compare two scenarios, load the first, click <strong>Freeze</strong> in the Key Outcomes card, then load the second — the frozen deltas will appear on each metric tile showing exactly what changed.</p>
+            <p><strong>Reset All</strong> clears all what-if toggles and returns to a clean base plan view without deleting your saved scenarios. The saved scenarios remain available in the Load menu.</p>
+          </div>
+        }>
         <div className="overflow-x-auto rounded border border-slate-200">
           <div className="bg-slate-50 border-b border-slate-200 px-3 py-2">
             <span className="text-sm font-medium text-slate-700">Saved Scenarios</span>
@@ -1117,7 +1124,17 @@ export function DashboardTab() {
       </SectionCard>
 
       {/* ── Drawdown Strategy Card ────────────────────────────────────────── */}
-      <SectionCard title="Drawdown Strategy" width="full">
+      <SectionCard title="Drawdown Strategy" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>The drawdown strategy is the heart of the retirement simulation. It tells the engine <em>how</em> to move money each year — which accounts to draw from, in what order, and how to handle surpluses — given the income, spending, and account balances from the base plan.</p>
+            <p><strong>No Strategy</strong> — The engine runs the base plan as-is: income flows in, contributions flow out, and the gap (if any) is shown as a cash flow shortfall. No withdrawals are made from investment accounts. Use this to see what your base plan income looks like before any drawdown decisions are layered on.</p>
+            <p><strong>Fixed Percentage</strong> — Each year, a fixed percentage of each account balance is withdrawn, with a floor amount to ensure a minimum draw. Straightforward, predictable, but not responsive to spending needs. Useful for modelling a specific withdrawal rate policy (e.g. 4% rule).</p>
+            <p><strong>Fixed Withdrawal</strong> — A fixed dollar amount is withdrawn from each account each year. Easy to understand, but the real value of withdrawals declines over time with inflation unless adjusted manually via the Base Plan Modifications.</p>
+            <p><strong>Cover Spending Gap</strong> — The most sophisticated strategy. The engine calculates the annual spending shortfall (spending minus after-tax income) and draws from accounts in your configured order to exactly cover it. Surplus income is optionally redirected into accounts. This strategy minimizes unnecessary draws, maximizes tax efficiency through proactive RRSP meltdown, and can be configured with per-account annual limits to control the pace of drawdown.</p>
+            <p>The configuration panels below the strategy selector only appear when relevant to the selected strategy type. Use the reset button to restore all strategy settings to defaults.</p>
+          </div>
+        }>
         <div className="space-y-3">
           <div className="overflow-x-auto rounded border border-slate-200">
             <table className="w-full text-sm">
@@ -1697,7 +1714,17 @@ export function DashboardTab() {
 
       {/* ── Key Outcomes ──────────────────────────────────────────────────── */}
       <SectionDivider title="Outcomes" />
-      <SectionCard title="Key Outcomes" width="full">
+      <SectionCard title="Key Outcomes" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Key Outcomes summarizes the most important results from the simulation across three groups: Portfolio, Spending, and Government Benefits. Each tile shows the current scenario value; click any tile to open a year-by-year detail table for that metric.</p>
+            <p><strong>Freeze</strong> — Captures the current values as a comparison baseline. Once frozen, each tile splits to show the current value alongside the frozen value, with a coloured arrow indicating whether the change is better (green) or worse (red). Use this to compare two scenarios: configure and freeze the first, then load or adjust the second — the deltas appear immediately on every tile.</p>
+            <p><strong>Portfolio tiles</strong> — Show the total investment portfolio (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones: today, each person's retirement, the peak balance, and each person's death. The peak balance and its year reveal when the portfolio is most exposed — a high peak followed by rapid decline may indicate sequencing risk.</p>
+            <p><strong>Spending tiles</strong> — Count years where annual cash flow is negative (spending exceeds all income and draws). The average and peak shortfall amounts help size the gap. Zero shortfall years is the primary goal of the simulation.</p>
+            <p><strong>Tax tiles</strong> — Total lifetime tax paid (federal + provincial + OAS clawback), the average effective rate across the plan, and the single worst tax year. Use these to evaluate the tax cost of different drawdown strategies — a higher RRSP meltdown rate often trades higher taxes now for lower taxes (and less clawback) later.</p>
+            <p><strong>Government Benefits tiles</strong> — Total CPP and OAS collected and years with OAS clawback. The vs-Age-65 tiles show whether your chosen CPP/OAS start ages were better or worse than starting at 65 — accounting for the full projection horizon including survivor benefits.</p>
+          </div>
+        }>
         <div className="flex justify-end mb-3">
           {frozenMetrics && (
             <button className="btn-secondary mr-2" onClick={clearFreeze}>Clear Freeze</button>
@@ -2180,7 +2207,15 @@ export function DashboardTab() {
 
       {/* ── Charts ────────────────────────────────────────────────────────── */}
       <SectionCard title="Income" width="full"
-        info="Stacked bars = annual gross income by source. Tick marks = net after tax (black) and spending target (red). All values in today's dollars."
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Annual income across the full projection, broken down by source and person. Use the filter bar to focus on specific sources or individuals.</p>
+            <p><strong>Gross vs Net</strong> — Gross shows all income before tax, stacked by source. Net collapses each person to a single after-tax bar, so you can see what's actually available to spend. The gap between the two is the annual tax bill.</p>
+            <p><strong>Person filter</strong> — Household stacks both people together. Selecting a person shows only their income streams, which is useful for understanding each individual's income mix and tax exposure separately.</p>
+            <p><strong>Source chips</strong> — In gross mode, toggle individual income sources on or off to isolate specific streams. Use All/None for bulk selection. Sources: Employment (salary/wages while working), DB Pension (defined benefit base + bridge), CPP/OAS (government benefits — survivor amounts included after the first death), RRIF (draws from RRSP/RRIF accounts), TFSA (withdrawals — tax-free, included here for cash flow context), Non-Reg (withdrawals), and Other (rental, part-time, inheritance, etc.).</p>
+            <p>Phase transitions are visible as step changes — employment stopping at retirement, CPP and OAS turning on at their configured start ages, RRIF draws beginning at conversion age, and survivor benefit adjustments after the first death year.</p>
+          </div>
+        }
         onReset={() => { setXAxisModeIncome('year'); setIncomeMode('gross'); setIncomePerson('both'); setEnabledSources(new Set(ALL_SOURCE_KEYS)) }}>
         {/* ── Income filter bar ───────────────────────────────────────── */}
         <div className="flex items-center gap-1.5 flex-wrap mb-3">
@@ -2263,6 +2298,14 @@ export function DashboardTab() {
       </SectionCard>
 
       <SectionCard title="Tax Paid" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Annual combined income tax for each person. Each bar includes federal tax, Ontario provincial tax, and OAS clawback — all three are treated as a tax cost for cash flow purposes.</p>
+            <p><strong>Person filter</strong> — Household stacks both people. Selecting an individual lets you see their tax trajectory in isolation, which is useful when evaluating pension splitting or a retirement timing change for one person only.</p>
+            <p>Step changes in the tax bars are typically caused by: RRIF forced minimums starting (adds taxable income), CPP and OAS turning on (adds taxable income, may trigger clawback), pension income splitting starting or stopping, and RRSP meltdown draws. Large spikes in individual years are often the year of RRSP withdrawal or when both people's RRIF minimums are highest.</p>
+            <p>Compare the shape of this chart against the Income chart — the gap between gross income and net income should match the Tax Paid bars. A high tax-to-income ratio in early retirement is often a signal that the drawdown strategy is creating unnecessarily large taxable withdrawals. Use the Drawdown Strategy to adjust withdrawal timing and sequencing to smooth the tax load.</p>
+          </div>
+        }
         onReset={() => { setXAxisModeTax('year'); setTaxPerson('both') }}>
         {/* ── Tax filter bar ──────────────────────────────────────────── */}
         <div className="flex items-center gap-1.5 flex-wrap mb-3">
@@ -2290,7 +2333,15 @@ export function DashboardTab() {
 
       <SectionCard title="Spending Breakdown" width="full"
         onReset={() => setXAxisModeSpending('year')}
-        info="Annual household spending in today's dollars, split into three components. Lifestyle = spending phases and planned additional spending. Contributions = RRSP, TFSA, and non-registered contributions (both people) — these are real cash outflows, not included in the spending profile. Unexpected Expense = one-shot modifier only.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Total household cash outflows per year, split into three categories. This chart treats all cash leaving the household symmetrically — whether going toward lifestyle or investment accounts.</p>
+            <p><strong>Lifestyle</strong> — The active spending phase amount for each year, inflated forward, plus any additional spending items (recurring from their start age, or one-time in the applicable year). Phase transitions appear as step changes. This is the cost-of-living component.</p>
+            <p><strong>Contributions</strong> — RRSP, TFSA, and non-registered deposits for both people. These are real cash outflows — money you're saving — but they leave your household account and enter an investment account. They count against available cash flow in the same way as spending. Contributions stop at each person's retirement date (or earlier if configured).</p>
+            <p><strong>Unexpected Expense</strong> — The one-time expense from the Base Plan Modifications, if enabled. It appears as a single-year spike on top of the other bars.</p>
+            <p>The total bar height in any year is what the Cash Flow chart uses as the spending side: <em>Cash Flow = Net Household Income − Total Spending here</em>. A high bar from contributions in pre-retirement years is normal and healthy — it means you're actively building the portfolio.</p>
+          </div>
+        }>
         <PlotlyChart
           data={spendingData}
           layout={{
@@ -2306,7 +2357,14 @@ export function DashboardTab() {
 
       <SectionCard title="Annual Cash Flow" width="full"
         onReset={() => setXAxisModeCashFlow('year')}
-        info="Net cash flow each year in today's dollars: after-tax income plus account withdrawals (RRSP/RRIF, TFSA, non-reg) minus total spending (lifestyle + contributions + unexpected expense). Green bars are surplus years; red bars are shortfall years where spending exceeds all available income and draws.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Net cash available after all income, withdrawals, and spending each year. This is the bottom line of the simulation: did money come in faster than it went out?</p>
+            <p><strong>Green bars (surplus)</strong> — Income and withdrawals exceed total spending. The surplus either accumulates in HISA or is reinvested per your Surplus Order in the drawdown strategy. Sustained surpluses in retirement may indicate over-saving or under-spending relative to your portfolio size — a potential signal to revisit your spending plan or drawdown pace.</p>
+            <p><strong>Red bars (shortfall)</strong> — Spending exceeds all income and configured withdrawals. This is not automatically covered — it represents a gap in the plan. Shortfall years show up in the Key Outcomes Spending tiles. Common causes: retirement before government benefits start, spending phases too high relative to income, or insufficient configured draws from investment accounts.</p>
+            <p>The calculation: <em>Cash Flow = After-Tax Income (all sources + withdrawals) − Total Spending (lifestyle + contributions + unexpected expense)</em>. Adjusting the drawdown strategy — increasing withdrawal limits, changing the deficit order, or adding a spending gap draw — is the primary lever to eliminate red bars.</p>
+          </div>
+        }>
         <PlotlyChart
           data={cashFlowData}
           layout={{
@@ -2319,6 +2377,16 @@ export function DashboardTab() {
       </SectionCard>
 
       <SectionCard title="Portfolio Balances" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>End-of-year investment account balances, stacked by account type and person. This is the most direct view of whether the plan is sustainable — a balance that reaches zero before the end of the horizon means the plan runs out of money.</p>
+            <p><strong>RRSP/RRIF</strong> — Registered savings/retirement accounts. Pre-retirement: grows by contributions and returns. Post-retirement: converted to RRIF at 71 (the label stays RRSP/RRIF throughout), then subject to mandatory minimum annual withdrawals calculated by CRA age factors. At the first death, the deceased's RRIF rolls over tax-free to the surviving spouse's RRIF.</p>
+            <p><strong>TFSA</strong> — Tax-free savings accounts. Withdrawals are not taxable and create re-contribution room the following year. At death, the TFSA rolls to the survivor's account tax-free.</p>
+            <p><strong>Non-Reg</strong> — Non-registered investment accounts. Growth is taxable each year (as dividends or capital gains). Withdrawals trigger capital gains on the gain above adjusted cost base. At death, deemed disposition triggers a final capital gains tax — this is handled in the simulation.</p>
+            <p><strong>HISA</strong> — High-interest savings account. Joint account treated as the household cash buffer. Earns interest (taxable) and serves as the primary surplus destination and deficit buffer depending on your drawdown configuration.</p>
+            <p>Use the person filter to see each individual's portfolio trajectory. Use account type chips to isolate specific accounts — for example, turning off RRSP/RRIF shows how the tax-free and non-registered portions evolve independently.</p>
+          </div>
+        }
         onReset={() => { setXAxisModePortfolio('year'); setPortfolioPerson('both'); setEnabledPortfolioAccounts(new Set(ALL_PORTFOLIO_KEYS)) }}>
         {/* ── Portfolio filter bar ─────────────────────────────────────── */}
         <div className="flex items-center gap-1.5 flex-wrap mb-3">
@@ -2394,10 +2462,6 @@ export function DashboardTab() {
             <div>
               <p className="font-semibold mb-1">Cash Flow</p>
               <p><strong>Cash Flow = Net HH − Spending.</strong> A positive value means the household has a surplus that flows into savings; a negative value means spending exceeds income and the gap is covered by portfolio withdrawals or HISA. Persistent shortfalls will deplete the portfolio.</p>
-            </div>
-            <div>
-              <p className="font-semibold mb-1">All figures in today's dollars</p>
-              <p>Every value in this table is expressed in present-day purchasing power — future nominal amounts are deflated by the personal inflation rate. This makes year-over-year comparisons meaningful and directly comparable to today's budget.</p>
             </div>
           </div>
         }

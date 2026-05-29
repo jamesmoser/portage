@@ -29,7 +29,16 @@ interface PersonPensionCardProps {
 
 function PersonPensionCard({ label, pension, onChange, onReset, personColor, retirementDate, cpiRatePct, personalInflationRatePct }: PersonPensionCardProps) {
   return (
-    <SectionCard title={label} width="half" personColor={personColor} onReset={onReset}>
+    <SectionCard title={label} width="half" personColor={personColor} onReset={onReset}
+      info={
+        <div className="space-y-2 text-sm">
+          <p>A <strong>Defined Benefit (DB) pension</strong> provides a guaranteed lifetime income from your employer, based on your salary and years of service — not investment performance. It is the most valuable retirement asset most public sector employees hold.</p>
+          <p><strong>Lifetime Annual Benefit</strong> — The gross annual pension you expect to receive at your pension start date. Get this from your pension statement or plan administrator. If you are retiring before the plan's normal retirement age (commonly 65, or an age+service "85 factor"), calculate the reduced amount yourself and enter the result — the app does not apply the reduction formula.</p>
+          <p><strong>Bridge Benefit</strong> — Many Ontario public sector plans (OMERS, OPB, HOOPP) pay an additional temporary benefit from retirement until age 65 to replace what CPP will eventually provide. Enter the bridge amount and the date it ends. If your plan has no bridge, leave this at zero.</p>
+          <p><strong>Indexing</strong> — Some plans fully index to CPI (OPB), others cap increases (OMERS caps at 6%/year), and older private sector plans provide none. Check your plan documents. A non-indexed pension loses real purchasing power every year — at 3% personal inflation, it loses about 26% of its real value over 10 years.</p>
+          <p><strong>Survivor Benefit</strong> — The fraction of your lifetime benefit paid to your spouse after you die. Common elections: 60%, 66.67%, or 100%. A higher survivor benefit often means a slightly lower lifetime amount during your own life — this election is typically made at retirement and is irrevocable.</p>
+        </div>
+      }>
       <div className="mb-4">
         <ToggleInput
           label="Has Defined Benefit Pension"
@@ -293,7 +302,14 @@ export function DBPensionTab() {
         personalInflationRatePct={personalInflationRatePct}
       />
 
-      <SectionCard title="Employment and Pension Income" width="full">
+      <SectionCard title="Employment and Pension Income" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>This chart previews employment income and DB pension payments over time, including the bridge benefit as a separate segment. All values are in today's dollars.</p>
+            <p>Employment bars stop at each person's retirement date. The pension bars begin at the pension start date — if different from retirement, there will be a gap. The bridge benefit segment ends at the bridge termination date (typically when CPP starts at 65).</p>
+            <p>This chart shows income from this tab only. The full household income picture — including CPP, OAS, RRIF withdrawals, and investment income — is on the Dashboard.</p>
+          </div>
+        }>
         {hasData
           ? <>
               <PlotlyChart

@@ -12,15 +12,19 @@ export function CashTab() {
     <div className="space-y-3 text-sm">
       <div>
         <p className="font-semibold mb-1">Role in the Plan</p>
-        <p>The HISA is the first account drawn from when income falls short of spending. It earns interest at the nominal rate you specify — fully taxable at your marginal rate each year. Once depleted, the engine draws from investment accounts in the order set in the withdrawal strategy.</p>
-      </div>
-      <div>
-        <p className="font-semibold mb-1">Minimum Balance</p>
-        <p>A warning threshold in today's dollars. The plan will flag any year where the projected HISA balance falls below this amount, helping you identify when your liquidity cushion is gone. It does not change withdrawal behaviour — that will be handled in the withdrawal strategy. A common target is 1–2 years of planned spending.</p>
+        <p>The HISA represents your liquid cash savings — money in a high-interest savings account, money market fund, or similar low-risk, instantly accessible account. It plays two roles in the plan:</p>
+        <ul className="mt-1 ml-3 list-disc list-outside space-y-0.5">
+          <li><strong>Spending buffer</strong> — In the spending gap drawdown strategy, the HISA is available as a deficit account to draw from when income falls short of spending. Having 1–2 years of living expenses in the HISA is a common rule of thumb to avoid selling investments in a downturn.</li>
+          <li><strong>Surplus target</strong> — The surplus routing in the Dashboard's drawdown strategy can direct excess income (e.g. when RRIF minimums exceed spending needs) into the HISA to build the cash cushion back up.</li>
+        </ul>
       </div>
       <div>
         <p className="font-semibold mb-1">Interest Rate</p>
-        <p>Enter the nominal (advertised) rate. The engine applies this gross before tax — actual purchasing power growth depends on your marginal tax rate and inflation, both of which are accounted for elsewhere in the plan.</p>
+        <p>Enter the nominal (advertised) rate. Interest earned is fully taxable at your marginal rate each year — this makes the HISA the least tax-efficient growth vehicle. In retirement, it's best used as a buffer rather than a long-term investment.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">Minimum Balance</p>
+        <p>A warning floor. The plan highlights years where the HISA drops below this amount, helping you see when your liquidity cushion is gone. A reasonable target is 1–2 years of planned spending. This is informational only — the engine will still draw below it if needed.</p>
       </div>
     </div>
   )

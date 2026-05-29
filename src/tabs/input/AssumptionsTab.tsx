@@ -25,7 +25,14 @@ export function AssumptionsTab() {
   return (
     <CardGrid>
       {/* Inflation */}
-      <SectionCard title="Inflation" width="half">
+      <SectionCard title="Inflation" width="half"
+        info={
+          <div className="space-y-2 text-sm">
+            <p><strong>Personal / Real Inflation Rate</strong> — Your assumed cost-of-living increase. This is what converts future dollars to today's dollars throughout the plan. A household spending $10,000/month today needs about $13,440/month in 10 years at 3%. The default 3% reflects historical Canadian household inflation including housing, healthcare, and lifestyle costs — which tends to run above the official CPI.</p>
+            <p><strong>CPI Rate (Statistics Canada)</strong> — The official government inflation measure, used to index government programs: DB pension payments (if indexed), CPP, OAS, and federal/Ontario tax bracket thresholds. CPI typically runs slightly below personal household inflation. Historically around 2% long-run for Canada.</p>
+            <p>When CPI equals your personal rate, indexed income sources (CPP, OAS, indexed DB pension) maintain constant purchasing power. When CPI is lower than your personal rate, those payments gradually lose real value over time — the gap compounds over a 30-year retirement. The InfoPanel below shows you the net real effect given your current settings.</p>
+          </div>
+        }>
         <div className="space-y-3">
           <NumberInput label="Personal / Real Inflation Rate" value={personalInflationRatePct}
             onChange={v => update('personalInflationRatePct', v)}
@@ -54,7 +61,20 @@ export function AssumptionsTab() {
 
       {/* Return rates */}
       <SectionCard title="Portfolio Return Rates (Nominal)" width="half"
-        info="Nominal returns for each life stage. Applies to all accounts unless overridden per account.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Enter the nominal (before inflation) annual return you expect for each life phase. These apply to all investment accounts — RRSP/RRIF, TFSA, and Non-Registered — unless you override the rate on a specific account in the Investments tab.</p>
+            <p>The four tiers are based on the <em>age reference person's</em> age. Declining rates over time reflect the typical investor glide path: higher equity exposure in earlier years, shifting toward bonds and GICs closer to and through retirement.</p>
+            <p><strong>Typical reference ranges:</strong></p>
+            <ul className="ml-3 list-disc list-outside space-y-0.5">
+              <li>All equities (e.g. 100% stocks): ~8–10% nominal historically</li>
+              <li>Balanced (60% equities / 40% bonds): ~6–7%</li>
+              <li>Conservative (bonds, GICs): ~3–5%</li>
+            </ul>
+            <p>Most financial plans use 5–7% for early retirement declining to 4–5% by age 70+. The real returns shown in the panel below are what drive portfolio growth — a 6% nominal return at 3% personal inflation gives 3% real growth per year.</p>
+            <p>If one account (e.g. HISA-held cash, or a GIC ladder) is invested very differently from the rest of the portfolio, use the per-account return rate override in the Investments tab.</p>
+          </div>
+        }>
 
         {(() => {
           const rows = [

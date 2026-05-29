@@ -162,7 +162,13 @@ export function TFSATab() {
         personColor={personB.color} />
 
       <SectionCard title="TFSA Balances" width="full"
-        info="Account balance without plan withdrawals — contributions and growth only. The full plan balance (after spending gap withdrawals) is shown in the Income Overview tab.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Projected TFSA balance over time based on contributions, growth, and the spousal rollover at first death. Balances are in today's dollars.</p>
+            <p>This is a <em>standalone preview</em> — withdrawals made by the drawdown strategy in the Dashboard are not included here. Use this chart to see whether contributions are building the TFSA as expected and when the balance would peak. The Dashboard shows the full simulated result including spending gap draws.</p>
+            <p>After the first death, the surviving spouse's TFSA bar will step up as the deceased's balance rolls over — this transfer does not consume the survivor's contribution room.</p>
+          </div>
+        }>
         <PlotlyChart
           data={withTotals(chartData)}
           layout={{

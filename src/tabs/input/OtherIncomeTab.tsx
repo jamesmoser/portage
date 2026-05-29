@@ -67,13 +67,12 @@ export function OtherIncomeTab() {
   }
 
   const infoModal = (
-    <div className="space-y-2">
-      <p>Add any income source not covered by employment, pension, CPP, or OAS. All amounts are in today's dollars and inflated to the future year using the personal inflation rate.</p>
-      <p><strong>Taxable:</strong> fully taxable at the recipient's marginal rate. Use for employment income, rental net income, business income, part-time work.</p>
-      <p><strong>Non-taxable:</strong> received tax-free, no CRA reporting required. Use for life insurance death benefits or inheritances. The Canadian estate pays any taxes on deemed dispositions — the recipient receives the proceeds tax-free.</p>
-      <p><strong>Attribution:</strong> determines whose marginal rate applies for taxable items. Joint income is split 50/50 between both persons. Rental income from jointly-held property should typically use Joint.</p>
-      <p><strong>Growth Rate:</strong> how fast the income grows above inflation. 0% = constant purchasing power each year.</p>
-      <p>All chart values are in today's dollars.</p>
+    <div className="space-y-2 text-sm">
+      <p>Add any income source not covered by employment, DB pension, CPP, or OAS. Income is entered in today's dollars and inflated forward. Use start and end dates to control exactly when each source is active — useful for income that doesn't align with retirement dates.</p>
+      <p>Common examples: <strong>rental income</strong> (net of expenses, taxable), <strong>part-time consulting</strong> or self-employment after formal retirement, <strong>business income</strong>, <strong>inheritances or life insurance proceeds</strong> (non-taxable — the estate handles taxes on deemed dispositions), <strong>structured settlements</strong> or legal awards.</p>
+      <p><strong>Attribution</strong> — Determines whose marginal tax rate applies for taxable items, which affects how much tax is paid. Person A and Person B are taxed independently at their own rates. Joint income is split 50/50. Rental income from jointly-owned property is typically split 50/50 regardless of who manages the property, unless your ownership ratio differs.</p>
+      <p><strong>Taxable toggle</strong> — Turn off for receipts that are genuinely non-taxable (life insurance death benefits, inheritances). Non-taxable income also does not count toward income-tested thresholds like OAS clawback or the Age Amount phase-out.</p>
+      <p><strong>Growth Rate</strong> — Real annual growth above inflation. Use 0% for constant purchasing power. Rental income might grow 1–2% real as rents tend to rise with the market over time.</p>
     </div>
   )
 
@@ -141,7 +140,13 @@ export function OtherIncomeTab() {
         ))}
       </SectionCard>
 
-      <SectionCard title="Other Income" width="full">
+      <SectionCard title="Other Income" width="full"
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Annual other income by person. Each bar segment represents a different item attributed to that person — Joint items are split 50/50. Bars stop in the year each item's end date falls.</p>
+            <p>Use this chart to confirm your income items are active in the right years and attributed to the right person. The combined total from both people feeds into the Dashboard simulation each year alongside employment, pension, CPP, and OAS income.</p>
+          </div>
+        }>
         <PlotlyChart
           data={withTotals(chartData)}
           layout={{

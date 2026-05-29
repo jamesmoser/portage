@@ -466,7 +466,13 @@ export function CPPOASTab() {
 
       {/* Government Benefits chart */}
       <SectionCard title="Government Benefits" width="full"
-        info={<p className="text-sm">Combined CPP and OAS payments for both people in present-day dollars. OAS is shown without clawback applied.</p>}>
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Combined CPP and OAS annual payments for both people. Values are in today's dollars — both CPP and OAS are indexed to CPI, so their real values hold roughly constant over time (visible as flat bars in this chart).</p>
+            <p>The chart uses the start ages you've set above. If a person defers CPP or OAS, you'll see zero for that benefit in the early years, followed by a step up when it begins. Compare different start ages visually here to see the trade-off between starting early at a lower amount versus deferring for a higher lifetime benefit.</p>
+            <p>OAS clawback is not applied in this chart — for high-income scenarios, the Dashboard's annual summary table shows net OAS after clawback. GIS is included in the OAS bar if enabled.</p>
+          </div>
+        }>
         <PlotlyChart
           data={withTotals(govChartData)}
           layout={{

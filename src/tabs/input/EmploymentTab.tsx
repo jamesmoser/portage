@@ -18,7 +18,15 @@ export function EmploymentTab() {
   return (
     <CardGrid>
       <SectionCard title={`Employment — ${aName}`} width="half" personColor={personA.color}
-        onReset={() => update('employmentA', DEFAULT_STATE.employmentA)}>
+        onReset={() => update('employmentA', DEFAULT_STATE.employmentA)}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Enter current gross employment income (before tax). The engine taxes it alongside all other income each year. Income stops automatically at the retirement date set in the Household tab — the retirement-year income is pro-rated to the month of retirement.</p>
+            <p><strong>Growth Rate</strong> — Expected annual salary increase (nominal). For most salaried employees 2–4% is typical. This rate compounds through to retirement, so it meaningfully affects the projected retirement-year income shown in the panel below.</p>
+            <p><strong>Part-time or phased retirement</strong> — If you plan to reduce hours before fully stopping, set the income to your expected part-time amount and use the retirement date as the end of part-time work. For income that overlaps with retirement or starts at a specific date rather than stopping at retirement, use Other Income instead.</p>
+            <p>Pre-retirement employment income reduces the need to draw from investment accounts in those years, and also generates RRSP contribution room — relevant if you're still making RRSP contributions.</p>
+          </div>
+        }>
         <div className="space-y-3">
           <NumberInput label="Current Annual Employment Income" value={employmentA.annualAmount}
             onChange={v => update('employmentA', { ...employmentA, annualAmount: v })}
@@ -35,7 +43,15 @@ export function EmploymentTab() {
       </SectionCard>
 
       <SectionCard title={`Employment — ${bName}`} width="half" personColor={personB.color}
-        onReset={() => update('employmentB', DEFAULT_STATE.employmentB)}>
+        onReset={() => update('employmentB', DEFAULT_STATE.employmentB)}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Enter current gross employment income (before tax). The engine taxes it alongside all other income each year. Income stops automatically at the retirement date set in the Household tab — the retirement-year income is pro-rated to the month of retirement.</p>
+            <p><strong>Growth Rate</strong> — Expected annual salary increase (nominal). For most salaried employees 2–4% is typical. This rate compounds through to retirement, so it meaningfully affects the projected retirement-year income shown in the panel below.</p>
+            <p><strong>Part-time or phased retirement</strong> — If you plan to reduce hours before fully stopping, set the income to your expected part-time amount and use the retirement date as the end of part-time work. For income that overlaps with retirement or starts at a specific date rather than stopping at retirement, use Other Income instead.</p>
+            <p>Pre-retirement employment income reduces the need to draw from investment accounts in those years, and also generates RRSP contribution room — relevant if you're still making RRSP contributions.</p>
+          </div>
+        }>
         <div className="space-y-3">
           <NumberInput label="Current Annual Employment Income" value={employmentB.annualAmount}
             onChange={v => update('employmentB', { ...employmentB, annualAmount: v })}

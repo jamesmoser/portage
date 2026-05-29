@@ -191,7 +191,13 @@ export function NonRegTab() {
         personColor={personB.color} />
 
       <SectionCard title="Non-Registered Balances" width="full"
-        info="Account balance without plan withdrawals — contributions (until retirement) and growth only. The full plan balance (after spending gap withdrawals) is shown in the Income Overview tab.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Projected non-registered account balance over time based on contributions, growth, and the spousal rollover at first death. Balances are in today's dollars.</p>
+            <p>This is a <em>standalone preview</em> — withdrawals made by the drawdown strategy in the Dashboard are not reflected here. Use this chart to confirm contributions are landing as expected and to gauge the starting balance at retirement. Annual yield income (dividends, foreign income, interest) is taxed each year in the full simulation but is not shown separately here.</p>
+            <p>The ACB (adjusted cost base) tracks the book value of the account. As the balance grows beyond the ACB through reinvested returns, the embedded capital gain grows — this becomes taxable when withdrawals are made in the Dashboard simulation.</p>
+          </div>
+        }>
         <PlotlyChart
           data={withTotals(chartData)}
           layout={{

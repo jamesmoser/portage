@@ -60,17 +60,40 @@ export function TaxSettingsTab() {
   return (
     <CardGrid>
       <SectionCard title="Federal Tax Brackets" width="half"
-        onReset={() => update2('federalBrackets', DEFAULT_TAX_SETTINGS.federalBrackets)}>
+        onReset={() => update2('federalBrackets', DEFAULT_TAX_SETTINGS.federalBrackets)}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Federal income tax is applied progressively — only the income within each band is taxed at that band's rate. You never pay the higher rate on all your income, only on the slice above each threshold. For example, at $120,000 income in 2024: the first $55,867 is taxed at 15%, the next $55,866 at 20.5%, and only the remaining $8,267 at 26%.</p>
+            <p>These default to the 2024 federal brackets. The engine indexes all bracket thresholds forward each year by the CPI rate you set in Assumptions, so bracket creep is automatically accounted for. You only need to change these if federal tax policy changes significantly or you want to model a specific scenario.</p>
+            <p>Federal tax applies to both people independently based on each person's net income in each year. Pension income splitting can shift income between spouses to reduce the combined tax burden — this is managed in the Dashboard's drawdown strategy.</p>
+          </div>
+        }>
         <BracketTable title="Federal Tax Brackets" brackets={s.federalBrackets} onChange={v => update2('federalBrackets', v)} />
       </SectionCard>
 
       <SectionCard title="Ontario Tax Brackets" width="half"
-        onReset={() => update2('ontarioBrackets', DEFAULT_TAX_SETTINGS.ontarioBrackets)}>
+        onReset={() => update2('ontarioBrackets', DEFAULT_TAX_SETTINGS.ontarioBrackets)}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Ontario provincial tax brackets, applied on top of federal tax. Ontario also levies an additional surtax on high provincial tax amounts — configured in the Ontario Credits & Surtax card below. This surtax is unique to Ontario and can add several thousand dollars for incomes above $100,000.</p>
+            <p>Combined federal + Ontario marginal rates at the top bracket reach approximately 53.5%, making tax-efficient income splitting and account sequencing important for higher-income households.</p>
+            <p>Like federal brackets, these defaults are based on 2024 rates and are indexed forward by CPI each year. Only modify these if Ontario tax policy changes or you want to model a scenario.</p>
+          </div>
+        }>
         <BracketTable title="Ontario Tax Brackets" brackets={s.ontarioBrackets} onChange={v => update2('ontarioBrackets', v)} />
       </SectionCard>
 
       <SectionCard title="Federal Non-Refundable Credits & Thresholds" width="full"
-        onReset={() => update('taxSettings', { ...s, federalBPA: DEFAULT_TAX_SETTINGS.federalBPA, federalAgeAmount: DEFAULT_TAX_SETTINGS.federalAgeAmount, federalAgeAmountThreshold: DEFAULT_TAX_SETTINGS.federalAgeAmountThreshold, federalAgeAmountReductionRate: DEFAULT_TAX_SETTINGS.federalAgeAmountReductionRate, federalPensionIncomeAmount: DEFAULT_TAX_SETTINGS.federalPensionIncomeAmount, oasClawbackThreshold: DEFAULT_TAX_SETTINGS.oasClawbackThreshold })}>
+        onReset={() => update('taxSettings', { ...s, federalBPA: DEFAULT_TAX_SETTINGS.federalBPA, federalAgeAmount: DEFAULT_TAX_SETTINGS.federalAgeAmount, federalAgeAmountThreshold: DEFAULT_TAX_SETTINGS.federalAgeAmountThreshold, federalAgeAmountReductionRate: DEFAULT_TAX_SETTINGS.federalAgeAmountReductionRate, federalPensionIncomeAmount: DEFAULT_TAX_SETTINGS.federalPensionIncomeAmount, oasClawbackThreshold: DEFAULT_TAX_SETTINGS.oasClawbackThreshold })}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Non-refundable credits reduce the tax you owe. They can reduce your tax to zero but cannot create a refund. The credit value equals the amount times the lowest federal bracket rate (15%).</p>
+            <p><strong>Basic Personal Amount (BPA)</strong> — Every Canadian gets this deduction. At $15,705, it provides a ~$2,356 federal credit, effectively making the first $15,705 of income federally tax-free for each person.</p>
+            <p><strong>Pension Income Amount</strong> — A $2,000 deduction for eligible pension income: RRIF withdrawals, DB pension payments, and CPP all qualify. Worth ~$300 in federal tax savings per person per year. Pension income splitting (in the Dashboard) helps ensure both spouses can claim it.</p>
+            <p><strong>Age Amount</strong> — An additional deduction for Canadians age 65 and older, worth up to $8,790 in 2024. It phases out at 15 cents for every dollar of net income above $42,335, disappearing entirely around $100,000 income. This is one reason to manage RRIF withdrawal levels carefully — keeping net income below $42,335 preserves the full Age Amount credit.</p>
+            <p><strong>OAS Clawback Threshold</strong> — OAS is "clawed back" (recovered) at 15% of net income above this threshold. For every $10,000 above ~$90,997, you lose $1,500 of OAS. For high RRIF withdrawal scenarios, this can significantly reduce OAS income — use the Dashboard to model the impact.</p>
+          </div>
+        }>
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="overflow-x-auto rounded border border-slate-200">
             <table className="w-full text-sm">
@@ -103,7 +126,18 @@ export function TaxSettingsTab() {
       </SectionCard>
 
       <SectionCard title="Ontario Credits & Surtax" width="full"
-        onReset={() => update('taxSettings', { ...s, ontarioBPA: DEFAULT_TAX_SETTINGS.ontarioBPA, ontarioAgeAmount: DEFAULT_TAX_SETTINGS.ontarioAgeAmount, ontarioAgeAmountThreshold: DEFAULT_TAX_SETTINGS.ontarioAgeAmountThreshold, ontarioPensionIncomeAmount: DEFAULT_TAX_SETTINGS.ontarioPensionIncomeAmount, ontarioSurtax1Threshold: DEFAULT_TAX_SETTINGS.ontarioSurtax1Threshold, ontarioSurtax1Rate: DEFAULT_TAX_SETTINGS.ontarioSurtax1Rate, ontarioSurtax2Threshold: DEFAULT_TAX_SETTINGS.ontarioSurtax2Threshold, ontarioSurtax2Rate: DEFAULT_TAX_SETTINGS.ontarioSurtax2Rate })}>
+        onReset={() => update('taxSettings', { ...s, ontarioBPA: DEFAULT_TAX_SETTINGS.ontarioBPA, ontarioAgeAmount: DEFAULT_TAX_SETTINGS.ontarioAgeAmount, ontarioAgeAmountThreshold: DEFAULT_TAX_SETTINGS.ontarioAgeAmountThreshold, ontarioPensionIncomeAmount: DEFAULT_TAX_SETTINGS.ontarioPensionIncomeAmount, ontarioSurtax1Threshold: DEFAULT_TAX_SETTINGS.ontarioSurtax1Threshold, ontarioSurtax1Rate: DEFAULT_TAX_SETTINGS.ontarioSurtax1Rate, ontarioSurtax2Threshold: DEFAULT_TAX_SETTINGS.ontarioSurtax2Threshold, ontarioSurtax2Rate: DEFAULT_TAX_SETTINGS.ontarioSurtax2Rate })}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Ontario provincial credits mirror the federal structure — each credit amount is multiplied by the lowest Ontario rate (5.05%) to calculate the tax reduction. The Ontario Age Amount also phases out above the same income threshold as the federal one.</p>
+            <p><strong>Ontario Surtax</strong> — Unique to Ontario. An extra layer of provincial tax is applied on top of your Ontario tax payable (after credits), not on income directly:</p>
+            <ul className="ml-3 list-disc list-outside space-y-0.5">
+              <li>Tier 1: 20% surcharge when Ontario tax payable exceeds ~$5,315</li>
+              <li>Tier 2: Additional 36% surcharge when Ontario tax payable exceeds ~$6,802</li>
+            </ul>
+            <p>Both tiers can apply simultaneously. The surtax kicks in at roughly $70,000–$80,000 of income for most retirees and can add $2,000–$5,000+ to provincial taxes for incomes in the $100,000–$150,000 range. This makes Ontario one of the highest-taxed provinces for high earners.</p>
+          </div>
+        }>
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="overflow-x-auto rounded border border-slate-200">
             <table className="w-full text-sm">
@@ -138,7 +172,14 @@ export function TaxSettingsTab() {
       </SectionCard>
 
       <SectionCard title="Dividend & Capital Gains Settings" width="full"
-        onReset={() => update('taxSettings', { ...s, federalEligibleDivGrossUp: DEFAULT_TAX_SETTINGS.federalEligibleDivGrossUp, federalEligibleDivCredit: DEFAULT_TAX_SETTINGS.federalEligibleDivCredit, ontarioEligibleDivCredit: DEFAULT_TAX_SETTINGS.ontarioEligibleDivCredit, capitalGainsInclusionRate: DEFAULT_TAX_SETTINGS.capitalGainsInclusionRate, capitalGainsHighRate: DEFAULT_TAX_SETTINGS.capitalGainsHighRate, capitalGainsHighThreshold: DEFAULT_TAX_SETTINGS.capitalGainsHighThreshold, federalNonEligibleDivGrossUp: DEFAULT_TAX_SETTINGS.federalNonEligibleDivGrossUp, federalNonEligibleDivCredit: DEFAULT_TAX_SETTINGS.federalNonEligibleDivCredit })}>
+        onReset={() => update('taxSettings', { ...s, federalEligibleDivGrossUp: DEFAULT_TAX_SETTINGS.federalEligibleDivGrossUp, federalEligibleDivCredit: DEFAULT_TAX_SETTINGS.federalEligibleDivCredit, ontarioEligibleDivCredit: DEFAULT_TAX_SETTINGS.ontarioEligibleDivCredit, capitalGainsInclusionRate: DEFAULT_TAX_SETTINGS.capitalGainsInclusionRate, capitalGainsHighRate: DEFAULT_TAX_SETTINGS.capitalGainsHighRate, capitalGainsHighThreshold: DEFAULT_TAX_SETTINGS.capitalGainsHighThreshold, federalNonEligibleDivGrossUp: DEFAULT_TAX_SETTINGS.federalNonEligibleDivGrossUp, federalNonEligibleDivCredit: DEFAULT_TAX_SETTINGS.federalNonEligibleDivCredit })}
+        info={
+          <div className="space-y-2 text-sm">
+            <p><strong>Eligible Dividends</strong> — Paid by most Canadian public companies and large private corporations. They receive preferential tax treatment: the dividend is grossed up (increased by 38%) to approximate the pre-tax corporate income, then a dividend tax credit offsets a portion of that grossed-up amount. The net effect is that eligible dividends are taxed at a significantly lower rate than regular income. In low-income retirement years, they can be effectively tax-free due to the credits exceeding the tax on the gross-up. These are the most tax-efficient form of non-registered income.</p>
+            <p><strong>Non-Eligible Dividends</strong> — Paid by Canadian-Controlled Private Corporations (CCPCs) on income taxed at the small business rate. Grossed up 15% with a smaller tax credit. More tax-efficient than interest income, but less so than eligible dividends.</p>
+            <p><strong>Capital Gains</strong> — Only the inclusion rate fraction of a capital gain is added to taxable income. At 50% inclusion, a $10,000 gain adds $5,000 to taxable income, taxed at your marginal rate. Capital gains in the non-registered account are only triggered in the model when withdrawals are made — unrealized gains grow tax-deferred. The two-tier structure allows modelling a higher inclusion rate above a threshold for large single-year gains, though the default $10,000,000 threshold effectively disables this.</p>
+          </div>
+        }>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
 

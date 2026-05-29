@@ -90,11 +90,18 @@ export function SpendingTab() {
       <SectionCard title="Spending Phases" width="full"
         onReset={() => update('spendingPhases', DEFAULT_STATE.spendingPhases)}
         info={
-          <div className="space-y-2">
-            <p>Define household spending for each life phase in today's dollars. The engine applies the phase whose start age ({refName}'s age) has been reached, switching mid-year on the exact birthday.</p>
-            <p>Common framework: Go-Go (active travel), Slow-Go (home-focused), No-Go (care costs), Survivor (one person remaining).</p>
-            <p>Start ages use the decimal convention: 55.0 = {refName}'s 55th birthday, 55.5 = six months later. The Survivor phase can be linked to the first death automatically — the start age is computed from the death date.</p>
-            <p><strong>Real Growth Rate:</strong> how fast spending grows above inflation within the phase. At 0%, spending maintains constant purchasing power. Negative = spending declines in real terms (typical as activity slows). Positive = lifestyle creep.</p>
+          <div className="space-y-2 text-sm">
+            <p>Spending phases define your household lifestyle costs for each period of retirement. The engine applies the phase whose start age ({refName}'s age) has been reached, switching phases mid-year on the exact birthday. Enter annual amounts in today's dollars — the engine inflates them forward automatically.</p>
+            <p>A typical framework:</p>
+            <ul className="ml-3 list-disc list-outside space-y-0.5">
+              <li><strong>Pre-Retirement</strong> — Current lifestyle while still working. Usually the highest spending period if you have a mortgage or children at home.</li>
+              <li><strong>Go-Go Years</strong> — Active early retirement: travel, activities, bucket list. Often the most expensive retirement phase.</li>
+              <li><strong>Slow-Go Years</strong> — Home-centred, local activities. Spending naturally declines from the Go-Go peak.</li>
+              <li><strong>No-Go Years</strong> — Less travel; potential healthcare cost increases. Modest overall spending.</li>
+              <li><strong>Survivor</strong> — One person remaining. Fixed costs (housing, utilities) don't drop in half — budget at roughly 60–70% of couple spending.</li>
+            </ul>
+            <p><strong>Real Growth Rate</strong> — How fast spending changes in real terms within the phase, independent of inflation. Use 0% to hold constant purchasing power, a negative value for phases where activity naturally slows (e.g. −1% in No-Go years), or a positive value for lifestyle creep.</p>
+            <p>The Survivor phase can be linked to the first death automatically — enable the toggle on that row and the start age is set to the reference person's age when the first death occurs.</p>
           </div>
         }>
 
@@ -150,11 +157,11 @@ export function SpendingTab() {
       <SectionCard title="Additional Spending" width="full"
         onReset={() => update('additionalSpending', DEFAULT_STATE.additionalSpending)}
         info={
-          <div className="space-y-2">
-            <p>Model any spending above the base phase amount — healthcare escalation, memberships, hobbies, one-time purchases, etc.</p>
-            <p><strong>Recurring:</strong> added to spending every year from the specified age onwards, in today's dollars inflated to the future year.</p>
-            <p><strong>One-time:</strong> a single expense occurring in the calendar year of the reference person's specified birthday.</p>
-            <p>All amounts are in today's dollars and are inflated using the personal inflation rate.</p>
+          <div className="space-y-2 text-sm">
+            <p>Model spending that doesn't fit the phase structure — items that start or stop at a specific age, or one-time purchases layered on top of the base phase amount.</p>
+            <p><strong>Recurring</strong> — Added to spending every year from the specified age onwards. Examples: private health insurance starting at 65, annual travel budget on top of your base phase, healthcare cost escalation in your 80s, club memberships.</p>
+            <p><strong>One-time</strong> — A single expense in the calendar year of the reference person's specified birthday. Examples: new vehicle, home renovation, helping a child with a down payment, a once-in-a-lifetime trip.</p>
+            <p>All amounts are entered in today's dollars and inflated forward. Age references use the age reference person set in the Household tab.</p>
           </div>
         }>
         <div className="mb-3">
@@ -208,7 +215,13 @@ export function SpendingTab() {
         ))}
       </SectionCard>
       <SectionCard title="Spending by Year" width="full"
-        info="Total household spending per year in today's dollars, including phase base amounts (with growth) and any additional spending items. Use this to verify recurring and one-time items are applying as expected.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Total projected household spending per year, combining all active spending phases and additional items. Use this chart to verify that phase transitions, recurring items, and one-time expenses are landing in the right years.</p>
+            <p>Phase switches are visible as step changes in the bar heights. One-time expenses appear as a single taller bar in the year they occur. Recurring additional items appear as a sustained increase from their start age onwards.</p>
+            <p>This chart feeds directly into the Dashboard simulation — the Dashboard uses exactly these spending values to calculate how much needs to be drawn from income and investment accounts each year.</p>
+          </div>
+        }>
         <PlotlyChart
           data={withTotals(chartData)}
           layout={{

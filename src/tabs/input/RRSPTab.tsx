@@ -234,7 +234,13 @@ export function RRSPTab() {
         personColor={personB.color} />
 
       <SectionCard title="RRSP / RRIF Balances" width="full"
-        info="Account balance without plan withdrawals — contributions, growth, and RRIF minimums only. The full plan balance (after spending gap withdrawals) is shown in the Income Overview tab.">
+        info={
+          <div className="space-y-2 text-sm">
+            <p>Projected RRSP and RRIF balances over time, based on contributions, RRIF mandatory minimums, any additional withdrawals above minimum, and the assumed portfolio return rate. Balances are shown in today's dollars.</p>
+            <p>This is a <em>standalone preview</em> — it does not include withdrawals driven by the drawdown strategy in the Dashboard. Use this chart to verify your contribution end dates, RRIF conversion age, and the general trajectory of each account. The Dashboard shows the full simulation including spending gap withdrawals.</p>
+            <p>After RRIF conversion, the balance will decline as mandatory minimums are taken each year. If the balance appears to grow into the RRIF phase, the portfolio return rate is outpacing the minimum withdrawal — which becomes increasingly unlikely at older ages as minimums accelerate.</p>
+          </div>
+        }>
         <PlotlyChart
           data={withTotals(chartData)}
           layout={{
