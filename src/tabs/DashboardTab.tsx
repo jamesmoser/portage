@@ -78,8 +78,8 @@ const DRAWDOWN_STRATEGY_OPTIONS: { value: DrawdownStrategyType; label: string }[
 
 // ─── Income chart filter constants ────────────────────────────────────────────
 
-type SourceKey = 'employment' | 'dbPension' | 'cpp' | 'oas' | 'rrif' | 'tfsa' | 'nonReg' | 'other'
-const ALL_SOURCE_KEYS: SourceKey[] = ['employment', 'dbPension', 'cpp', 'oas', 'rrif', 'tfsa', 'nonReg', 'other']
+type SourceKey = 'employment' | 'dbPension' | 'cpp' | 'oas' | 'rrif' | 'tfsa' | 'nonReg' | 'hisa' | 'other'
+const ALL_SOURCE_KEYS: SourceKey[] = ['employment', 'dbPension', 'cpp', 'oas', 'rrif', 'tfsa', 'nonReg', 'hisa', 'other']
 const SOURCE_DEFS: { key: SourceKey; label: string; color: string }[] = [
   { key: 'employment', label: 'Employment', color: CHART_COLORS.employmentA },
   { key: 'dbPension',  label: 'DB Pension', color: CHART_COLORS.pensionA },
@@ -88,6 +88,7 @@ const SOURCE_DEFS: { key: SourceKey; label: string; color: string }[] = [
   { key: 'rrif',       label: 'RRIF',       color: CHART_COLORS.rrifA },
   { key: 'tfsa',       label: 'TFSA',       color: CHART_COLORS.tfsaA },
   { key: 'nonReg',     label: 'Non-Reg',    color: CHART_COLORS.nonRegA },
+  { key: 'hisa',       label: 'HISA',       color: '#94a3b8' },
   { key: 'other',      label: 'Other',      color: CHART_COLORS.otherIncomeA },
 ]
 
@@ -982,6 +983,7 @@ export function DashboardTab() {
     { x: years, y: dataPoints.map(d => d.tfsaWithdrawalB),   name: `${bName} TFSA`,       type: 'bar', marker: { color: CHART_COLORS.tfsaB },           _p: 'B', _src: 'tfsa'       },
     { x: years, y: dataPoints.map(d => d.nonRegWithdrawalA), name: `${aName} Non-Reg`,    type: 'bar', marker: { color: CHART_COLORS.nonRegA },         _p: 'A', _src: 'nonReg'     },
     { x: years, y: dataPoints.map(d => d.nonRegWithdrawalB), name: `${bName} Non-Reg`,    type: 'bar', marker: { color: CHART_COLORS.nonRegB },         _p: 'B', _src: 'nonReg'     },
+    { x: years, y: dataPoints.map(d => d.hisaWithdrawal),   name: 'HISA/Cash Draw',      type: 'bar', marker: { color: '#94a3b8' },                               _src: 'hisa'       },
     { x: years, y: dataPoints.map(d => d.otherIncomeA),      name: `${aName} Other`,      type: 'bar', marker: { color: CHART_COLORS.otherIncomeA },    _p: 'A', _src: 'other'      },
     { x: years, y: dataPoints.map(d => d.otherIncomeB),      name: `${bName} Other`,      type: 'bar', marker: { color: CHART_COLORS.otherIncomeB },    _p: 'B', _src: 'other'      },
   ]
