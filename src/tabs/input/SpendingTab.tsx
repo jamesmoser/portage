@@ -77,12 +77,9 @@ export function SpendingTab() {
   const years = dataPoints.map(d => d.year)
   const xAxis = buildXAxis(years, xAxisMode, personA.birthDate, personB.birthDate, personA.planningEndAge, personB.planningEndAge)
   const chartData: Data[] = [
-    {
-      x: years, y: dataPoints.map(d => d.householdSpending),
-      name: 'Household Spending', type: 'bar',
-      marker: { color: '#7B1515' },
-      xaxis: xAxis,
-    },
+    { x: years, y: dataPoints.map(d => d.spendingLifestyle),  name: 'Lifestyle',          type: 'bar', marker: { color: '#7B1515' } },
+    { x: years, y: dataPoints.map(d => d.contributions),      name: 'Contributions',      type: 'bar', marker: { color: '#3b82f6' } },
+    { x: years, y: dataPoints.map(d => d.spendingUnexpected), name: 'Unexpected Expense', type: 'bar', marker: { color: '#f59e0b' } },
   ]
 
   return (
@@ -101,18 +98,19 @@ export function SpendingTab() {
               <li><strong>Survivor</strong> — One person remaining. Fixed costs (housing, utilities) don't drop in half — budget at roughly 60–70% of couple spending.</li>
             </ul>
             <p><strong>Real Growth Rate</strong> — How fast spending changes in real terms within the phase, independent of inflation. Use 0% to hold constant purchasing power, a negative value for phases where activity naturally slows (e.g. −1% in No-Go years), or a positive value for lifestyle creep.</p>
-            <p>The Survivor phase can be linked to the first death automatically — enable the toggle on that row and the start age is set to the reference person's age when the first death occurs.</p>
+            <p>The last phase has a <strong>Survivor Phase</strong> toggle. When enabled, that phase takes over for the remainder of the plan from the moment the first person dies — the start age is determined automatically from the planning end ages and cannot be edited. When disabled, the phase behaves like any other and starts at its configured age.</p>
           </div>
         }>
 
         {spendingPhases.map((phase, i) => {
+          const isLastPhase = i === spendingPhases.length - 1
           const linked = phase.linkedToFirstDeath ?? false
           return (
             <div key={phase.id} className="mb-3 p-3 border border-slate-200 rounded bg-slate-50">
-              {i === spendingPhases.length - 1 && (
+              {isLastPhase && (
                 <div className="mb-2">
                   <ToggleInput
-                    label={`Start at First to Die (${firstToDisName})`}
+                    label={`Survivor Phase — starts at ${firstToDisName}'s death`}
                     value={linked}
                     onChange={v => updatePhase(phase.id, { linkedToFirstDeath: v })}
                   />
@@ -125,29 +123,36 @@ export function SpendingTab() {
                     className="input-field"
                     value={phase.label}
                     onChange={e => updatePhase(phase.id, { label: e.target.value })}
+                    disabled={isLastPhase}
                   />
                 </div>
-                <NumberInput
-                  label={`Starts (${refName}'s Age)`}
-                  value={linked ? computedSurvivorAge : phase.startAge}
-                  onChange={v => updatePhase(phase.id, { startAge: v })}
-                  min={40} max={100} step={0.5} decimals={1} size="sm"
-                  disabled={linked}
-                  tooltip={linked ? "Automatically set to reference person's age at first death" : '55.0 = 55th birthday · 55.5 = 6 months after 55th birthday'}
-                />
-                <NumberInput
-                  label="Annual Spending"
-                  value={phase.annualAmount}
-                  onChange={v => updatePhase(phase.id, { annualAmount: v })}
-                  prefix="$" min={0} step={1000} decimals={0}
-                />
-                <NumberInput
-                  label="Real Growth Rate"
-                  value={phase.growthRatePct}
-                  onChange={v => updatePhase(phase.id, { growthRatePct: v })}
-                  suffix="%" min={-10} max={20} step={0.1} decimals={1} size="sm"
-                  tooltip="Real spending growth above inflation within this phase. 0% = constant purchasing power. Negative = spending declines in real terms over time (typical as activity slows). Positive = lifestyle creep."
-                />
+                {!isLastPhase && (
+                  <NumberInput
+                    label={`Starts (${refName}'s Age)`}
+                    value={phase.startAge}
+                    onChange={v => updatePhase(phase.id, { startAge: v })}
+                    min={40} max={100} step={0.5} decimals={1} size="sm"
+                    tooltip="55.0 = 55th birthday · 55.5 = 6 months after 55th birthday"
+                  />
+                )}
+                {isLastPhase && <div />}
+                <div className={isLastPhase && !linked ? 'opacity-40 pointer-events-none' : ''}>
+                  <NumberInput
+                    label="Annual Spending"
+                    value={phase.annualAmount}
+                    onChange={v => updatePhase(phase.id, { annualAmount: v })}
+                    prefix="$" min={0} step={1000} decimals={0}
+                  />
+                </div>
+                <div className={isLastPhase && !linked ? 'opacity-40 pointer-events-none' : ''}>
+                  <NumberInput
+                    label="Real Growth Rate"
+                    value={phase.growthRatePct}
+                    onChange={v => updatePhase(phase.id, { growthRatePct: v })}
+                    suffix="%" min={-10} max={20} step={0.1} decimals={1} size="sm"
+                    tooltip="Real spending growth above inflation within this phase. 0% = constant purchasing power. Negative = spending declines in real terms over time (typical as activity slows). Positive = lifestyle creep."
+                  />
+                </div>
               </div>
             </div>
           )
@@ -232,6 +237,14 @@ export function SpendingTab() {
           }}
         />
         <XAxisSelector value={xAxisMode} onChange={v => setXAxisMode(v as XAxisMode)} aName={personA.name || 'Person A'} bName={personB.name || 'Person B'} />
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 pb-1">
+          {chartData.filter(s => s.y.some((v: number) => v > 0.01)).map((s: Data, i: number) => (
+            <div key={i} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+              <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: s.marker.color }} />
+              {s.name}
+            </div>
+          ))}
+        </div>
       </SectionCard>
     </CardGrid>
   )

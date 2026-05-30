@@ -5,6 +5,17 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.1.2] — 2026-05-30
+
+### Changed
+- Spending by Year chart (Assumptions tab) now stacked by category: Lifestyle (red), Contributions (blue), Unexpected Expense (amber), with legend
+- Survivor phase toggle renamed to "Survivor Phase — starts at [Name]'s death" for clarity
+- Survivor phase: age input removed (never relevant); phase name is non-editable; spending/growth fields grey out when toggle is off; column alignment maintained with other phases
+- Survivor phase engine: when toggle is off, phase is fully excluded from simulation — preceding phase runs to end of plan
+- Spend-gap info panel updated: clarifies that base plan contributions are deducted from income before surplus is calculated for routing
+
+---
+
 ## [0.1.1] — 2026-05-30
 
 ### Fixed

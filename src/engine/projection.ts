@@ -518,7 +518,13 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     // Phases are date-checked monthly so mid-year transitions (e.g. survivor phase
     // starting on the death birthday) are correctly captured.
     const refBirth = state.ageReferencePerson === 'personB' ? state.personB.birthDate : state.personA.birthDate
-    const phaseCalcs = state.spendingPhases.map(p => {
+    // Last phase is the survivor phase — only included when linkedToFirstDeath is true.
+    // When the survivor toggle is off (false), the last phase is skipped entirely and
+    // the preceding phase continues for the remainder of the plan.
+    const activePhases = state.spendingPhases.filter((p, i, arr) =>
+      i < arr.length - 1 || p.linkedToFirstDeath !== false
+    )
+    const phaseCalcs = activePhases.map(p => {
       const startDate = dateAtDecimalAge(refBirth, p.startAge)
       const spendYrs  = Math.max(0, exactAgeAt(refBirth, dateStr) - p.startAge)
       const annual    = p.annualAmount * inflFactor * Math.pow(1 + p.growthRatePct / 100, spendYrs)
