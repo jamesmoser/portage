@@ -719,6 +719,7 @@ describe('CPP survivor combined maximum cap', () => {
   })
 
   it('symmetric: cap applies to B when A is the deceased', () => {
+
     // Same logic in the other direction — B survives A.
     // Use bDthA (dies CY+2) and bCapA as survivor to confirm symmetry.
     // A: $1,000/mo; B: $1,000/mo → in years after A's death, B's combined is capped.
@@ -732,5 +733,58 @@ describe('CPP survivor combined maximum cap', () => {
     // CY+3: first full year after A's death (A dies July CY+2).
     // B's combined = 1000 + 600 = 1600 > 1563 → capped at 1563 × 12 = 18,756
     expect(dp(dataPoints, CY + 3).cppB).toBeCloseTo(CPP_COMBINED_MAX_MONTHLY * 12, 0)
+  })
+})
+
+// ─── RRSP contribution tax deduction ──────────────────────────────────────────
+//
+// RRSP contributions reduce net income for tax purposes (CRA T1 line 20800).
+// The engine applies the deduction by subtracting the contribution from
+// employment income before passing to calculateTax.
+
+describe('RRSP contribution tax deduction', () => {
+  const birthA    = `${CY - 50}-01-01`   // A: age 50, retires CY+10
+  const birthB    = `${CY - 48}-01-01`   // B: age 48, not contributing
+  const retireA   = dateAtAge(birthA, 60)
+  const retireB   = dateAtAge(birthB, 60)
+
+  function deductionState(rrspContrib: number): AppState {
+    return makeState(birthA, 90, retireA, birthB, 90, retireB, {
+      employmentA: { annualAmount: 120_000, growthRatePct: 0 },
+      rrspA: {
+        ...DEFAULT_STATE.rrspA,
+        balance: 0,
+        annualContribution:  rrspContrib,
+        contributionEndDate: dateAtAge(birthA, 60),
+        contributionTiming:  'lump',
+        rrifConversionDate:  dateAtAge(birthA, 71),
+        returnRateOverrideEnabled: true,
+        returnRateOverridePct: 0,
+      },
+    })
+  }
+
+  it('RRSP contribution reduces gross income by the contribution amount', () => {
+    const { dataPoints: withoutD } = runProjection(deductionState(0))
+    const { dataPoints: withD    } = runProjection(deductionState(20_000))
+    // CY+1: A working, contributing.  grossIncomeA = net income for tax purposes.
+    // With deduction: employment income passed to tax engine = 120,000 − 20,000 = 100,000.
+    expect(dp(withD, CY + 1).grossIncomeA).toBeCloseTo(
+      dp(withoutD, CY + 1).grossIncomeA - 20_000, 0)
+  })
+
+  it('RRSP contribution reduces tax paid', () => {
+    const { dataPoints: withoutD } = runProjection(deductionState(0))
+    const { dataPoints: withD    } = runProjection(deductionState(20_000))
+    expect(dp(withD, CY + 1).taxA).toBeLessThan(dp(withoutD, CY + 1).taxA)
+  })
+
+  it('RRSP deduction does not apply after contributions stop (retirement year)', () => {
+    const { dataPoints: withoutD } = runProjection(deductionState(0))
+    const { dataPoints: withD    } = runProjection(deductionState(20_000))
+    // Contributions end at age 60 (CY+10).  From CY+11 onward: no contribution → no deduction.
+    // With zero income after retirement and no other sources, both gross incomes are equal.
+    expect(dp(withD, CY + 11).grossIncomeA).toBeCloseTo(
+      dp(withoutD, CY + 11).grossIncomeA, 0)
   })
 })

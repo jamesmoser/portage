@@ -780,9 +780,25 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       }
     }
 
+    // ── RRSP contribution deduction — must be known before tax ───────────────
+    // RRSP contributions are a deduction from net income (CRA T1 line 20800).
+    // Computing them here lets calculateTax see the correct lower taxable income.
+    // The contribScale applied later may reduce the actual contribution slightly,
+    // meaning the deduction can be marginally overstated in edge cases — negligible
+    // in practice since applying the deduction increases surplus, making scale = 1 more likely.
+    // aContribActive / bContribActive are also needed here (same flags used below).
+    const sgStop = withdrawalStrategy.drawdownStrategy === 'spendGap'
+      && withdrawalStrategy.spendGapConfig.stopContributionsWhenPartnerRetired
+    const aPartnerRetired = bAlive && onOrAfter(dateStr, state.personB.retirementDate)
+    const bPartnerRetired = aAlive && onOrAfter(dateStr, state.personA.retirementDate)
+    const aContribActive = aAlive && !(sgStop && aPartnerRetired)
+    const bContribActive = bAlive && !(sgStop && bPartnerRetired)
+    const rrspContribA = rrspContribNom(state.rrspA, year, aContribActive, isRrifA, inflFactor)
+    const rrspContribB = rrspContribNom(state.rrspB, year, bContribActive, isRrifB, inflFactor)
+
     // ── Tax with pension splitting ────────────────────────────────────────────
     const taxInputA: TaxInput = {
-      employmentIncome:     empA_nom + otherTaxableA_nom,
+      employmentIncome:     Math.max(0, empA_nom + otherTaxableA_nom - rrspContribA),
       pensionIncome:        dbBase_nom + dbBridge_nom + rrifA_nom,
       cppIncome:            cppA_nom,
       oasIncome:            oasA_nom,
@@ -793,7 +809,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       age:                  personAAgeInt,
     }
     const taxInputB: TaxInput = {
-      employmentIncome:     empB_nom + otherTaxableB_nom,
+      employmentIncome:     Math.max(0, empB_nom + otherTaxableB_nom - rrspContribB),
       pensionIncome:        dbBaseB_nom + dbBridgeB_nom + rrifB_nom,
       cppIncome:            cppB_nom,
       oasIncome:            oasB_nom,
@@ -833,19 +849,10 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     // into investment accounts). Including them in spending gives an accurate
     // cash flow: income - lifestyle spending - contributions = true surplus/deficit.
     //
-    // stopContributionsWhenPartnerRetired: when enabled under the spendGap strategy,
-    // a person's contributions cease once their partner has retired.
-    const sgStop = withdrawalStrategy.drawdownStrategy === 'spendGap'
-      && withdrawalStrategy.spendGapConfig.stopContributionsWhenPartnerRetired
-    const aPartnerRetired = bAlive && onOrAfter(dateStr, state.personB.retirementDate)
-    const bPartnerRetired = aAlive && onOrAfter(dateStr, state.personA.retirementDate)
-    const aContribActive = aAlive && !(sgStop && aPartnerRetired)
-    const bContribActive = bAlive && !(sgStop && bPartnerRetired)
-
+    // sgStop / aContribActive / bContribActive / rrspContribA / rrspContribB are
+    // declared above the tax block so the RRSP deduction can reduce taxable income.
     const tfsaContribA  = tfsaContribNom(state.tfsaA,  year, aContribActive, inflFactor)
     const tfsaContribB  = tfsaContribNom(state.tfsaB,  year, bContribActive, inflFactor)
-    const rrspContribA  = rrspContribNom(state.rrspA,  year, aContribActive, isRrifA, inflFactor)
-    const rrspContribB  = rrspContribNom(state.rrspB,  year, bContribActive, isRrifB, inflFactor)
     const nonRegContribA = contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aContribActive, inflFactor)
     const nonRegContribB = contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bContribActive, inflFactor)
     const totalContribs_nom = rrspContribA + rrspContribB + tfsaContribA + tfsaContribB + nonRegContribA + nonRegContribB
