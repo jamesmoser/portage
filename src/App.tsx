@@ -717,6 +717,9 @@ function VersionModal({ onClose }: { onClose: () => void }) {
           </div>
 
         </div>
+        <div className="border-t border-slate-100 pt-3 text-xs text-slate-500">
+          <p>Portage is a personal planning tool, not professional financial advice. All projections are estimates — accuracy depends on your inputs and assumptions about future returns, inflation, and longevity.</p>
+        </div>
         <div className="border-t border-slate-100 pt-3 text-xs text-slate-400">
           <p>Built with React, TypeScript, Vite, Tailwind CSS, and Plotly.js. All computation runs locally in your browser — no data leaves your machine.</p>
         </div>
