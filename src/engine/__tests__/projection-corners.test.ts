@@ -788,3 +788,64 @@ describe('RRSP contribution tax deduction', () => {
       dp(withoutD, CY + 11).grossIncomeA, 0)
   })
 })
+
+// ─── Spousal RRSP ─────────────────────────────────────────────────────────────
+//
+// spousalBalance on rrspA = money A contributed to B's spousal RRSP (held in B's name).
+// It should seed B's working balance, NOT A's.
+// spousalAnnualContribution on rrspA = A's ongoing contributions into B's RRSP.
+// A gets the tax deduction; B's balance grows; B pays tax on eventual withdrawals.
+
+describe('Spousal RRSP', () => {
+  const birthA  = `${CY - 50}-01-01`
+  const birthB  = `${CY - 48}-01-01`
+  const retireA = dateAtAge(birthA, 60)
+  const retireB = dateAtAge(birthB, 60)
+
+  function spousalState(spousalBal: number, spousalContrib: number): AppState {
+    return makeState(birthA, 90, retireA, birthB, 90, retireB, {
+      employmentA: { annualAmount: 120_000, growthRatePct: 0 },
+      rrspA: {
+        ...DEFAULT_STATE.rrspA,
+        balance: 0,
+        annualContribution: 0,
+        spousalBalance: spousalBal,
+        spousalAnnualContribution: spousalContrib,
+        spousalLastContributionDate: dateAtAge(birthA, 60),
+        spousalContributionTiming: 'lump',
+        rrifConversionDate: dateAtAge(birthA, 71),
+        returnRateOverrideEnabled: true, returnRateOverridePct: 0,
+      },
+      rrspB: {
+        ...DEFAULT_STATE.rrspB,
+        balance: 0,
+        annualContribution: 0,
+        rrifConversionDate: dateAtAge(birthB, 71),
+        returnRateOverrideEnabled: true, returnRateOverridePct: 0,
+      },
+    })
+  }
+
+  it('spousal RRSP starting balance seeds B\'s RRSP, not A\'s', () => {
+    const { dataPoints } = runProjection(spousalState(50_000, 0))
+    // A has no own RRSP; B should start with the $50k spousal balance.
+    expect(dp(dataPoints, CY).rrspA).toBeCloseTo(0, 0)
+    expect(dp(dataPoints, CY).rrspB).toBeCloseTo(50_000, 0)
+  })
+
+  it('spousal annual contribution grows B\'s RRSP and deducts from A\'s taxable income', () => {
+    const without = runProjection(spousalState(0, 0))
+    const withS   = runProjection(spousalState(0, 10_000))
+    // After year CY, B's RRSP = 1 year × $10k contribution (return=0, no prior balance)
+    expect(dp(withS.dataPoints, CY).rrspB).toBeCloseTo(10_000, 0)
+    // A gets the deduction → A's gross income is lower by $10k
+    expect(dp(withS.dataPoints, CY).grossIncomeA)
+      .toBeCloseTo(dp(without.dataPoints, CY).grossIncomeA - 10_000, 0)
+  })
+
+  it('spousal contribution does not affect A\'s RRSP balance', () => {
+    const { dataPoints } = runProjection(spousalState(0, 10_000))
+    // A has no own RRSP and no spousal balance; A's RRSP should stay 0
+    expect(dp(dataPoints, CY + 1).rrspA).toBeCloseTo(0, 0)
+  })
+})

@@ -41,10 +41,6 @@ function RRSPSection({ label, account, birthDate, retirementDate, spouseName, on
         <p>Annual RRSP contributions are <strong>not</strong> included in your spending profile — they are added on top as a separate cash outflow. This means your spending phases should reflect lifestyle costs only. The Spending Breakdown chart on the Dashboard shows contributions as a distinct segment alongside lifestyle spending.</p>
       </div>
       <div>
-        <p className="font-semibold mb-1">Spousal RRSP</p>
-        <p>You are the contributor — withdrawals use your contribution room. {spouseName} is the annuitant and reports withdrawals as their income, which is useful if they will be in a lower bracket in retirement. The <strong>3-year attribution rule</strong> applies: withdrawals within 3 calendar years of your last contribution are attributed back to you for tax purposes, not {spouseName}.</p>
-      </div>
-      <div>
         <p className="font-semibold mb-1">Lump Sum vs Spread</p>
         <p>Lump sum applies the full annual contribution on Jan 1 each year. Spread pro-rates the contribution evenly through the year. In both cases the final partial year is adjusted to the contribution end date month — lump sum still receives the full amount if the end date falls within that year.</p>
       </div>
@@ -106,30 +102,6 @@ function RRSPSection({ label, account, birthDate, retirementDate, spouseName, on
         </div>
       </div>
 
-      <div className="mt-6 pt-3 border-t border-slate-100 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <NumberInput label="Spousal RRSP Balance" value={account.spousalBalance}
-            onChange={v => onChange({ ...account, spousalBalance: v })}
-            prefix="$" min={0} step={1000} decimals={0} />
-          <div />
-          <ToggleInput label="Lump Sum at Year Start"
-            value={account.spousalContributionTiming === 'lump'}
-            onChange={v => onChange({ ...account, spousalContributionTiming: v ? 'lump' : 'spread' })}
-            tooltip="Applies to spousal RRSP contributions — same timing logic as your own contributions." />
-          <NumberInput label="Spousal Annual Contribution" value={account.spousalAnnualContribution}
-            onChange={v => onChange({ ...account, spousalAnnualContribution: v })}
-            prefix="$" min={0} step={500} decimals={0} />
-        </div>
-        <div className="flex items-end gap-2">
-          <DateInput label="Last Spousal Contribution Date" value={account.spousalLastContributionDate}
-            onChange={v => onChange({ ...account, spousalLastContributionDate: v })} />
-          <button type="button" className="btn-primary shrink-0"
-            onClick={() => onChange({ ...account, spousalLastContributionDate: retirementDate })}>
-            Use Retirement Date
-          </button>
-        </div>
-      </div>
-
       <div className="mt-6 pt-3 border-t border-slate-100">
         <div className="grid grid-cols-2 gap-3">
           <NumberInput label="RRIF Conversion Age" value={rrifAge}
@@ -155,6 +127,64 @@ function RRSPSection({ label, account, birthDate, retirementDate, spouseName, on
   )
 }
 
+function SpousalRRSPSection({ label, account, retirementDate, spouseName, annuitantName, onChange, onReset, personColor }: {
+  label: string
+  account: RRSPAccount
+  retirementDate: string
+  spouseName: string
+  annuitantName: string
+  onChange: (v: RRSPAccount) => void
+  onReset: () => void
+  personColor?: string
+}) {
+  const infoModal = (
+    <div className="space-y-3 text-sm">
+      <div>
+        <p className="font-semibold mb-1">How It Works</p>
+        <p><strong>{spouseName}</strong> is the contributor and gets the tax deduction. <strong>{annuitantName}</strong> is the annuitant — the plan is held in their name and withdrawals are reported as <strong>{annuitantName}'s</strong> income, which is beneficial if they will be in a lower tax bracket in retirement.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">3-Year Attribution Rule</p>
+        <p>If {annuitantName} withdraws from this account within 3 calendar years of {spouseName}'s last contribution, the withdrawn amount (up to total recent contributions) is attributed back to {spouseName}'s income for that year. <strong>The app does not model this rule.</strong> To avoid unexpected tax, {annuitantName} should not withdraw until at least 3 calendar years after {spouseName}'s last contribution.</p>
+      </div>
+      <div>
+        <p className="font-semibold mb-1">Surplus Routing</p>
+        <p>Surplus routing and drawdown strategies act on {annuitantName}'s primary RRSP/RRIF pool only. Spousal RRSP contributions are from the base plan only — enter the planned annual amount directly.</p>
+      </div>
+    </div>
+  )
+
+  return (
+    <SectionCard title={label} width="half" personColor={personColor} onReset={onReset} info={infoModal}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberInput label="Spousal RRSP Balance" value={account.spousalBalance}
+            onChange={v => onChange({ ...account, spousalBalance: v })}
+            prefix="$" min={0} step={1000} decimals={0}
+            tooltip={`Current balance of the spousal RRSP held in ${annuitantName}'s name, funded by ${spouseName}.`} />
+          <div />
+          <ToggleInput label="Lump Sum at Year Start"
+            value={account.spousalContributionTiming === 'lump'}
+            onChange={v => onChange({ ...account, spousalContributionTiming: v ? 'lump' : 'spread' })}
+            tooltip="On: full annual contribution applied Jan 1. Off: spread evenly through the year, pro-rated to the last contribution date month." />
+          <NumberInput label="Annual Contribution" value={account.spousalAnnualContribution}
+            onChange={v => onChange({ ...account, spousalAnnualContribution: v })}
+            prefix="$" min={0} step={500} decimals={0} />
+        </div>
+        <div className="flex items-end gap-2">
+          <DateInput label="Last Contribution Date" value={account.spousalLastContributionDate}
+            onChange={v => onChange({ ...account, spousalLastContributionDate: v })}
+            tooltip={`Date of ${spouseName}'s last contribution. Important for the 3-year attribution rule.`} />
+          <button type="button" className="btn-primary shrink-0"
+            onClick={() => onChange({ ...account, spousalLastContributionDate: retirementDate })}>
+            Use Retirement Date
+          </button>
+        </div>
+      </div>
+    </SectionCard>
+  )
+}
+
 export function RRSPTab() {
   const state = useStore()
   const { rrspA, rrspB, personA, personB, update } = state
@@ -170,26 +200,29 @@ export function RRSPTab() {
   const endYearB = getYear(dateAtAge(personB.birthDate, personB.planningEndAge))
   const years = Array.from({ length: Math.max(endYearA, endYearB) - currentYear + 1 }, (_, i) => currentYear + i)
 
-  function rrspContrib(account: RRSPAccount, year: number, infl: number): number {
-    let c = 0
+  // Own contributions only (no spousal) — used for each person's own RRSP growth.
+  function ownContrib(account: RRSPAccount, year: number, infl: number): number {
     const endY = getYear(account.contributionEndDate)
-    if (account.annualContribution > 0 && year <= endY) {
-      const base = account.annualContribution * infl
-      c += (account.contributionTiming === 'lump' || year < endY)
-        ? base : base * parseInt(account.contributionEndDate.substring(5, 7), 10) / 12
-    }
-    const endSY = getYear(account.spousalLastContributionDate)
-    if (account.spousalAnnualContribution > 0 && year <= endSY) {
-      const base = account.spousalAnnualContribution * infl
-      c += (account.spousalContributionTiming === 'lump' || year < endSY)
-        ? base : base * parseInt(account.spousalLastContributionDate.substring(5, 7), 10) / 12
-    }
-    return c
+    if (account.annualContribution <= 0 || year > endY) return 0
+    const base = account.annualContribution * infl
+    return (account.contributionTiming === 'lump' || year < endY)
+      ? base : base * parseInt(account.contributionEndDate.substring(5, 7), 10) / 12
   }
 
+  // Spousal contributions made BY this account holder TO the other person's RRSP.
+  function spousalContrib(account: RRSPAccount, year: number, infl: number): number {
+    const endSY = getYear(account.spousalLastContributionDate)
+    if (account.spousalAnnualContribution <= 0 || year > endSY) return 0
+    const base = account.spousalAnnualContribution * infl
+    return (account.spousalContributionTiming === 'lump' || year < endSY)
+      ? base : base * parseInt(account.spousalLastContributionDate.substring(5, 7), 10) / 12
+  }
+
+  // A's pool = A's own balance + what B funded for A (held in A's name).
+  // B's pool = B's own balance + what A funded for B (held in B's name).
   const rrspAVals: number[] = [], rrspBVals: number[] = []
-  let balA = rrspA.balance + rrspA.spousalBalance
-  let balB = rrspB.balance + rrspB.spousalBalance
+  let balA = rrspA.balance + rrspB.spousalBalance
+  let balB = rrspB.balance + rrspA.spousalBalance
   for (const year of years) {
     const yp = year - currentYear
     const infl = Math.pow(1 + pi, yp)
@@ -203,8 +236,12 @@ export function RRSPTab() {
       : age < 70 ? rates.from65to70 / 100 : rates.from70plus / 100
     const isRrifA = jan1(year) >= rrspA.rrifConversionDate
     const isRrifB = jan1(year) >= rrspB.rrifConversionDate
-    const contribA = aAlive && !isRrifA ? rrspContrib(rrspA, year, infl) : 0
-    const contribB = bAlive && !isRrifB ? rrspContrib(rrspB, year, infl) : 0
+    // A's balance grows by A's own contributions + B's spousal-for-A.
+    // B's balance grows by B's own contributions + A's spousal-for-B.
+    const contribA = (aAlive && !isRrifA ? ownContrib(rrspA, year, infl) : 0)
+                   + (bAlive && !isRrifB ? spousalContrib(rrspB, year, infl) : 0)
+    const contribB = (bAlive && !isRrifB ? ownContrib(rrspB, year, infl) : 0)
+                   + (aAlive && !isRrifA ? spousalContrib(rrspA, year, infl) : 0)
     const withA = isRrifA ? balA * rrifMinFactor(intAgeAt(rrspA.useSpouseAgeForMinimums ? personB.birthDate : personA.birthDate, `${year}-01-01`)) + rrspA.additionalWithdrawalAboveMinimum * infl : 0
     const withB = isRrifB ? balB * rrifMinFactor(intAgeAt(rrspB.useSpouseAgeForMinimums ? personA.birthDate : personB.birthDate, `${year}-01-01`)) + rrspB.additionalWithdrawalAboveMinimum * infl : 0
     balA = Math.max(0, balA + contribA - withA) * (1 + nomRet(rrspA))
@@ -232,6 +269,19 @@ export function RRSPTab() {
         onChange={v => update('rrspB', v)}
         onReset={() => update('rrspB', { ...DEFAULT_STATE.rrspB, contributionEndDate: personB.retirementDate, rrifConversionDate: dateAtAge(personB.birthDate, 71) })}
         personColor={personB.color} />
+
+      <SpousalRRSPSection label={`Spousal RRSP — ${aName} contributes for ${bName}`}
+        account={rrspA} retirementDate={personA.retirementDate}
+        spouseName={aName} annuitantName={bName}
+        onChange={v => update('rrspA', v)}
+        onReset={() => update('rrspA', { ...rrspA, spousalBalance: 0, spousalAnnualContribution: 0, spousalLastContributionDate: personA.retirementDate })}
+        personColor={personB.color} />
+      <SpousalRRSPSection label={`Spousal RRSP — ${bName} contributes for ${aName}`}
+        account={rrspB} retirementDate={personB.retirementDate}
+        spouseName={bName} annuitantName={aName}
+        onChange={v => update('rrspB', v)}
+        onReset={() => update('rrspB', { ...rrspB, spousalBalance: 0, spousalAnnualContribution: 0, spousalLastContributionDate: personB.retirementDate })}
+        personColor={personA.color} />
 
       <SectionCard title="RRSP / RRIF Balances" width="full"
         info={

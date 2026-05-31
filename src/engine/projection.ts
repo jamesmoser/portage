@@ -37,6 +37,13 @@ function rrspContribNom(account: AppState['rrspA'], year: number, alive: boolean
   return contribNom(account.annualContribution, account.contributionEndDate, account.contributionTiming, year, alive, inflFactor)
 }
 
+/** Spousal RRSP contribution made BY the account holder TO their spouse's RRSP.
+ *  Gated on the contributor not yet being in RRIF phase (no RRSP room after age 71). */
+function spousalContribNom(account: AppState['rrspA'], year: number, alive: boolean, isRrif: boolean, inflFactor: number): number {
+  if (isRrif) return 0
+  return contribNom(account.spousalAnnualContribution, account.spousalLastContributionDate, account.spousalContributionTiming, year, alive, inflFactor)
+}
+
 function contribNom(annualContribution: number, contributionEndDate: string, contributionTiming: 'lump' | 'spread', year: number, alive: boolean, inflFactor: number): number {
   if (!alive || annualContribution <= 0) return 0
   const endYear = getYear(contributionEndDate)
@@ -99,8 +106,10 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
   }
 
   // ── Mutable account balances (nominal) ───────────────────────────────────
-  let rrspA      = state.rrspA.balance
-  let rrspB      = state.rrspB.balance
+  // Each person's RRSP working balance = their own account + the spousal RRSP
+  // the other person contributed for them (held in their name, taxed as their income).
+  let rrspA      = state.rrspA.balance + state.rrspB.spousalBalance
+  let rrspB      = state.rrspB.balance + state.rrspA.spousalBalance
   let tfsaA      = state.tfsaA.balance
   let tfsaB      = state.tfsaB.balance
   let nonRegA    = state.nonRegA.balance
@@ -793,12 +802,16 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const bPartnerRetired = aAlive && onOrAfter(dateStr, state.personA.retirementDate)
     const aContribActive = aAlive && !(sgStop && aPartnerRetired)
     const bContribActive = bAlive && !(sgStop && bPartnerRetired)
-    const rrspContribA = rrspContribNom(state.rrspA, year, aContribActive, isRrifA, inflFactor)
-    const rrspContribB = rrspContribNom(state.rrspB, year, bContribActive, isRrifB, inflFactor)
+    const rrspContribA    = rrspContribNom(state.rrspA, year, aContribActive, isRrifA, inflFactor)
+    const rrspContribB    = rrspContribNom(state.rrspB, year, bContribActive, isRrifB, inflFactor)
+    // Spousal contributions: A funds a spousal RRSP held by B (and vice versa).
+    // A gets the deduction; the money flows into B's RRSP balance.
+    const spousalContribByA = spousalContribNom(state.rrspA, year, aContribActive, isRrifA, inflFactor)
+    const spousalContribByB = spousalContribNom(state.rrspB, year, bContribActive, isRrifB, inflFactor)
 
     // ── Tax with pension splitting ────────────────────────────────────────────
     const taxInputA: TaxInput = {
-      employmentIncome:     Math.max(0, empA_nom + otherTaxableA_nom - rrspContribA),
+      employmentIncome:     Math.max(0, empA_nom + otherTaxableA_nom - rrspContribA - spousalContribByA),
       pensionIncome:        dbBase_nom + dbBridge_nom + rrifA_nom,
       cppIncome:            cppA_nom,
       oasIncome:            oasA_nom,
@@ -809,7 +822,7 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       age:                  personAAgeInt,
     }
     const taxInputB: TaxInput = {
-      employmentIncome:     Math.max(0, empB_nom + otherTaxableB_nom - rrspContribB),
+      employmentIncome:     Math.max(0, empB_nom + otherTaxableB_nom - rrspContribB - spousalContribByB),
       pensionIncome:        dbBaseB_nom + dbBridgeB_nom + rrifB_nom,
       cppIncome:            cppB_nom,
       oasIncome:            oasB_nom,
@@ -855,19 +868,21 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const tfsaContribB  = tfsaContribNom(state.tfsaB,  year, bContribActive, inflFactor)
     const nonRegContribA = contribNom(state.nonRegA.annualContribution, state.nonRegA.contributionEndDate, state.nonRegA.contributionTiming, year, aContribActive, inflFactor)
     const nonRegContribB = contribNom(state.nonRegB.annualContribution, state.nonRegB.contributionEndDate, state.nonRegB.contributionTiming, year, bContribActive, inflFactor)
-    const totalContribs_nom = rrspContribA + rrspContribB + tfsaContribA + tfsaContribB + nonRegContribA + nonRegContribB
+    const totalContribs_nom = rrspContribA + rrspContribB + spousalContribByA + spousalContribByB + tfsaContribA + tfsaContribB + nonRegContribA + nonRegContribB
 
     // Contributions are funded from surplus only — no gap-fill or account draws are used.
     // Cap total contributions at income remaining after lifestyle + unexpected spending.
     const surplusBeforeContribs = Math.max(0, totalNetNom - spending_nom)
     const contribScale = totalContribs_nom > 0 ? Math.min(1, surplusBeforeContribs / totalContribs_nom) : 0
-    let effTfsaContribA   = tfsaContribA   * contribScale
-    let effTfsaContribB   = tfsaContribB   * contribScale
-    const effRrspContribA   = rrspContribA   * contribScale
-    const effRrspContribB   = rrspContribB   * contribScale
-    let effNonRegContribA = nonRegContribA * contribScale
-    let effNonRegContribB = nonRegContribB * contribScale
-    const effTotalContribs  = effTfsaContribA + effTfsaContribB + effRrspContribA + effRrspContribB + effNonRegContribA + effNonRegContribB
+    let effTfsaContribA     = tfsaContribA     * contribScale
+    let effTfsaContribB     = tfsaContribB     * contribScale
+    const effRrspContribA   = rrspContribA     * contribScale
+    const effRrspContribB   = rrspContribB     * contribScale
+    const effSpousalByA     = spousalContribByA * contribScale   // flows into rrspB
+    const effSpousalByB     = spousalContribByB * contribScale   // flows into rrspA
+    let effNonRegContribA   = nonRegContribA   * contribScale
+    let effNonRegContribB   = nonRegContribB   * contribScale
+    const effTotalContribs  = effTfsaContribA + effTfsaContribB + effRrspContribA + effRrspContribB + effSpousalByA + effSpousalByB + effNonRegContribA + effNonRegContribB
     spending_nom += effTotalContribs
 
     // ── Gap fill / account draws ──────────────────────────────────────────────
@@ -1190,8 +1205,10 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const tfsaRetA = state.tfsaA.returnRateOverrideEnabled ? state.tfsaA.returnRateOverridePct / 100 : nomReturn
     const tfsaRetB = state.tfsaB.returnRateOverrideEnabled ? state.tfsaB.returnRateOverridePct / 100 : nomReturn
 
-    rrspA   = grow(Math.max(0, rrspA  + effRrspContribA - (isRrifA ? rrifA_nom : 0)), rrspRetA)
-    rrspB   = grow(Math.max(0, rrspB  + effRrspContribB - (isRrifB ? rrifB_nom : 0)), rrspRetB)
+    // A's RRSP grows by A's own contributions + B's spousal-for-A (held in A's name).
+    // B's RRSP grows by B's own contributions + A's spousal-for-B (held in B's name).
+    rrspA   = grow(Math.max(0, rrspA  + effRrspContribA + effSpousalByB - (isRrifA ? rrifA_nom : 0)), rrspRetA)
+    rrspB   = grow(Math.max(0, rrspB  + effRrspContribB + effSpousalByA - (isRrifB ? rrifB_nom : 0)), rrspRetB)
     tfsaA   = grow(tfsaA  + effTfsaContribA, tfsaRetA)
     tfsaB   = grow(tfsaB  + effTfsaContribB, tfsaRetB)
     nonRegA = grow(nonRegA + effNonRegContribA, nonRegRetA)
@@ -1250,8 +1267,8 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       householdSpending:  pd(spending_nom),
       spendingLifestyle:  pd(spendingLifestyle_nom),
       contributions:      pd(effTotalContribs + surplusRoutedTotal_nom),
-      contribRrspA:   pd(effRrspContribA),
-      contribRrspB:   pd(effRrspContribB),
+      contribRrspA:   pd(effRrspContribA + effSpousalByB),
+      contribRrspB:   pd(effRrspContribB + effSpousalByA),
       contribTfsaA:   pd(effTfsaContribA),
       contribTfsaB:   pd(effTfsaContribB),
       contribNonRegA: pd(effNonRegContribA),
