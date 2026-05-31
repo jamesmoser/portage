@@ -207,8 +207,6 @@ export const DEFAULT_STATE: AppState = {
     survivorBenefitPct: 0.6,
     cppIntegration: false,
     cppIntegrationAmount: 0,
-    normalRetirementAge: 65,
-    earlyReductionPctPerYear: 0,
   },
   dbPensionB: {
     enabled: false,
@@ -224,8 +222,6 @@ export const DEFAULT_STATE: AppState = {
     survivorBenefitPct: 0.6,
     cppIntegration: false,
     cppIntegrationAmount: 0,
-    normalRetirementAge: 65,
-    earlyReductionPctPerYear: 0,
   },
 
   cppA: {

@@ -34,8 +34,6 @@ export interface DBPension {
   survivorBenefitPct: number    // 0–1, fraction of pension paid to survivor
   cppIntegration: boolean       // pension reduces at 65 by CPP integration amount
   cppIntegrationAmount: number  // annual reduction amount
-  normalRetirementAge: number   // plan's normal retirement age
-  earlyReductionPctPerYear: number // % reduction per year before normal retirement age
 }
 
 // ─── CPP ─────────────────────────────────────────────────────────────────────
