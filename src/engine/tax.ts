@@ -150,10 +150,11 @@ export function calculateTax(
   // ── FEDERAL TAX ───────────────────────────────────────────────────────────
   const fedTaxBeforeCredits = applyBrackets(netIncome, s.federalBrackets)
 
-  // Non-refundable credits applied at lowest federal rate (15%)
-  const fedBPACredit = s.federalBPA * 0.15
-  const fedAgeCredit = federalAgeAmt * 0.15
-  const fedPensionCredit = Math.min(eligiblePensionForCredit, s.federalPensionIncomeAmount) * 0.15
+  // Non-refundable credits applied at the lowest federal bracket rate.
+  const fedLowestRate = s.federalBrackets[0]?.rate ?? 0.15
+  const fedBPACredit = s.federalBPA * fedLowestRate
+  const fedAgeCredit = federalAgeAmt * fedLowestRate
+  const fedPensionCredit = Math.min(eligiblePensionForCredit, s.federalPensionIncomeAmount) * fedLowestRate
   const fedEligibleDivCredit = eligibleGrossed * s.federalEligibleDivCredit
   const fedNonEligibleDivCredit = nonEligibleGrossed * s.federalNonEligibleDivCredit
 

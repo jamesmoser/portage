@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { runProjection } from '../projection'
-import { DEFAULT_STATE } from '../defaults'
+import { DEFAULT_STATE, CPP_COMBINED_MAX_MONTHLY } from '../defaults'
 import { dateAtAge } from '../dates'
 import type { AppState } from '../types'
 
@@ -315,7 +315,7 @@ describe('death corners', () => {
     // B alive all 12 months of CY+2. anyAlive = true all year. Full spending.
     const spending = 24_000
     const state = deathState({
-      spendingPhases: [{ id: 'p0', label: 'Test', startAge: 0, annualAmount: spending, growthRatePct: 0, linkedToFirstDeath: false }],
+      spendingPhases: [{ id: 'p0', label: 'Test', startAge: 0, annualAmount: spending, growthRatePct: 0, linkedToFirstDeath: undefined}],
     })
     const { dataPoints } = runProjection(state)
     // CY+2 spending should equal CY+1 spending (A dying doesn't reduce spending)
@@ -327,7 +327,7 @@ describe('death corners', () => {
     // not Apr(1 > Mar 15). aliveMonths = 3. Spending = 24000 × 3/12 = 6000.
     const spending = 24_000
     const state = deathState({
-      spendingPhases: [{ id: 'p0', label: 'Test', startAge: 0, annualAmount: spending, growthRatePct: 0, linkedToFirstDeath: false }],
+      spendingPhases: [{ id: 'p0', label: 'Test', startAge: 0, annualAmount: spending, growthRatePct: 0, linkedToFirstDeath: undefined}],
     })
     const { dataPoints } = runProjection(state)
     expect(dp(dataPoints, CY + 8).householdSpending).toBeCloseTo(6_000, 0)
@@ -511,7 +511,7 @@ describe('contribution surplus capping', () => {
     const state = contribState({
       employmentA: { annualAmount: 5_000, growthRatePct: 0 },
       spendingPhases: [{ id: 'p0', label: 'test', startAge: 0, annualAmount: 1_000,
-                         growthRatePct: 0, linkedToFirstDeath: false }],
+                         growthRatePct: 0, linkedToFirstDeath: undefined}],
       tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 0, annualContribution: 10_000,
                contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
     })
@@ -528,7 +528,7 @@ describe('contribution surplus capping', () => {
     const state = contribState({
       employmentA: { annualAmount: 5_000, growthRatePct: 0 },
       spendingPhases: [{ id: 'p0', label: 'test', startAge: 0, annualAmount: 1_000,
-                         growthRatePct: 0, linkedToFirstDeath: false }],
+                         growthRatePct: 0, linkedToFirstDeath: undefined}],
       tfsaA: { ...DEFAULT_STATE.tfsaA, balance: 0, annualContribution: 3_000,
                contributionEndDate: dateAtAge(bA50, 55), returnRateOverrideEnabled: true, returnRateOverridePct: 0 },
       tfsaB: { ...DEFAULT_STATE.tfsaB, balance: 0, annualContribution: 3_000,
@@ -630,5 +630,107 @@ describe('pension split tracking (pensionSplitPaid / pensionSplitReceived)', () 
       const totalAuto = dpAuto[i].grossIncomeA + dpAuto[i].grossIncomeB
       expect(totalAuto).toBeCloseTo(totalNo, 0)
     }
+  })
+})
+
+// ─── CPP survivor benefit combined maximum cap ─────────────────────────────────
+// CRA rule: combined (own retirement + survivor) cannot exceed CPP_COMBINED_MAX_MONTHLY
+// (CPI-indexed).  The survivor benefit is reduced first — own CPP is never cut.
+//
+// Setup: pi=0, cpi=0 so monthly amounts are constant and PD=nominal.
+// A (born Jan 1, age 68) lives for 4 years.  B (born Jan 1, age 65) dies end of CY+1.
+// Both started CPP at 65 (factor = 1.0).  CY+2 is the first full post-death year.
+//
+//   Uncapped:  combined = own + 0.60×deceased   if combined ≤ cap
+//   Capped:    survivor reduced so own + survivor = cap
+
+describe('CPP survivor combined maximum cap', () => {
+  const bCapA = `${CY - 68}-01-01`   // A: age 68, planEnd 72 → endYearA = CY+4
+  const bCapB = `${CY - 65}-01-01`   // B: age 65, planEnd 66 → deathDate Jan 1 CY+1, endYearB = CY+1
+  const retiredLongAgo = `${CY - 15}-01-01`
+
+  function capState(monthlyA: number, monthlyB: number, startAgeA = 65, startAgeB = 65): AppState {
+    return makeState(bCapA, 72, retiredLongAgo, bCapB, 66, retiredLongAgo, {
+      cppA: { ...DEFAULT_STATE.cppA, estimatedMonthlyAt65: monthlyA, startDate: dateAtAge(bCapA, startAgeA) },
+      cppB: { ...DEFAULT_STATE.cppB, estimatedMonthlyAt65: monthlyB, startDate: dateAtAge(bCapB, startAgeB) },
+    })
+  }
+
+  it('survivor is uncapped when combined is below the monthly maximum', () => {
+    // A: $700/mo own; B (deceased): $700/mo → raw survivor $420/mo
+    // Combined $1,120/mo < $1,563 cap → uncapped; annual CY+2 = 1120 × 12 = 13,440
+    const { dataPoints } = runProjection(capState(700, 700))
+    const full = dp(dataPoints, CY + 2).cppA
+    expect(full).toBeCloseTo((700 + 700 * 0.60) * 12, 0)
+    expect(full).toBeLessThan(CPP_COMBINED_MAX_MONTHLY * 12)
+  })
+
+  it('survivor is reduced when combined would exceed the monthly maximum', () => {
+    // A: $1,000/mo own; B (deceased): $1,000/mo → raw survivor $600/mo
+    // Combined $1,600/mo > $1,563 cap → survivor capped at $563/mo
+    // Annual CY+2 = 1,563 × 12 = 18,756
+    const { dataPoints } = runProjection(capState(1_000, 1_000))
+    const capped = dp(dataPoints, CY + 2).cppA
+    expect(capped).toBeCloseTo(CPP_COMBINED_MAX_MONTHLY * 12, 0)
+    expect(capped).toBeLessThan((1_000 + 1_000 * 0.60) * 12)
+  })
+
+  it('full survivor benefit flows when A has no own CPP (survivor well below cap)', () => {
+    // A: no CPP; B (deceased): $1,000/mo → survivor $600/mo < $1,563 cap → uncapped
+    // Annual CY+2 = 600 × 12 = 7,200
+    const { dataPoints } = runProjection(capState(0, 1_000))
+    expect(dp(dataPoints, CY + 2).cppA).toBeCloseTo(600 * 12, 0)
+  })
+
+  it('survivor is zero when own CPP (deferred to 70) already fills the scaled cap', () => {
+    // A: $1,563/mo at 65 deferred to 70 → factor 1.42 → own = $2,219/mo
+    // Scaled cap = 1,563 × 1.42 = $2,219/mo → headroom = 0 → no survivor benefit
+    // Annual CY+2 = 2,219 × 12 ≈ 26,628  (own CPP is NOT reduced)
+    const { dataPoints } = runProjection(capState(CPP_COMBINED_MAX_MONTHLY, 1_000, 70, 65))
+    const ownOnly = dp(dataPoints, CY + 2).cppA
+    const expectedOwn = CPP_COMBINED_MAX_MONTHLY * 1.42 * 12
+    expect(ownOnly).toBeCloseTo(expectedOwn, 0)
+    expect(ownOnly).toBeGreaterThan(CPP_COMBINED_MAX_MONTHLY * 12)
+  })
+
+  it("survivor receives 60% of deceased's age-65 amount, not their deferred amount", () => {
+    // B deferred to 70 (factor 1.42) but the deferral premium is not transferable.
+    // A (survivor): no own CPP; B (deceased): $1,000/mo at 65, deferred to 70.
+    // Correct:  survivor = 1,000 × 0.60 = 600/mo → 7,200/yr
+    // Wrong:    survivor = 1,000 × 1.42 × 0.60 = 852/mo → 10,224/yr
+    const bOldB = `${CY - 80}-01-01`   // B: age 80 now, planEnd=81 → dies end CY+1; CPP started at 70 (CY-10)
+    const bOldA = `${CY - 68}-01-01`   // A: age 68 now, planEnd=72; CPP started at 65 (CY-3)
+    const state = makeState(bOldA, 72, retiredLongAgo, bOldB, 81, retiredLongAgo, {
+      cppA: { ...DEFAULT_STATE.cppA, estimatedMonthlyAt65: 0,     startDate: dateAtAge(bOldA, 65) },
+      cppB: { ...DEFAULT_STATE.cppB, estimatedMonthlyAt65: 1_000, startDate: dateAtAge(bOldB, 70) },
+    })
+    const { dataPoints } = runProjection(state)
+    // CY+2: first full year after B's death
+    expect(dp(dataPoints, CY + 2).cppA).toBeCloseTo(1_000 * 0.60 * 12, 0)  // 7,200
+  })
+
+  it("combined maximum cap scales with survivor's own deferral factor", () => {
+    // A deferred to 70 (factor 1.42): own = 1,000 × 1.42 = 1,420/mo; raw survivor = 1,000 × 0.60 = 600/mo
+    // Correct cap  = 1,563 × 1.42 = 2,219/mo → combined 2,020 < 2,219 → uncapped → 2,020 × 12 = 24,240
+    // Wrong flat cap = 1,563/mo → combined 2,020 > 1,563 → capped at 1,563 × 12 = 18,756
+    const { dataPoints } = runProjection(capState(1_000, 1_000, 70, 65))
+    // CY+2: A starts CPP (deferred to 70); B died Dec 31 CY+1
+    expect(dp(dataPoints, CY + 2).cppA).toBeCloseTo((1_000 * 1.42 + 1_000 * 0.60) * 12, 0)
+  })
+
+  it('symmetric: cap applies to B when A is the deceased', () => {
+    // Same logic in the other direction — B survives A.
+    // Use bDthA (dies CY+2) and bCapA as survivor to confirm symmetry.
+    // A: $1,000/mo; B: $1,000/mo → in years after A's death, B's combined is capped.
+    const bSurvA = `${CY - 71}-07-01`   // dies CY+2-07-01 (reusing bDthA birth)
+    const bSurvB = `${CY - 65}-01-01`   // lives to CY+5
+    const state = makeState(bSurvA, 73, retiredLongAgo, bSurvB, 70, retiredLongAgo, {
+      cppA: { ...DEFAULT_STATE.cppA, estimatedMonthlyAt65: 1_000, startDate: dateAtAge(bSurvA, 65) },
+      cppB: { ...DEFAULT_STATE.cppB, estimatedMonthlyAt65: 1_000, startDate: dateAtAge(bSurvB, 65) },
+    })
+    const { dataPoints } = runProjection(state)
+    // CY+3: first full year after A's death (A dies July CY+2).
+    // B's combined = 1000 + 600 = 1600 > 1563 → capped at 1563 × 12 = 18,756
+    expect(dp(dataPoints, CY + 3).cppB).toBeCloseTo(CPP_COMBINED_MAX_MONTHLY * 12, 0)
   })
 })

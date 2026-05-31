@@ -134,7 +134,7 @@ function sgState(p: SgParams = {}): AppState {
     },
     cash: { hisaBalance: p.hisaBal ?? 0, hisaRatePct: 0, hisaMinBalance: 0 },
     spendingPhases: (p.spending ?? 0) > 0
-      ? [{ id: 'p0', label: 'test', startAge: 0, annualAmount: p.spending!, growthRatePct: 0, linkedToFirstDeath: false }]
+      ? [{ id: 'p0', label: 'test', startAge: 0, annualAmount: p.spending!, growthRatePct: 0 }]
       : [],
     additionalSpending: [],
     withdrawalStrategy: {

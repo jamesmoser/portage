@@ -50,8 +50,19 @@ export function CPPOASTab() {
 
   const annualA = cppA.estimatedMonthlyAt65 * 12 * cppFactA
   const annualB = cppB.estimatedMonthlyAt65 * 12 * cppFactB
-  const survivorFromA = annualA * 0.60   // payable to B when A dies
-  const survivorFromB = annualB * 0.60   // payable to A when B dies
+
+  // Survivor benefit — per CRA:
+  //   1. Deceased's deferral factor is NOT transferable; benefit = 60% of deceased's age-65 baseline.
+  //   2. Combined maximum cap scales with the SURVIVOR's own deferral factor.
+  // survivorFromA = payable to B when A dies; survivorFromB = payable to A when B dies.
+  const survivorFromA = Math.min(
+    cppA.estimatedMonthlyAt65 * 0.60,
+    Math.max(0, CPP_COMBINED_MAX_MONTHLY * cppFactB - cppB.estimatedMonthlyAt65 * cppFactB),
+  ) * 12
+  const survivorFromB = Math.min(
+    cppB.estimatedMonthlyAt65 * 0.60,
+    Math.max(0, CPP_COMBINED_MAX_MONTHLY * cppFactA - cppA.estimatedMonthlyAt65 * cppFactA),
+  ) * 12
 
   const fmt0 = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
 
@@ -98,7 +109,7 @@ export function CPPOASTab() {
       <p><strong>Residency-based benefit</strong> — Unlike CPP, OAS is not based on employment or contributions. Eligibility requires at least 10 years of Canadian residency after age 18; the full benefit requires 40 years. Most long-term Canadian residents qualify for the full amount.</p>
       <p><strong>Estimation Methods</strong> — <em>Direct Entry</em>: enter the monthly amount from your My Service Canada account. <em>Years of Residency</em>: enter your years of Canadian residency after age 18; the app calculates (years ÷ 40) × the maximum benefit.</p>
       <p><strong>Deferral</strong> — OAS can start between age 65 and 70. There is no early option. Each month deferred past 65 increases the benefit by 0.6% per month (maximum +36% at age 70). There is no survivor benefit — payments stop at death.</p>
-      <p><strong>Clawback (OAS Recovery Tax)</strong> — 15% of net income above ~$95,323 (2026, indexed to CPI annually), calculated per person. The clawback is <strong>not applied in the base model</strong> and will be addressed in scenario analysis for high-income projections.</p>
+      <p><strong>Clawback (OAS Recovery Tax)</strong> — 15% of net income above ~$95,323 (2026, indexed to CPI annually), calculated per person. The tax engine applies the clawback in every projection year — OAS may be partially or fully clawed back for high-income years. Check the Tax tab in the Dashboard to see the effective OAS received after clawback.</p>
       <p><strong>GIS (Guaranteed Income Supplement)</strong> — A non-taxable monthly top-up for low-income OAS recipients. If enabled, the app adds the entered GIS amount to OAS in the base projection, but does <strong>not apply the income test</strong>. For high earners, GIS would be $0 in practice. The 2026 maximum for a coupled recipient is ~$667/month.</p>
     </div>
   )
@@ -113,9 +124,9 @@ export function CPPOASTab() {
   const cppInfoModal = (
     <div className="space-y-2 text-sm">
       <p><strong>My Service Canada estimate</strong> — The app uses your projected monthly CPP at age 65 from your My Service Canada account. This reflects your actual earnings history and contribution record and is the most accurate input available for planning.</p>
-      <p><strong>CPP Enhancement (CPP2)</strong> — Since 2019, CPP contributions are split into two tiers (base CPP and CPP2 on earnings between the YMPE and YAMPE). My Service Canada's projected retirement amount includes both tiers, so entering the figure from your statement implicitly captures CPP2 with no separate input required.</p>
+      <p><strong>CPP Enhancement (CPP2)</strong> — The CPP has been enhanced in two phases. The phase-1 enhancement (2019–2023) gradually increased contributions and benefits within the existing base tier (up to the YMPE). CPP2, introduced January 2024, adds a second tier on earnings between the YMPE and the YAMPE. My Service Canada's projected retirement amount includes both phases, so entering that figure implicitly captures CPP2 with no separate input required.</p>
       <p><strong>CPP Disability</strong> — CPP disability is not modelled in this app. If you are currently receiving CPP disability, your My Service Canada statement will show that benefit rather than a retirement projection — contact Service Canada for an equivalent retirement estimate. Note: years spent on CPP disability are excluded from the contributory period, which is favourable to the retirement calculation.</p>
-      <p><strong>Survivor Benefit</strong> — When the CPP recipient dies, the surviving spouse receives up to 60% of the deceased's adjusted retirement pension. This calculation assumes the survivor is age 65 or older at the time. The combined CPP (survivor + own) cannot exceed the maximum CPP pension; this cap is not applied here.</p>
+      <p><strong>Survivor Benefit</strong> — When the CPP recipient dies, the surviving spouse receives up to 60% of the deceased's <em>age-65</em> retirement pension. The deceased's deferral premium is not transferable — if the deceased deferred to 70, only the age-65 baseline is used in the calculation. The combined CPP (survivor + own) cannot exceed a maximum that <em>scales with the survivor's own deferral factor</em>: {fmt0(CPP_COMBINED_MAX_MONTHLY)}/month at age 65, rising to {fmt0(Math.round(CPP_COMBINED_MAX_MONTHLY * 1.42))}/month if the survivor also deferred to 70. Own CPP is never reduced — only the survivor addition is constrained. The survivor amounts shown below already reflect this cap. <em>Note: the 60% rule applies when the survivor is age 65+. For survivors under 65, CRA uses a different formula (flat amount + 37.5%); the app applies the 60% rule regardless of survivor age, which may slightly overstate the benefit if one partner dies young.</em></p>
       <p><strong>Estimation Methods</strong> — Three methods are available. <em>Direct Entry</em>: enter the projected amount from My Service Canada directly. <em>% of Maximum</em>: enter your benefit as a percentage of the 2026 combined maximum ({fmt0(CPP_COMBINED_MAX_MONTHLY)}/month). <em>Years at Maximum</em>: enter years of full contributions; the app calculates (years ÷ 39) × maximum. All methods assume the combined base CPP + CPP2 maximum. <strong>CPP2 caveat:</strong> CPP2 only started January 2024, so the CPP2 component (~$55/month in 2026) is understated for anyone expecting a full career of CPP2 contributions. Use Direct Entry from My Service Canada for the most accurate figure.</p>
       <p><strong>Start Age Adjustment Rates</strong></p>
       <div className="grid grid-cols-2 gap-2 text-xs">

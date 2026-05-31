@@ -13,6 +13,7 @@
 import type { AppState, DataPoint, ProjectionResult, SpendGapAccountType, SpendGapDeficitItem, SpendGapSurplusAccountType, BengenAccountItem } from './types'
 import { jan1, getYear, exactAgeAt, intAgeAt, onOrAfter, before, dateAtAge, dateAtDecimalAge } from './dates'
 import { calculateTax, optimizePensionSplit, rrifMinFactor, type TaxInput } from './tax'
+import { CPP_COMBINED_MAX_MONTHLY } from './defaults'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -609,22 +610,37 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       }
 
       // ── CPP A ───────────────────────────────────────────────────────────────
-      if (mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
-        cppA_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * cpiFactorForYear
-      }
-      // Survivor CPP: A receives 60% of B's pension in any month B is dead and B's CPP had started.
-      // Independent of A's own CPP start date — survivor benefit is a separate CRA entitlement.
-      if (mAAlive && !mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
-        cppA_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * 0.60 * cpiFactorForYear
+      // CRA rules for the combined maximum cap:
+      //   1. Deceased's deferral factor does NOT transfer — survivor benefit uses
+      //      the deceased's age-65 baseline (estimatedMonthlyAt65 × 0.60, no factor).
+      //   2. The combined maximum cap scales with the SURVIVOR's own deferral factor.
+      //      cap = CPP_COMBINED_MAX_MONTHLY × survivorCppFactor × cpiFactor
+      // Own CPP is never reduced — only the survivor addition is constrained.
+      if (mAAlive) {
+        const ownCppA = onOrAfter(monthDate, state.cppA.startDate)
+          ? state.cppA.estimatedMonthlyAt65 * cppFactorA * cpiFactorForYear : 0
+        const cppCombinedCapA = CPP_COMBINED_MAX_MONTHLY * cpiFactorForYear * cppFactorA
+        const survivorCppA = (!mBAlive && onOrAfter(monthDate, state.cppB.startDate))
+          ? Math.min(
+              state.cppB.estimatedMonthlyAt65 * 0.60 * cpiFactorForYear,
+              Math.max(0, cppCombinedCapA - ownCppA),
+            )
+          : 0
+        cppA_nom += ownCppA + survivorCppA
       }
 
       // ── CPP B ───────────────────────────────────────────────────────────────
-      if (mBAlive && onOrAfter(monthDate, state.cppB.startDate)) {
-        cppB_nom += state.cppB.estimatedMonthlyAt65 * cppFactorB * cpiFactorForYear
-      }
-      // Survivor CPP: B receives 60% of A's pension in any month A is dead and A's CPP had started.
-      if (mBAlive && !mAAlive && onOrAfter(monthDate, state.cppA.startDate)) {
-        cppB_nom += state.cppA.estimatedMonthlyAt65 * cppFactorA * 0.60 * cpiFactorForYear
+      if (mBAlive) {
+        const ownCppB = onOrAfter(monthDate, state.cppB.startDate)
+          ? state.cppB.estimatedMonthlyAt65 * cppFactorB * cpiFactorForYear : 0
+        const cppCombinedCapB = CPP_COMBINED_MAX_MONTHLY * cpiFactorForYear * cppFactorB
+        const survivorCppB = (!mAAlive && onOrAfter(monthDate, state.cppA.startDate))
+          ? Math.min(
+              state.cppA.estimatedMonthlyAt65 * 0.60 * cpiFactorForYear,
+              Math.max(0, cppCombinedCapB - ownCppB),
+            )
+          : 0
+        cppB_nom += ownCppB + survivorCppB
       }
 
       // ── OAS A ───────────────────────────────────────────────────────────────
