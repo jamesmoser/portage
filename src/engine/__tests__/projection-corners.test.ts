@@ -631,6 +631,29 @@ describe('pension split tracking (pensionSplitPaid / pensionSplitReceived)', () 
       expect(totalAuto).toBeCloseTo(totalNo, 0)
     }
   })
+
+  it('smoke test — auto split reduces combined household tax vs no split (asymmetric incomes)', () => {
+    // A: $80k DB pension.  B: no income.  Auto-split should shift pension to B,
+    // equalising marginal rates and reducing combined tax in every year both are alive.
+    const stateOff = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
+      dbPensionA: dbPension80k,
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'off' },
+    })
+    const stateAuto = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
+      dbPensionA: dbPension80k,
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'auto' },
+    })
+    const dpOff  = runProjection(stateOff).dataPoints
+    const dpAuto = runProjection(stateAuto).dataPoints
+    // Both alive for CY, CY+1, CY+2 (bSplitA planEnd=68, bSplitB planEnd=65)
+    for (const yr of [CY, CY + 1, CY + 2]) {
+      const taxOff  = dp(dpOff,  yr).taxA + dp(dpOff,  yr).taxB
+      const taxAuto = dp(dpAuto, yr).taxA + dp(dpAuto, yr).taxB
+      expect(taxAuto).toBeLessThan(taxOff)
+    }
+    // B receives some income (confirming transfer occurred)
+    expect(dp(dpAuto, CY).grossIncomeB).toBeGreaterThan(0)
+  })
 })
 
 // ─── CPP survivor benefit combined maximum cap ─────────────────────────────────
@@ -847,5 +870,207 @@ describe('Spousal RRSP', () => {
     const { dataPoints } = runProjection(spousalState(0, 10_000))
     // A has no own RRSP and no spousal balance; A's RRSP should stay 0
     expect(dp(dataPoints, CY + 1).rrspA).toBeCloseTo(0, 0)
+  })
+})
+
+// ─── Smoke test: RRIF minimum withdrawal trajectory ───────────────────────────
+// CRA mandatory minimum = rrifMinFactor(age) × opening balance.
+// With return=0 and no extra draws, the balance decreases by exactly that amount
+// each year, and the rrifA output field matches the computed minimum.
+//
+// Note: drawdownStrategy='none' explicitly zeroes rrifA_nom (line 242 of projection.ts),
+// so tests that exercise RRIF minimums must use a strategy with a RRIF floor — the
+// simplest is 'fixedWithdrawal' with all amounts at zero.
+//
+// Starting balance: $500,000 at age 71.
+//   Year CY   (age 71): min = 500,000 × 5.28% = 26,400   → balance end = 473,600
+//   Year CY+1 (age 72): min = 473,600 × 5.40% = 25,574   → balance end = 448,026
+
+describe('smoke test — RRIF minimum withdrawal trajectory', () => {
+  const bRrifA      = `${CY - 71}-01-01`   // A: exactly 71 on Jan 1 CY
+  const bRrifB      = `${CY - 60}-01-01`   // B: companion, no accounts
+  const retiredLong = `${CY - 10}-01-01`
+
+  function rrifState(): AppState {
+    return makeState(bRrifA, 80, retiredLong, bRrifB, 78, retiredLong, {
+      rrspA: {
+        ...DEFAULT_STATE.rrspA,
+        balance:                  500_000,
+        annualContribution:       0,
+        rrifConversionDate:       dateAtAge(bRrifA, 71),  // Jan 1 CY
+        returnRateOverrideEnabled: true,
+        returnRateOverridePct:    0,
+      },
+      // drawdownStrategy: 'none' explicitly zeros rrifA_nom.  Use 'fixedWithdrawal'
+      // with zero amounts so only the mandatory RRIF minimum floor applies.
+      withdrawalStrategy: {
+        ...DEFAULT_STATE.withdrawalStrategy,
+        drawdownStrategy: 'fixedWithdrawal',
+        drawdownFixedWithdrawal: {
+          ...DEFAULT_STATE.withdrawalStrategy.drawdownFixedWithdrawal,
+          rrspAmountA: 0, rrspAmountB: 0,
+        },
+      },
+    })
+  }
+
+  it('RRIF minimum for age 71 is 5.28% of opening balance ($26,400 on $500k)', () => {
+    const { dataPoints } = runProjection(rrifState())
+    expect(dp(dataPoints, CY).rrifA).toBeCloseTo(26_400, 0)
+  })
+
+  it('RRIF balance decreases by exactly the CRA minimum each year (return = 0)', () => {
+    const { dataPoints } = runProjection(rrifState())
+    // End of CY: 500,000 − 26,400 = 473,600
+    expect(dp(dataPoints, CY).rrspA).toBeCloseTo(473_600, 0)
+  })
+
+  it('RRIF minimum for age 72 applied to the reduced balance ($25,574 on $473,600)', () => {
+    const { dataPoints } = runProjection(rrifState())
+    // 473,600 × 5.40% = 25,574;  balance end = 448,026
+    expect(dp(dataPoints, CY + 1).rrifA).toBeCloseTo(25_574, 0)
+    expect(dp(dataPoints, CY + 1).rrspA).toBeCloseTo(448_026, 0)
+  })
+})
+
+// ─── Smoke test: OAS clawback amount ─────────────────────────────────────────
+// CRA: clawback = min(oasIncome, (netIncome − threshold) × 15%)
+// Threshold ≈ $95,323 (2026, cpi=0).
+//
+// Setup: DB pension $100,000 + OAS $8,904 (742 × 12) → net income $108,904.
+// Excess: 108,904 − 95,323 = 13,581.  Clawback: 13,581 × 15% = 2,037.
+
+describe('smoke test — OAS clawback in projection', () => {
+  const bOasA      = `${CY - 70}-01-01`   // A: age 70, OAS started at 65
+  const bOasB      = `${CY - 65}-01-01`   // B: companion, no income
+  const retiredLong = `${CY - 20}-01-01`
+
+  function oasClawState(): AppState {
+    return makeState(bOasA, 80, retiredLong, bOasB, 80, retiredLong, {
+      dbPensionA: {
+        ...DEFAULT_STATE.dbPensionA,
+        enabled:             true,
+        startDate:           retiredLong,
+        annualAmount:        100_000,
+        cpiIndexed:          false,
+        bridgeBenefitAmount: 0,
+        survivorBenefitPct:  0,
+        cppIntegration:      false,
+      },
+      oasA: { ...DEFAULT_STATE.oasA, estimatedMonthlyAt65: 742, startDate: dateAtAge(bOasA, 65) },
+      // Pension splitting disabled so A's full $100k pension stays in A's net income
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'off' },
+    })
+  }
+
+  it('oasClawbackA is 15% of net income above the threshold ($2,037 on $108,904 net)', () => {
+    const { dataPoints } = runProjection(oasClawState())
+    // net = 100,000 + 8,904 = 108,904; excess = 13,581; clawback = 2,037.15
+    expect(dp(dataPoints, CY).oasClawbackA).toBeCloseTo(2_037, 0)
+  })
+
+  it('oasClawbackA is zero when OAS is not started', () => {
+    // B has no OAS income → no clawback even with high pension
+    const { dataPoints } = runProjection(oasClawState())
+    expect(dp(dataPoints, CY).oasClawbackB).toBe(0)
+  })
+})
+
+// ─── Smoke test: DB pension bridge benefit cutoff ─────────────────────────────
+// The bridge fires each month where monthDate < bridgeBenefitEndDate.
+// At A's 65th birthday the bridge end date is reached — bridge = $0 from that year on.
+//
+// Setup: base = $60,000, bridge = $10,000, bridgeEndDate = dateAtAge(A, 65).
+//   Year CY+4 (A age 64): bridge fully active → total DB = $70,000
+//   Year CY+5 (A turns 65): bridge end date = Jan 1 CY+5 → all months inactive → $0
+
+describe('smoke test — DB pension bridge benefit cutoff', () => {
+  const bBridgeA  = `${CY - 60}-01-01`   // A: age 60, bridge ends at 65 = Jan 1 CY+5
+  const bBridgeB  = `${CY - 58}-01-01`   // B: companion
+  const retiredNow = `${CY}-01-01`
+
+  function bridgeState(): AppState {
+    return makeState(bBridgeA, 75, retiredNow, bBridgeB, 73, `${CY - 5}-01-01`, {
+      dbPensionA: {
+        ...DEFAULT_STATE.dbPensionA,
+        enabled:               true,
+        startDate:             retiredNow,
+        annualAmount:          60_000,
+        cpiIndexed:            false,
+        bridgeBenefitAmount:   10_000,
+        bridgeBenefitEndDate:  dateAtAge(bBridgeA, 65),
+        survivorBenefitPct:    0,
+        cppIntegration:        false,
+      },
+    })
+  }
+
+  it('bridge adds $10,000 to DB pension before age 65 (total = $70,000 in CY+4)', () => {
+    const { dataPoints } = runProjection(bridgeState())
+    expect(dp(dataPoints, CY + 4).dbPensionBase).toBeCloseTo(60_000, 0)
+    expect(dp(dataPoints, CY + 4).dbBridge).toBeCloseTo(10_000, 0)
+  })
+
+  it('bridge is $0 in the year A turns 65 and all years after (endDate = Jan 1 CY+5)', () => {
+    const { dataPoints } = runProjection(bridgeState())
+    expect(dp(dataPoints, CY + 5).dbPensionBase).toBeCloseTo(60_000, 0)
+    expect(dp(dataPoints, CY + 5).dbBridge).toBe(0)
+    expect(dp(dataPoints, CY + 6).dbBridge).toBe(0)
+  })
+})
+
+// ─── Smoke test: survivor asset rollover — exact amounts ─────────────────────
+// When A dies, all of A's RRSP and TFSA balances transfer to B at the start of
+// the first year A is no longer alive (before any RRIF minimums or draws).
+// With return=0 and no withdrawals or contributions, the balances are exact.
+//
+// Setup: A born Jan 1 CY-65, planEnd=66 → endYearA=CY+1 → rollover fires in CY+2.
+//        rrspA = $200,000, tfsaA = $50,000; B starts with $0 in both.
+
+describe('smoke test — survivor asset rollover exact amounts', () => {
+  const bSurvA = `${CY - 65}-01-01`   // A: age 65, dies end of CY+1
+  const bSurvB = `${CY - 60}-01-01`   // B: age 60, survives
+  const retiredLong = `${CY - 10}-01-01`
+
+  function survivalState(): AppState {
+    return makeState(bSurvA, 66, retiredLong, bSurvB, 80, retiredLong, {
+      rrspA: {
+        ...DEFAULT_STATE.rrspA,
+        balance:                  200_000,
+        annualContribution:       0,
+        rrifConversionDate:       dateAtAge(bSurvA, 71),  // CY+6 — no RRIF before death
+        returnRateOverrideEnabled: true,
+        returnRateOverridePct:    0,
+      },
+      tfsaA: {
+        ...DEFAULT_STATE.tfsaA,
+        balance:                  50_000,
+        annualContribution:       0,
+        returnRateOverrideEnabled: true,
+        returnRateOverridePct:    0,
+      },
+    })
+  }
+
+  it('A holds the full RRSP and TFSA balances in the year before death', () => {
+    const { dataPoints } = runProjection(survivalState())
+    expect(dp(dataPoints, CY + 1).rrspA).toBeCloseTo(200_000, 0)
+    expect(dp(dataPoints, CY + 1).tfsaA).toBeCloseTo(50_000, 0)
+    expect(dp(dataPoints, CY + 1).rrspB).toBeCloseTo(0, 0)
+    expect(dp(dataPoints, CY + 1).tfsaB).toBeCloseTo(0, 0)
+  })
+
+  it("exact RRSP balance transfers from A to B in the first year after death", () => {
+    const { dataPoints } = runProjection(survivalState())
+    // CY+2: rollover fires. A's $200k RRSP moves to B. A's RRSP = 0.
+    expect(dp(dataPoints, CY + 2).rrspA).toBeCloseTo(0, 0)
+    expect(dp(dataPoints, CY + 2).rrspB).toBeCloseTo(200_000, 0)
+  })
+
+  it("exact TFSA balance transfers from A to B in the first year after death", () => {
+    const { dataPoints } = runProjection(survivalState())
+    // CY+2: A's $50k TFSA moves to B.
+    expect(dp(dataPoints, CY + 2).tfsaA).toBeCloseTo(0, 0)
+    expect(dp(dataPoints, CY + 2).tfsaB).toBeCloseTo(50_000, 0)
   })
 })

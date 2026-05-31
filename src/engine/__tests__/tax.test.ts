@@ -483,3 +483,32 @@ describe('optimizePensionSplit', () => {
     expect(r.splitPct).toBeLessThanOrEqual(50)
   })
 })
+
+// ─── Smoke test: $100,000 employment income ───────────────────────────────────
+// Intent: end-to-end bracket + credit + surtax verification at a round income
+// level not covered by the existing test suite (between the $80k and $130k cases).
+
+describe('smoke test — $100,000 employment income', () => {
+  it('federal and Ontario tax match hand-calculated 2026 bracket values', () => {
+    // Federal:
+    //   Bracket 1 (≤$58,523):   58,523 × 14%                     =  8,193.22
+    //   Bracket 2 ($58,523–):   (100,000 − 58,523) × 20.5%       =  8,502.79
+    //   Total before credits:                                        16,696.01
+    //   BPA credit:             16,452 × 14%                     = −2,303.28
+    //   Federal tax:                                                 14,392.73
+    //
+    // Ontario:
+    //   Bracket 1 (≤$53,891):   53,891 × 5.05%                   =  2,721.50
+    //   Bracket 2 ($53,891–):   (100,000 − 53,891) × 9.15%       =  4,218.97
+    //   Total before credits:                                         6,940.47
+    //   BPA credit:             12,989 × 5.05%                   =   −655.94
+    //   Ontario basic:                                                6,284.52
+    //   Surtax tier 1:          (6,284.52 − 5,818) × 20%         =     +93.31
+    //   Ontario tax:                                                  6,377.83
+    const r = calc({ ...zero, employmentIncome: 100_000 })
+    expect(r.federalTax).toBeCloseTo(14_392.73, 0)
+    expect(r.ontarioTax).toBeCloseTo(6_377.83, 0)
+    expect(r.totalTax).toBeCloseTo(20_770.56, 0)
+    expect(r.netAfterTax).toBeCloseTo(79_229.44, 0)
+  })
+})
