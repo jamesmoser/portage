@@ -5,6 +5,22 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.2.0] — 2026-05-31
+
+### Added
+- Spousal RRSP displayed as a dedicated card below the primary RRSP/RRIF section; contributor receives the tax deduction, annuitant holds the balance; 3-year attribution rule noted in info modal; surplus routing stays in the primary account only
+- 13 new engine smoke tests: RRIF minimum trajectory, OAS clawback amount, DB pension bridge cutoff, pension split tax reduction, and survivor asset rollover exact amounts
+
+### Fixed
+- CPP survivor benefit: deceased's deferral factor no longer transferred to the survivor; combined maximum cap now correctly scales with the survivor's own deferral factor
+- RRSP contribution tax deduction: contributions now reduce net income before tax is calculated (CRA T1 line 20800); previously the deduction was missing entirely
+- Spousal RRSP balance seeding: A's spousal balance was incorrectly pooled with A's own RRSP instead of B's
+
+### Changed
+- CPP/OAS info modal: corrected CPP2 history, OAS clawback note, and survivor benefit explanation
+
+---
+
 ## [0.1.2] — 2026-05-30
 
 ### Changed

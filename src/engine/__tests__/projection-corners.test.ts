@@ -637,7 +637,7 @@ describe('pension split tracking (pensionSplitPaid / pensionSplitReceived)', () 
     // equalising marginal rates and reducing combined tax in every year both are alive.
     const stateOff = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
       dbPensionA: dbPension80k,
-      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'off' },
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'manual', pensionSplitPct: 0 },
     })
     const stateAuto = makeState(bSplitA, 68, retiredLongAgo, bSplitB, 65, retiredLongAgo, {
       dbPensionA: dbPension80k,
@@ -959,7 +959,7 @@ describe('smoke test — OAS clawback in projection', () => {
       },
       oasA: { ...DEFAULT_STATE.oasA, estimatedMonthlyAt65: 742, startDate: dateAtAge(bOasA, 65) },
       // Pension splitting disabled so A's full $100k pension stays in A's net income
-      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'off' },
+      withdrawalStrategy: { ...DEFAULT_STATE.withdrawalStrategy, drawdownStrategy: 'none', pensionSplitMode: 'manual', pensionSplitPct: 0 },
     })
   }
 
