@@ -266,13 +266,24 @@ When the user says this, follow these steps:
    - While in `0.x.x`, `MINOR` bumps are appropriate for most feature releases
    - Explain your reasoning and ask the user to confirm or override
 
-4. **On confirmation**, make all four changes atomically:
+4. **On confirmation**, make all four file changes atomically:
    - `package.json` — update `"version"` field
    - `CHANGELOG.md` — prepend a new entry at the top (below the header), dated today, with sections `### Added`, `### Changed`, `### Fixed`, `### Removed` (omit empty sections)
    - `README.md` — update the `**Version X.Y.Z**` line on line 5
    - `src/App.tsx` — version is auto-imported from `package.json`, no change needed
 
-5. **Do not commit** — leave that to the user.
+5. **Build and release** — run the following in order:
+   ```
+   npm run build
+   git add -A
+   git commit -m "Bump version to X.Y.Z"
+   git tag vX.Y.Z
+   git push && git push --tags
+   gh release create vX.Y.Z dist/index.html \
+     --title "Portage vX.Y.Z" \
+     --notes "See CHANGELOG.md for details."
+   ```
+   The `gh release create` command uploads `dist/index.html` as the release artifact. Recipients download it directly from the GitHub release page and open it in any browser — no install required.
 
 ---
 
