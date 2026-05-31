@@ -715,18 +715,7 @@ function VersionModal({ onClose }: { onClose: () => void }) {
             <span className="text-slate-500">Tax year</span>
             <span className="font-medium">2026 (CPI-indexed forward)</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Capital gains inclusion</span>
-            <span className="font-medium">50%</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">CPP deferral</span>
-            <span className="font-medium">−0.6%/mo before 65, +0.7%/mo after</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">OAS deferral</span>
-            <span className="font-medium">+0.6%/mo after 65 (max +36%)</span>
-          </div>
+
         </div>
         <div className="border-t border-slate-100 pt-3 text-xs text-slate-400">
           <p>Built with React, TypeScript, Vite, Tailwind CSS, and Plotly.js. All computation runs locally in your browser — no data leaves your machine.</p>
