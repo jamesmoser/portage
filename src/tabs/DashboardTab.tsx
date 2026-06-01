@@ -127,6 +127,7 @@ const MARKET_PROFILE_OPTIONS: { value: string; label: string }[] = [
   { value: 'backLoaded',     label: 'Back-Loaded' },
   { value: 'cyclicalCrest',  label: 'Cyclical Crest' },
   { value: 'cyclicalTrough', label: 'Cyclical Trough' },
+  { value: 'marketShock',    label: 'Market Shock' },
   { value: 'noise',          label: 'Noise' },
 ]
 
@@ -1709,18 +1710,28 @@ export function DashboardTab() {
         <p className="mb-3">Each modification overrides a specific part of the base plan. Modifications stack — all enabled toggles apply simultaneously. The Reset button clears all modifications except the Drawdown Strategy.</p>
 
         <p className="font-semibold text-slate-700 mb-1">Market — Return Profile</p>
-        <p className="mb-1">Shapes how nominal portfolio returns vary year-to-year. Peak and low are the max and min of your base plan age-tier rates; mid is their average.</p>
-        <ul className="space-y-1 mb-1 ml-2 text-slate-600">
+        <p className="mb-1">Shapes how nominal portfolio returns vary year-to-year. For all profiles except Flat and Market Shock, peak and low are the max and min of your base plan age-tier rates; mid is their time-weighted average (so expected average return is preserved across profiles).</p>
+        <ul className="space-y-1 mb-2 ml-2 text-slate-600">
           <li><span className="font-medium text-slate-700">Base</span> — Age-based tiers exactly as entered (default).</li>
-          <li><span className="font-medium text-slate-700">Flat Rate</span> — A single fixed return for every year of the plan.</li>
-          <li><span className="font-medium text-slate-700">Front-Loaded</span> — Returns start at peak and fall linearly to low.</li>
+          <li><span className="font-medium text-slate-700">Flat Rate</span> — A single fixed return every year. Bypasses beta and outlook.</li>
+          <li><span className="font-medium text-slate-700">Front-Loaded</span> — Returns start at peak and fall linearly to low over the plan horizon.</li>
           <li><span className="font-medium text-slate-700">Back-Loaded</span> — Returns start at low and rise linearly to peak.</li>
-          <li><span className="font-medium text-slate-700">Cyclical Crest</span> — Cosine wave starting at peak; one full cycle spans the configured period.</li>
-          <li><span className="font-medium text-slate-700">Cyclical Trough</span> — Inverted cosine starting at trough. Stress-tests a down-cycle at the start of retirement.</li>
-          <li><span className="font-medium text-slate-700">Noise</span> — Seeded random between low and peak each year. Re-roll generates a new sequence.</li>
+          <li><span className="font-medium text-slate-700">Cyclical Crest</span> — Phase-distorted cosine starting at peak. Good returns dominate; use to stress-test a "mostly bull" sequence.</li>
+          <li><span className="font-medium text-slate-700">Cyclical Trough</span> — Inverted cosine starting at trough. Stress-tests a down-cycle early in retirement (sequence-of-returns risk).</li>
+          <li><span className="font-medium text-slate-700">Market Shock</span> — Flat rate baseline with a one-time crash modelled as a damped oscillator. Bypasses beta and outlook.</li>
+          <li><span className="font-medium text-slate-700">Noise</span> — Seeded uniform random between low and peak each year. Re-roll generates a new sequence.</li>
         </ul>
-        <p className="mb-1"><span className="font-medium text-slate-700">Outlook</span> — Shifts the entire return curve up or down by a fixed number of percentage points (applied after beta scaling).</p>
-        <p className="mb-3"><span className="font-medium text-slate-700">Beta</span> — Scales amplitude around the midpoint. β=1: unchanged. β=2: twice as wide (same average, higher peaks, lower troughs). β=0: flat at mid.</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Outlook</span> — Shifts the entire return curve ±pp (applied after beta). Not used by Flat or Market Shock.</p>
+        <p className="mb-2"><span className="font-medium text-slate-700">Beta</span> — Scales amplitude around mid. β=1: unchanged. β=2: double swing (same average, wider range). β=0: flat line at mid. Not used by Flat or Market Shock.</p>
+        <p className="font-semibold text-slate-700 mb-1">Cyclical controls</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Cycle Period</span> — Length of one full cycle in years.</p>
+        <p className="mb-2"><span className="font-medium text-slate-700">Duty Cycle</span> — Fraction of each period spent above the midpoint return. 50% is a symmetric sine wave. Higher values (e.g. 70%) compress the trough into a narrow dip; lower values compress the crest. Approaches a square wave at the extremes.</p>
+        <p className="font-semibold text-slate-700 mb-1">Market Shock controls</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Flat Rate</span> — The long-run baseline return the portfolio gravitates back toward after the crash.</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Shock Year</span> — Years from the start of the projection when the crash hits. Year 0 is the first year of the plan.</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Magnitude</span> — Peak crash depth in percentage points added to the flat rate in the shock year (e.g. −30% on a 6% baseline yields −24% that year).</p>
+        <p className="mb-1"><span className="font-medium text-slate-700">Recovery</span> — Years until the shock has decayed to ~5% of its original magnitude.</p>
+        <p className="mb-3"><span className="font-medium text-slate-700">Damping</span> — Controls the recovery character. Fully damped: pure exponential decay, returns stay below the flat rate throughout. Lightly damped: returns oscillate above and below the flat rate before settling (market overreaction and correction).</p>
 
         <p className="font-semibold text-slate-700 mb-1">Inflation</p>
         <p className="mb-3">Overrides either or both inflation rates. <span className="font-medium text-slate-700">Personal inflation</span> deflates all outputs to present-day dollars and grows your spending phases. <span className="font-medium text-slate-700">CPI</span> indexes government benefits (CPP, OAS, GIS), DB pension escalation, and tax bracket thresholds forward each year.</p>
@@ -1759,6 +1770,7 @@ export function DashboardTab() {
                 const setMarketProfile = (partial: Partial<typeof mValue>) =>
                   updateWhatIf('marketProfile', { value: { ...mValue, ...partial } })
                 const isCyclical = mValue.profileType === 'cyclicalCrest' || mValue.profileType === 'cyclicalTrough'
+                const isShock    = mValue.profileType === 'marketShock'
                 return (
                   <div>
                     {/* Shape preview chart + stats — always visible */}
@@ -1805,7 +1817,8 @@ export function DashboardTab() {
                     {/* Sub-controls — only when enabled */}
                     {mEnabled && (
                       <div className="border-t border-slate-100">
-                        {mValue.profileType === 'flat' ? (
+                        {/* Flat rate row — shown for flat and marketShock profiles */}
+                        {(mValue.profileType === 'flat' || isShock) && (
                           <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-100">
                             <span className="text-sm text-slate-600 w-24 shrink-0">Flat Rate (%)</span>
                             <NumberInput
@@ -1824,7 +1837,9 @@ export function DashboardTab() {
                               Use CPI
                             </button>
                           </div>
-                        ) : (
+                        )}
+                        {/* Outlook + Beta — shown for all profiles except flat and marketShock */}
+                        {mValue.profileType !== 'flat' && !isShock && (
                           <>
                             <WhatIfSlider
                               label="Outlook"
@@ -1842,27 +1857,80 @@ export function DashboardTab() {
                               onChange={v => setMarketProfile({ beta: v })}
                               valueSuffix="x"
                             />
-                            {isCyclical && (
-                              <WhatIfSlider
-                                label="Cycle Period"
-                                min={1} max={20} step={1} baseValue={10}
-                                value={mValue.cyclePeriodYears}
-                                enabled={mValue.cyclePeriodYears !== 10}
-                                onChange={v => setMarketProfile({ cyclePeriodYears: v })}
-                                valueSuffix="yr"
-                              />
-                            )}
-                            {mValue.profileType === 'noise' && (
-                              <div className="px-3 py-2 border-t border-slate-100">
-                                <button
-                                  className="btn-primary"
-                                  onClick={() => setMarketProfile({ noiseSeed: Math.floor(Math.random() * 99999) })}
-                                >
-                                  Re-roll
-                                </button>
-                              </div>
-                            )}
                           </>
+                        )}
+                        {/* Cyclical-only sliders */}
+                        {isCyclical && (
+                          <WhatIfSlider
+                            label="Cycle Period"
+                            min={1} max={20} step={1} baseValue={10}
+                            value={mValue.cyclePeriodYears}
+                            enabled={mValue.cyclePeriodYears !== 10}
+                            onChange={v => setMarketProfile({ cyclePeriodYears: v })}
+                            valueSuffix="yr"
+                          />
+                        )}
+                        {isCyclical && (
+                          <WhatIfSlider
+                            label="Duty Cycle"
+                            min={5} max={95} step={5} baseValue={50}
+                            value={Math.round(mValue.dutyCycle * 100)}
+                            enabled={mValue.dutyCycle !== 0.5}
+                            onChange={v => setMarketProfile({ dutyCycle: v / 100 })}
+                            valueSuffix="%"
+                          />
+                        )}
+                        {/* Market Shock sliders */}
+                        {isShock && (
+                          <WhatIfSlider
+                            label="Shock Year"
+                            min={0} max={40} step={1} baseValue={5}
+                            value={mValue.shockOffset}
+                            enabled={mValue.shockOffset !== 5}
+                            onChange={v => setMarketProfile({ shockOffset: v })}
+                            valueSuffix="yr"
+                          />
+                        )}
+                        {isShock && (
+                          <WhatIfSlider
+                            label="Magnitude"
+                            min={-50} max={0} step={1} baseValue={-20}
+                            value={mValue.shockMagnitude}
+                            enabled={mValue.shockMagnitude !== -20}
+                            onChange={v => setMarketProfile({ shockMagnitude: v })}
+                            valueSuffix="%"
+                          />
+                        )}
+                        {isShock && (
+                          <WhatIfSlider
+                            label="Recovery"
+                            min={1} max={30} step={1} baseValue={10}
+                            value={mValue.shockRecovery}
+                            enabled={mValue.shockRecovery !== 10}
+                            onChange={v => setMarketProfile({ shockRecovery: v })}
+                            valueSuffix="yr"
+                          />
+                        )}
+                        {isShock && (
+                          <WhatIfSlider
+                            label="Damping"
+                            min={0} max={20} step={1} baseValue={14}
+                            value={Math.round(mValue.shockDamping * 20)}
+                            enabled={mValue.shockDamping !== 0.7}
+                            onChange={v => setMarketProfile({ shockDamping: v / 20 })}
+                            labelRight={<span className="text-xs text-slate-400">{mValue.shockDamping <= 0.3 ? 'ringing' : mValue.shockDamping >= 0.8 ? 'overdamped' : 'mixed'}</span>}
+                          />
+                        )}
+                        {/* Noise re-roll */}
+                        {mValue.profileType === 'noise' && (
+                          <div className="px-3 py-2 border-t border-slate-100">
+                            <button
+                              className="btn-primary"
+                              onClick={() => setMarketProfile({ noiseSeed: Math.floor(Math.random() * 99999) })}
+                            >
+                              Re-roll
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}

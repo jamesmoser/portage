@@ -103,10 +103,11 @@ export function SectionCard({
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md mx-4 p-6"
+            className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md mx-4 flex flex-col"
+            style={{ maxHeight: 'calc(100dvh - 3rem)' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-start justify-between gap-4 p-6 pb-4 shrink-0">
               <h2 className="font-display text-lg font-bold text-slate-900">{title}</h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -118,10 +119,12 @@ export function SectionCard({
                 </svg>
               </button>
             </div>
-            {info
-              ? <div className="text-sm text-slate-700">{info}</div>
-              : <p className="text-sm text-slate-400 italic">More information coming soon.</p>
-            }
+            <div className="overflow-y-auto px-6 pb-6 text-sm text-slate-700">
+              {info
+                ? info
+                : <p className="text-slate-400 italic">More information coming soon.</p>
+              }
+            </div>
           </div>
         </div>
       )}

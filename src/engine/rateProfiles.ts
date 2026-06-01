@@ -25,7 +25,8 @@ export function generateRateSchedule(
   endYear: number,
   refBirthDate: string,
 ): number[] {
-  const { profileType, outlookOffset, beta, cyclePeriodYears, noiseSeed } = config
+  const { profileType, outlookOffset, beta, cyclePeriodYears, dutyCycle,
+          shockOffset, shockMagnitude, shockRecovery, shockDamping, noiseSeed } = config
 
   const peak = Math.max(baseRates.upTo55, baseRates.from55to65, baseRates.from65to70, baseRates.from70plus)
   const low  = Math.min(baseRates.upTo55, baseRates.from55to65, baseRates.from65to70, baseRates.from70plus)
@@ -60,11 +61,45 @@ export function generateRateSchedule(
         pct = n > 1 ? low + (peak - low) * i / (n - 1) : mid
         break
       case 'cyclicalCrest':
-        pct = mid + amp * Math.cos(2 * Math.PI * i / cyclePeriodYears)
+      case 'cyclicalTrough': {
+        // Phase-distorted cosine: D = fraction of period above midpoint.
+        // 4 quadrant mapping — each above-mid segment gets D/2, each below-mid gets (1-D)/2.
+        const D = Math.max(0.01, Math.min(0.99, dutyCycle))
+        const T = cyclePeriodYears
+        const theta = ((i % T) + T) % T / T  // position in cycle [0, 1)
+        const hD  = D / 2
+        const h1D = (1 - D) / 2
+        let phi: number
+        if (theta < hD) {
+          phi = (theta / hD) * (Math.PI / 2)
+        } else if (theta < 0.5) {
+          phi = Math.PI / 2 + ((theta - hD) / h1D) * (Math.PI / 2)
+        } else if (theta < 0.5 + h1D) {
+          phi = Math.PI + ((theta - 0.5) / h1D) * (Math.PI / 2)
+        } else {
+          phi = 3 * Math.PI / 2 + ((theta - (1 - hD)) / hD) * (Math.PI / 2)
+        }
+        pct = profileType === 'cyclicalCrest'
+          ? mid + amp * Math.cos(phi)
+          : mid - amp * Math.cos(phi)
         break
-      case 'cyclicalTrough':
-        pct = mid - amp * Math.cos(2 * Math.PI * i / cyclePeriodYears)
-        break
+      }
+      case 'marketShock': {
+        // Damped oscillator impulse response centred on flatRate.
+        // deviation(t) = M · e^(−k·t) · cos(ω·t)   where t = years since shock
+        // k = 3/N  → envelope at 5% of M when t = N (recovery years)
+        // ω = 2π · MAX_RINGS · (1−D) / N  → 0 rings at D=1, MAX_RINGS at D=0
+        // Returns directly (like 'flat') — beta/outlook do not apply.
+        const t = i - shockOffset
+        if (t < 0) return config.flatRate / 100
+        const N  = Math.max(1, shockRecovery)
+        const D  = Math.max(0, Math.min(1, shockDamping))
+        const M  = shockMagnitude                    // already in %, e.g. -30
+        const k  = 3 / N
+        const MAX_RINGS = 3
+        const omega = (2 * Math.PI * MAX_RINGS * (1 - D)) / N
+        return (config.flatRate + M * Math.exp(-k * t) * Math.cos(omega * t)) / 100
+      }
       case 'noise':
       default:
         pct = low + rand() * (peak - low)
@@ -83,5 +118,10 @@ export const DEFAULT_MARKET_PROFILE: MarketProfileConfig = {
   outlookOffset:    0,
   beta:             1,
   cyclePeriodYears: 10,
+  dutyCycle:        0.5,
+  shockOffset:      5,
+  shockMagnitude:   -20,
+  shockRecovery:    10,
+  shockDamping:     0.7,
   noiseSeed:        42,
 }

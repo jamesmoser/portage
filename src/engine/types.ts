@@ -383,14 +383,20 @@ export type MarketProfileType =
   | 'backLoaded'     // starts at low, rises linearly to peak
   | 'cyclicalCrest'  // cosine wave — starts at peak
   | 'cyclicalTrough' // inverted cosine — starts at trough
+  | 'marketShock'    // flat rate with damped-oscillator crash at a specified year
   | 'noise'          // seeded uniform random between peak and low
 
 export interface MarketProfileConfig {
   profileType:       MarketProfileType
-  flatRate:          number   // nominal % used when profileType === 'flat'
+  flatRate:          number   // nominal % used when profileType === 'flat' and 'marketShock'
   outlookOffset:     number   // ±% shift applied to all rates (e.g. +2 shifts curve up 2 pp)
   beta:              number   // amplitude multiplier: 1 = no change, 2 = double swing, 0.5 = half swing
   cyclePeriodYears:  number   // cycle length in years (cyclical profiles only)
+  dutyCycle:         number   // fraction of period above midpoint (0.01–0.99); 0.5 = symmetric sine
+  shockOffset:       number   // years from plan start when shock occurs (marketShock only)
+  shockMagnitude:    number   // crash depth in % points, negative (e.g. -30); marketShock only
+  shockRecovery:     number   // years to settle back to flat rate (marketShock only)
+  shockDamping:      number   // 0 = lightly damped (rings), 1 = fully damped (no overshoot)
   noiseSeed:         number   // PRNG seed (noise profile only; re-roll changes this)
 }
 

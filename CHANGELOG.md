@@ -5,6 +5,17 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.3.0] — 2026-06-01
+
+### Added
+- **Market Shock rate profile** — flat-rate baseline with a one-time crash modelled as a damped oscillator. Sliders for shock year, magnitude (0 to −50%), recovery period, and damping (overdamped = pure exponential decay; underdamped = ringing oscillation around baseline).
+- **Duty Cycle control for Cyclical profiles** — adjusts the fraction of each cycle spent above the midpoint return (5%–95%). Values above 50% compress the trough into a narrow dip; values below 50% compress the crest. Approaches a square wave at the extremes.
+
+### Fixed
+- Info modals now have a scrollable content area with a viewport-aware max height, preventing them from extending off screen on smaller displays.
+
+---
+
 ## [0.2.0] — 2026-05-31
 
 ### Added
