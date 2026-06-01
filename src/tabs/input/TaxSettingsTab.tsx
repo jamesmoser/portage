@@ -64,7 +64,7 @@ export function TaxSettingsTab() {
         info={
           <div className="space-y-2 text-sm">
             <p>Federal income tax is applied progressively — only the income within each band is taxed at that band's rate. You never pay the higher rate on all your income, only on the slice above each threshold. For example, at $120,000 income in 2026: the first $58,523 is taxed at 14%, the next $58,522 at 20.5%, and only the remaining $2,955 at 26%. Note: the lowest federal bracket rate was reduced from 15% to 14% effective January 1, 2026.</p>
-            <p>These default to the 2026 federal brackets. The engine indexes all bracket thresholds forward each year by the CPI rate you set in Assumptions, so bracket creep is automatically accounted for. You only need to change these if federal tax policy changes significantly or you want to model a specific scenario.</p>
+            <p>These default to the 2026 federal brackets. The engine indexes all bracket thresholds forward each year by the CPI rate you set in Settings, so bracket creep is automatically accounted for. You only need to change these if federal tax policy changes significantly or you want to model a specific scenario.</p>
             <p>Federal tax applies to both people independently based on each person's net income in each year. Pension income splitting can shift income between spouses to reduce the combined tax burden — this is managed in the Dashboard's drawdown strategy.</p>
           </div>
         }>

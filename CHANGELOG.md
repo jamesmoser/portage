@@ -5,6 +5,16 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.3.1] — 2026-06-01
+
+### Changed
+- Renamed "Assumptions" tab to "Settings"
+
+### Added
+- Reset buttons on Inflation and Portfolio Return Rates cards
+
+---
+
 ## [0.3.0] — 2026-06-01
 
 ### Added

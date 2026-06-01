@@ -668,7 +668,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         <div>
           <p className="font-semibold text-slate-800 mb-1">Workflow</p>
           <ol className="list-decimal list-outside ml-4 space-y-1.5">
-            <li><strong>Base Plan (right tabs)</strong> — Enter your household data across the Assumptions, Income, and Investments tabs. This is the foundation of the simulation.</li>
+            <li><strong>Base Plan (right tabs)</strong> — Enter your household data across the Settings, Income, and Investments tabs. This is the foundation of the simulation.</li>
             <li><strong>Dashboard</strong> — Review the Key Outcomes and charts. With no drawdown strategy selected, you see your income and portfolio growth as-is.</li>
             <li><strong>Drawdown Strategy</strong> — Configure how accounts are drawn down in retirement. Cover Spending Gap is the most comprehensive option.</li>
             <li><strong>Base Plan Modifications</strong> — Adjust individual parameters (retirement age, CPP/OAS timing, inflation, longevity) to see their impact on outcomes.</li>
@@ -735,7 +735,7 @@ const DASHBOARD_TABS = [
 ]
 
 const INPUT_TABS = [
-  { id: 'assumptions', label: 'Assumptions', Component: AssumptionsTab },
+  { id: 'assumptions', label: 'Settings', Component: AssumptionsTab },
   { id: 'income',      label: 'Income',      Component: IncomeTab      },
   { id: 'investments', label: 'Investments', Component: InvestmentsTab },
 ]

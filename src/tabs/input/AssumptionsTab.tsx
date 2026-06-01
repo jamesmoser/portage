@@ -3,6 +3,7 @@ import { CardGrid } from '../../components/CardGrid'
 import { SectionCard } from '../../components/SectionCard'
 import { NumberInput } from '../../components/NumberInput'
 import { InfoPanel } from '../../components/InfoPanel'
+import { DEFAULT_STATE } from '../../engine/defaults'
 
 export function AssumptionsTab() {
   const { personalInflationRatePct, cpiRatePct, returnRates,
@@ -26,6 +27,10 @@ export function AssumptionsTab() {
     <CardGrid>
       {/* Inflation */}
       <SectionCard title="Inflation" width="half"
+        onReset={() => {
+          update('personalInflationRatePct', DEFAULT_STATE.personalInflationRatePct)
+          update('cpiRatePct', DEFAULT_STATE.cpiRatePct)
+        }}
         info={
           <div className="space-y-2 text-sm">
             <p><strong>Personal / Real Inflation Rate</strong> — Your assumed cost-of-living increase. This is what converts future dollars to today's dollars throughout the plan. A household spending $10,000/month today needs about $13,440/month in 10 years at 3%. The default 3% reflects historical Canadian household inflation including housing, healthcare, and lifestyle costs — which tends to run above the official CPI.</p>
@@ -61,6 +66,7 @@ export function AssumptionsTab() {
 
       {/* Return rates */}
       <SectionCard title="Portfolio Return Rates (Nominal)" width="half"
+        onReset={() => update('returnRates', DEFAULT_STATE.returnRates)}
         info={
           <div className="space-y-2 text-sm">
             <p>Enter the nominal (before inflation) annual return you expect for each life phase. These apply to all investment accounts — RRSP/RRIF, TFSA, and Non-Registered — unless you override the rate on a specific account in the Investments tab.</p>
