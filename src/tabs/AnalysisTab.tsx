@@ -18,6 +18,8 @@ import { runMonteCarlo } from '../engine/monteCarlo'
 import type { MonteCarloResult } from '../engine/monteCarlo'
 import { runMeltdownOptimizer } from '../engine/meltdownOptimizer'
 import type { MeltdownOptimizerResult } from '../engine/meltdownOptimizer'
+import { runGovBenefitOptimizer } from '../engine/govBenefitOptimizer'
+import type { GovBenefitOptimizerResult } from '../engine/govBenefitOptimizer'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
@@ -86,6 +88,83 @@ export function AnalysisTab() {
       setMcResult(result)
       setMcRunning(false)
     }, 20)
+  }
+
+  // ── CPP / OAS optimizer state ─────────────────────────────────────────────
+
+  const [govResult,  setGovResult]  = useState<GovBenefitOptimizerResult | null>(null)
+  const [govRunning, setGovRunning] = useState(false)
+
+  function runGov() {
+    setGovRunning(true)
+    setTimeout(() => {
+      const result = runGovBenefitOptimizer(effectiveState, rateSchedule)
+      setGovResult(result)
+      setGovRunning(false)
+    }, 20)
+  }
+
+  function applyOptimalGovAges() {
+    if (!govResult) return
+    updateWhatIf('cppStartAgeA', { enabled: true, value: govResult.optimalCppAgeA })
+    updateWhatIf('cppStartAgeB', { enabled: true, value: govResult.optimalCppAgeB })
+    updateWhatIf('oasStartAgeA', { enabled: true, value: govResult.optimalOasAgeA })
+    updateWhatIf('oasStartAgeB', { enabled: true, value: govResult.optimalOasAgeB })
+  }
+
+  // ── CPP / OAS chart builder ───────────────────────────────────────────────
+
+  function buildGovChart(
+    sweep: GovBenefitOptimizerResult['cppSweepA'],
+    metric: 'cpp' | 'oas',
+    optimalAge: number,
+    baseAge: number,
+  ) {
+    const ages = sweep.map(p => p.age)
+    const values = sweep.map(p => metric === 'cpp' ? p.lifetimeCPP : p.lifetimeOASNet)
+
+    // Per-point marker styling:
+    //   optimal age  → red filled dot, larger
+    //   base plan    → hollow grey circle (white fill, grey border), larger
+    //   other ages   → small grey dot
+    const markerFill   = ages.map(a => a === optimalAge ? '#7B1515' : a === baseAge ? 'white' : '#cbd5e1')
+    const markerBorder = ages.map(a => a === optimalAge ? '#7B1515' : '#94a3b8')
+    const markerSize   = ages.map(a => (a === optimalAge || a === baseAge) ? 10 : 6)
+    const markerWidth  = ages.map(a => (a === optimalAge || a === baseAge) ? 2 : 1)
+
+    const trace: Data = {
+      x: ages,
+      y: values,
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { color: '#cbd5e1', width: 1.5 },
+      marker: {
+        size: markerSize,
+        color: markerFill,
+        line: { color: markerBorder, width: markerWidth },
+      },
+      hovertemplate: 'Age %{x}<br>%{y:$,.0f}<extra></extra>',
+    }
+
+    const optimalValue = values[ages.indexOf(optimalAge)]
+    const baseValue    = values[ages.indexOf(baseAge)]
+
+    const annotations: object[] = [
+      {
+        x: optimalAge, xref: 'x', y: optimalValue, yref: 'y',
+        text: 'Optimal', showarrow: false, yshift: 12,
+        font: { size: 9, color: '#7B1515' }, xanchor: 'center', yanchor: 'bottom',
+      },
+    ]
+    if (baseAge !== optimalAge) {
+      annotations.push({
+        x: baseAge, xref: 'x', y: baseValue, yref: 'y',
+        text: 'Configured', showarrow: false, yshift: 12,
+        font: { size: 9, color: '#64748b' }, xanchor: 'center', yanchor: 'bottom',
+      })
+    }
+
+    return { trace, annotations }
   }
 
   // ── Meltdown Optimizer state ──────────────────────────────────────────────
@@ -536,6 +615,181 @@ export function AnalysisTab() {
                 </button>
                 <span className="text-xs text-slate-400">
                   Enables the Cover Spending Gap strategy in the Dashboard what-if panel with the optimal ceilings above.
+                </span>
+              </div>
+            </>
+          )
+        })()}
+      </SectionCard>
+
+      {/* ── CPP / OAS Timing Optimizer ────────────────────────────────────────── */}
+      <div className="mt-6" />
+      <SectionCard title="CPP / OAS Timing Optimizer" width="full"
+        onReset={() => setGovResult(null)}
+        info={
+          <div className="space-y-2 text-sm">
+            <p>The CPP / OAS timing optimizer sweeps start ages to find the household-lifetime-benefit-maximising ages for each person independently.</p>
+            <p><strong>CPP sweep (ages 60–70)</strong> — The objective is total household CPP collected across all plan years, including survivor benefits. Because the combined CPP cap for the surviving spouse scales with the <em>survivor's own deferral factor</em>, the optimal start age for one person depends on whether the other person is likely to predecease them: a later start by B raises B's cap, potentially allowing more of A's CPP to transfer on A's death.</p>
+            <p><strong>OAS sweep (ages 65–70)</strong> — The objective is total household net OAS: gross OAS minus clawback paid. Each month of deferral past 65 adds +0.6% to the monthly benefit (maximum +36% at 70). For high-income households where OAS is fully clawed back, the optimal OAS start age may still be 65 because you collect more total benefits before the income threshold becomes binding.</p>
+            <p><strong>Independent sweeps</strong> — When sweeping one person's start age, the other's is held at the base plan value. The optimal ages are those that maximise lifetime benefit holding all other plan parameters constant.</p>
+            <p><strong>Survivor benefits are automatic</strong> — the projection engine fully models CPP survivor logic (60% of deceased's effective monthly, capped by the combined maximum that scales with the survivor's deferral factor). No special configuration is needed.</p>
+            <p><strong>Apply to Dashboard</strong> — writes all four optimal start ages to the CPP/OAS what-if overrides in the Dashboard so you can verify the full tax and portfolio impact.</p>
+          </div>
+        }>
+
+        {/* Controls */}
+        <div className="flex items-center gap-4 mb-4 flex-wrap">
+          <button className="btn-primary self-end" onClick={runGov} disabled={govRunning}>
+            {govRunning ? 'Optimizing…' : govResult ? 'Re-run' : 'Run Optimizer'}
+          </button>
+          {govResult && !govRunning && (
+            <span className="text-xs text-slate-400 self-end pb-1">
+              34 projection runs completed
+            </span>
+          )}
+        </div>
+
+        {govRunning && (
+          <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
+            Running 34 projections across CPP and OAS start ages…
+          </div>
+        )}
+
+        {govResult && !govRunning && (() => {
+          const cppDeltaA = govResult.cppSweepA.find(p => p.age === govResult.optimalCppAgeA)!.lifetimeCPP
+                           - govResult.cppSweepA.find(p => p.age === govResult.baseCppAgeA)!.lifetimeCPP
+          const cppDeltaB = govResult.cppSweepB.find(p => p.age === govResult.optimalCppAgeB)!.lifetimeCPP
+                           - govResult.cppSweepB.find(p => p.age === govResult.baseCppAgeB)!.lifetimeCPP
+          const oasDeltaA = govResult.oasSweepA.find(p => p.age === govResult.optimalOasAgeA)!.lifetimeOASNet
+                           - govResult.oasSweepA.find(p => p.age === govResult.baseOasAgeA)!.lifetimeOASNet
+          const oasDeltaB = govResult.oasSweepB.find(p => p.age === govResult.optimalOasAgeB)!.lifetimeOASNet
+                           - govResult.oasSweepB.find(p => p.age === govResult.baseOasAgeB)!.lifetimeOASNet
+
+          function deltaLabel(delta: number) {
+            if (Math.abs(delta) < 500) return <span className="text-slate-400">no change vs configured</span>
+            const sign = delta > 0 ? '+' : ''
+            const color = delta > 0 ? '#166534' : '#991b1b'
+            return <span style={{ color }}>{sign}{fmt(delta)} vs configured</span>
+          }
+
+          return (
+            <>
+              {/* Two-column layout: CPP left, OAS right */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+                {/* ── CPP column ── */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="text-xs text-slate-400">{aName} — CPP Start</div>
+                      <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeA}</div>
+                      <div className="text-xs mt-0.5">{deltaLabel(cppDeltaA)}</div>
+                    </div>
+                    <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="text-xs text-slate-400">{bName} — CPP Start</div>
+                      <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeB}</div>
+                      <div className="text-xs mt-0.5">{deltaLabel(cppDeltaB)}</div>
+                    </div>
+                  </div>
+                  {(() => {
+                    const { trace, annotations } = buildGovChart(
+                      govResult.cppSweepA, 'cpp', govResult.optimalCppAgeA, govResult.baseCppAgeA,
+                    )
+                    return (
+                      <PlotlyChart
+                        data={[trace]}
+                        layout={{
+                          height: 220,
+                          annotations,
+                          xaxis: { title: { text: `${aName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
+                          yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
+                          showlegend: false,
+                          margin: { t: 12, r: 12, b: 48, l: 80 },
+                        }}
+                      />
+                    )
+                  })()}
+                  {(() => {
+                    const { trace, annotations } = buildGovChart(
+                      govResult.cppSweepB, 'cpp', govResult.optimalCppAgeB, govResult.baseCppAgeB,
+                    )
+                    return (
+                      <PlotlyChart
+                        data={[trace]}
+                        layout={{
+                          height: 220,
+                          annotations,
+                          xaxis: { title: { text: `${bName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
+                          yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
+                          showlegend: false,
+                          margin: { t: 12, r: 12, b: 48, l: 80 },
+                        }}
+                      />
+                    )
+                  })()}
+                </div>
+
+                {/* ── OAS column ── */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="text-xs text-slate-400">{aName} — OAS Start</div>
+                      <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeA}</div>
+                      <div className="text-xs mt-0.5">{deltaLabel(oasDeltaA)}</div>
+                    </div>
+                    <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="text-xs text-slate-400">{bName} — OAS Start</div>
+                      <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeB}</div>
+                      <div className="text-xs mt-0.5">{deltaLabel(oasDeltaB)}</div>
+                    </div>
+                  </div>
+                  {(() => {
+                    const { trace, annotations } = buildGovChart(
+                      govResult.oasSweepA, 'oas', govResult.optimalOasAgeA, govResult.baseOasAgeA,
+                    )
+                    return (
+                      <PlotlyChart
+                        data={[trace]}
+                        layout={{
+                          height: 220,
+                          annotations,
+                          xaxis: { title: { text: `${aName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
+                          yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
+                          showlegend: false,
+                          margin: { t: 12, r: 12, b: 48, l: 80 },
+                        }}
+                      />
+                    )
+                  })()}
+                  {(() => {
+                    const { trace, annotations } = buildGovChart(
+                      govResult.oasSweepB, 'oas', govResult.optimalOasAgeB, govResult.baseOasAgeB,
+                    )
+                    return (
+                      <PlotlyChart
+                        data={[trace]}
+                        layout={{
+                          height: 220,
+                          annotations,
+                          xaxis: { title: { text: `${bName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
+                          yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
+                          showlegend: false,
+                          margin: { t: 12, r: 12, b: 48, l: 80 },
+                        }}
+                      />
+                    )
+                  })()}
+                </div>
+
+              </div>
+
+              {/* Apply button */}
+              <div className="mt-5 pt-4 border-t border-slate-200 flex items-center gap-4">
+                <button className="btn-primary" onClick={applyOptimalGovAges}>
+                  Apply to Dashboard
+                </button>
+                <span className="text-xs text-slate-400">
+                  Set CPP and OAS start ages to optimal values in the Dashboard.
                 </span>
               </div>
             </>
