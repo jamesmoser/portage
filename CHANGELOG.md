@@ -5,6 +5,18 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.5.0] — 2026-06-02
+
+### Added
+- **Analysis tab** — new left-side tab alongside Dashboard; houses tools that loop the projection engine for analysis and optimisation rather than a single deterministic run
+- **RRSP Meltdown Optimizer** — sweeps the Cover Spending Gap `grossIncomeCeiling` parameter independently for each person to find the lifetime-tax-minimising ceiling. Dynamic extension continues past the OAS full-clawback income until the curve turns up (5 consecutive rising points) or a hard cap of 3× full-clawback income is reached. Annotated reference lines for income floor, OAS clawback start, and OAS fully clawed back. "Apply to Dashboard" button writes the optimal ceilings to the drawdown strategy what-if. All thresholds (OAS clawback, federal brackets) sourced from Tax Settings — no hardcoded values.
+
+### Changed
+- Monte Carlo simulation moved from Dashboard to the Analysis tab
+- Tab components are now kept mounted when navigating between tabs (hidden with `display:none` rather than unmounted), so Monte Carlo and optimizer results survive tab switches
+
+---
+
 ## [0.4.0] — 2026-06-02
 
 ### Added

@@ -4,6 +4,7 @@ import type { AppState, SpendGapPhaseConfig, SpendGapSurplusItem, DrawdownStrate
 import portageIcon from './assets/portage-icon.png'
 
 import { DashboardTab }   from './tabs/DashboardTab'
+import { AnalysisTab }    from './tabs/AnalysisTab'
 import { AssumptionsTab } from './tabs/AssumptionsTab'
 import { IncomeTab }      from './tabs/IncomeTab'
 import { InvestmentsTab } from './tabs/InvestmentsTab'
@@ -737,6 +738,7 @@ function VersionModal({ onClose }: { onClose: () => void }) {
 
 const DASHBOARD_TABS = [
   { id: 'dashboard', label: 'Dashboard', Component: DashboardTab },
+  { id: 'analysis',  label: 'Analysis',  Component: AnalysisTab  },
 ]
 
 const INPUT_TABS = [
@@ -758,7 +760,9 @@ export default function App() {
   const [helpOpen,     setHelpOpen]     = useState(false)
   const [versionOpen,  setVersionOpen]  = useState(false)
 
-  const ActiveComponent = ALL_TABS.find(t => t.id === activeTab)?.Component ?? (() => null)
+  // Keep all tabs mounted so analysis results (MC, meltdown optimizer) survive
+  // navigation.  Active tab uses display:contents (no layout effect); inactive
+  // tabs use display:none so they are hidden but not unmounted.
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -943,7 +947,11 @@ export default function App() {
 
       {/* ── Tab content ── */}
       <main className="flex-1 overflow-auto p-5">
-        <ActiveComponent />
+        {ALL_TABS.map(t => (
+          <div key={t.id} style={{ display: activeTab === t.id ? 'contents' : 'none' }}>
+            <t.Component />
+          </div>
+        ))}
       </main>
     </div>
   )

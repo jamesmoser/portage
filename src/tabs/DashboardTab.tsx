@@ -15,8 +15,6 @@ import { DateInput } from '../components/DateInput'
 import type { AppState, HeadlineMetrics, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem, GKPersonConfig } from '../engine/types'
 import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG, DEFAULT_GK_CONFIG } from '../engine/defaults'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
-import { runMonteCarlo } from '../engine/monteCarlo'
-import type { MonteCarloResult } from '../engine/monteCarlo'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
@@ -849,24 +847,6 @@ export function DashboardTab() {
   const endYearB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
   const endYear  = Math.max(endYearA, endYearB)
 
-  // ── Monte Carlo state ────────────────────────────────────────────────────────
-  const [mcSimulations,   setMcSimulations]   = useState(500)
-  const [mcVolatilityPct, setMcVolatilityPct] = useState(12)
-  const [mcResult,        setMcResult]        = useState<MonteCarloResult | null>(null)
-  const [mcRunning,       setMcRunning]       = useState(false)
-
-  function runMC() {
-    setMcRunning(true)
-    // Defer computation one tick so React can render the "Running…" state first.
-    setTimeout(() => {
-      const result = runMonteCarlo(effectiveState, rateSchedule, {
-        simulations:   mcSimulations,
-        volatilityPct: mcVolatilityPct,
-      })
-      setMcResult(result)
-      setMcRunning(false)
-    }, 20)
-  }
   const currentYear = new Date().getFullYear()
   // Retirement years for modal highlights
   const retirementYearA = getYear(effectiveState.personA.retirementDate)
@@ -3175,170 +3155,6 @@ export function DashboardTab() {
 
     </div>
 
-    {/* ── Probability Analysis ──────────────────────────────────────────────── */}
-    <SectionDivider title="Probability Analysis" />
-    <SectionCard title="Monte Carlo Simulation" width="full"
-      onReset={() => { setMcSimulations(500); setMcVolatilityPct(12); setMcResult(null) }}
-      info={
-        <div className="space-y-2 text-sm">
-          <p>Monte Carlo runs your plan hundreds of times, varying annual market returns randomly around the configured rate profile. Everything else — income, tax, spending phases, drawdown strategy, and all active modifications — is held fixed. Only market sequence varies.</p>
-          <p><strong>Return Volatility (σ)</strong> — The standard deviation of annual return noise added to each year's base rate. 12% is a reasonable default for a balanced equity/bond portfolio. Lower values produce a tighter fan; higher values widen it.</p>
-          <p><strong>Probability of Success</strong> — Percentage of simulations where the portfolio remains above zero at the final year of the plan. 90%+ is generally considered robust; below 70% warrants strategy changes.</p>
-          <p><strong>Median Depletion Age</strong> — In simulations that do deplete, the median age of the reference person when the portfolio first reaches zero. Only shown when at least 5% of simulations deplete.</p>
-          <p>The fan chart shows the distribution of portfolio outcomes over time. The red line is the deterministic result of the configured rate profile. Grey bands show the 10th–90th and 25th–75th percentile ranges. Black dotted lines are the best and worst case outcomes across all simulations.</p>
-        </div>
-      }>
-
-      {/* Controls */}
-      <div className="flex items-center gap-4 mb-4 flex-wrap">
-        <NumberInput label="Simulations" value={mcSimulations} onChange={setMcSimulations}
-          min={100} max={2000} step={100} decimals={0} size="sm" />
-        <NumberInput label="Volatility σ (%)" value={mcVolatilityPct} onChange={setMcVolatilityPct}
-          min={1} max={30} step={1} decimals={0} size="sm" />
-        <button className="btn-primary self-end" onClick={runMC} disabled={mcRunning}>
-          {mcRunning ? 'Running…' : mcResult ? 'Re-run' : 'Run Simulation'}
-        </button>
-{mcResult && !mcRunning && (
-          <span className="text-xs text-slate-400 self-end pb-1">
-            Last run: {mcResult.simulationCount.toLocaleString()} simulations
-          </span>
-        )}
-      </div>
-
-      {mcRunning && (
-        <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
-          Running {mcSimulations.toLocaleString()} simulations…
-        </div>
-      )}
-
-      {mcResult && !mcRunning && (() => {
-        const refName = ageReferencePerson === 'personB' ? bName : aName
-        const successPct = mcResult.probabilityOfSuccess * 100
-        const deplPct    = mcResult.depletionPct * 100
-
-        // Fan chart traces — order matters for Plotly's tonexty fill.
-        const mcTraces: Data[] = [
-          // Outer band: P10 → P90
-          { x: mcResult.years, y: mcResult.p10, type: 'scatter', mode: 'lines',
-            line: { color: 'rgba(0,0,0,0)', width: 0 }, showlegend: false, hoverinfo: 'skip' },
-          { x: mcResult.years, y: mcResult.p90, type: 'scatter', mode: 'lines',
-            fill: 'tonexty', fillcolor: 'rgba(140,140,140,0.15)',
-            line: { color: 'rgba(0,0,0,0)', width: 0 }, name: 'P10–P90',
-            hovertemplate: '%{y:$,.0f}<extra>P90</extra>' },
-          // Inner band: P25 → P75
-          { x: mcResult.years, y: mcResult.p25, type: 'scatter', mode: 'lines',
-            line: { color: 'rgba(0,0,0,0)', width: 0 }, showlegend: false, hoverinfo: 'skip' },
-          { x: mcResult.years, y: mcResult.p75, type: 'scatter', mode: 'lines',
-            fill: 'tonexty', fillcolor: 'rgba(100,100,100,0.20)',
-            line: { color: 'rgba(0,0,0,0)', width: 0 }, name: 'P25–P75',
-            hovertemplate: '%{y:$,.0f}<extra>P75</extra>' },
-          // Median
-          { x: mcResult.years, y: mcResult.p50, type: 'scatter', mode: 'lines',
-            line: { color: '#94a3b8', width: 1.5 }, name: 'Median (P50)',
-            hovertemplate: '%{y:$,.0f}<extra>Median</extra>' },
-          // Worst / best case envelope
-          { x: mcResult.years, y: mcResult.pMin, type: 'scatter', mode: 'lines',
-            line: { color: '#1e293b', width: 1, dash: 'dot' }, name: 'Worst case',
-            hovertemplate: '%{y:$,.0f}<extra>Worst</extra>' },
-          { x: mcResult.years, y: mcResult.pMax, type: 'scatter', mode: 'lines',
-            line: { color: '#1e293b', width: 1, dash: 'dot' }, name: 'Best case',
-            hovertemplate: '%{y:$,.0f}<extra>Best</extra>' },
-          // Configured rate profile (deterministic)
-          { x: dataPoints.map(d => d.year), y: dataPoints.map(d => d.totalPortfolio),
-            type: 'scatter', mode: 'lines',
-            line: { color: '#7B1515', width: 2 }, name: 'Configured profile',
-            hovertemplate: '%{y:$,.0f}<extra>Configured</extra>' },
-        ]
-
-        return (
-          <>
-            {/* Stats tiles */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                <div className="text-xs text-slate-400">Probability of Success</div>
-                <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                  {successPct.toFixed(1)}%
-                </div>
-                <div className="text-xs text-slate-400">portfolio survives to end of plan</div>
-              </div>
-              <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                <div className="text-xs text-slate-400">Depletion Rate</div>
-                <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                  {deplPct.toFixed(1)}%
-                </div>
-                <div className="text-xs text-slate-400">of simulations depleted</div>
-              </div>
-              <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                <div className="text-xs text-slate-400">Earliest Depletion Age</div>
-                <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                  {mcResult.earliestDepletionAge !== null ? mcResult.earliestDepletionAge.toFixed(1) : '—'}
-                </div>
-                <div className="text-xs text-slate-400">
-                  {mcResult.earliestDepletionAge !== null ? `${refName}'s age` : 'no simulations depleted'}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                <div className="text-xs text-slate-400">Median Depletion Age</div>
-                <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                  {mcResult.medianDepletionAge !== null ? mcResult.medianDepletionAge.toFixed(1) : '—'}
-                </div>
-                <div className="text-xs text-slate-400">
-                  {mcResult.medianDepletionAge !== null
-                    ? `${refName}'s age at depletion`
-                    : 'fewer than 5% of sims depleted'}
-                </div>
-              </div>
-            </div>
-
-            {/* Fan chart */}
-            <PlotlyChart
-              data={mcTraces}
-              layout={{
-                height: 380,
-                yaxis: { tickformat: ',.0f', title: { text: 'Portfolio', font: { size: 11 } } },
-                xaxis: { title: { text: 'Year', font: { size: 11 } } },
-                legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
-              }}
-            />
-
-            {/* Milestone Px table */}
-            <div className="mt-4 overflow-x-auto rounded border border-slate-200">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th colSpan={7} className="px-3 py-2 text-left font-medium text-slate-700">
-                      Portfolio by Percentile
-                    </th>
-                  </tr>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
-                    <th className="px-3 py-2 text-left font-medium">Milestone</th>
-                    <th className="px-3 py-2 text-right font-medium">Year</th>
-                    <th className="px-3 py-2 text-right font-medium text-slate-700">P10</th>
-                    <th className="px-3 py-2 text-right font-medium">P25</th>
-                    <th className="px-3 py-2 text-right font-medium">P50</th>
-                    <th className="px-3 py-2 text-right font-medium">P75</th>
-                    <th className="px-3 py-2 text-right font-medium">P90</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {mcResult.milestones.map(m => (
-                    <tr key={m.year} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-2 text-slate-600">{m.label}</td>
-                      <td className="px-3 py-2 text-right text-slate-500 text-xs">{m.year}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmt(m.p10)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p25)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p50)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p75)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p90)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )
-      })()}
-    </SectionCard>
 
     {/* ── Metric Detail Modal ──────────────────────────────────────────────── */}
     {modalDef && <MetricDetailModal def={modalDef} onClose={() => setModalDef(null)} />}
