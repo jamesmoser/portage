@@ -226,6 +226,30 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     s = { ...s, homeSaleEvent: { date, amount, account } }
   }
 
+  // ── Spending Modifier ─────────────────────────────────────────────────────────
+  if (wi.spendingModifier?.enabled && wi.spendingModifier.value.mode !== 'base' && wi.spendingModifier.value.amount > 0) {
+    const { mode, amount } = wi.spendingModifier.value
+    if (mode === 'subsistence') {
+      // Subsistence replaces all phase amounts with a flat constant and removes all
+      // recurring additional spending — the subsistence amount is the total lifestyle floor.
+      // One-time items are kept since they represent discrete events, not ongoing lifestyle.
+      s = {
+        ...s,
+        spendingPhases: s.spendingPhases.map(phase => ({ ...phase, annualAmount: amount, growthRatePct: 0 })),
+        additionalSpending: s.additionalSpending.filter(item => !item.recurring),
+      }
+    } else {
+      // Lean reduces each phase by a fixed amount (floored at 0). Additional spending
+      // items are intentional committed costs and are left unchanged.
+      s = {
+        ...s,
+        spendingPhases: s.spendingPhases.map(phase => ({
+          ...phase, annualAmount: Math.max(0, phase.annualAmount - amount),
+        })),
+      }
+    }
+  }
+
   return s
 }
 

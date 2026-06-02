@@ -805,6 +805,62 @@ export function DashboardTab() {
     [dataPoints, ageReferencePerson, effectiveState],
   )
 
+  // Lifestyle spending preview chart — base plan (phases + recurring additional) vs. current (from projection).
+  // Uses dataPoints.spendingLifestyle for the current series so it matches every other spending chart exactly.
+  const { spendingChartSeries, spendingStats } = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    const refBirth = state.ageReferencePerson === 'personB' ? state.personB.birthDate : state.personA.birthDate
+
+    // Base series: phases + recurring additional spending from settings, in today's dollars.
+    // Mirrors spendingLifestyle computation without alive-fraction pro-rating (preview approximation).
+    const endYearA = getYear(dateAtDecimalAge(state.personA.birthDate, state.personA.planningEndAge))
+    const endYearB = getYear(dateAtDecimalAge(state.personB.birthDate, state.personB.planningEndAge))
+    const endYear  = Math.max(endYearA, endYearB)
+    const years    = Array.from({ length: endYear - currentYear + 1 }, (_, i) => currentYear + i)
+    const sorted   = [...state.spendingPhases].sort((a, b) => a.startAge - b.startAge)
+
+    const baseSeries = years.map(year => {
+      const refAge = exactAgeAt(refBirth, `${year}-07-01`)
+      let active = sorted[0]
+      for (const p of sorted) { if (p.startAge <= refAge) active = p; else break }
+      let amt = active ? active.annualAmount * Math.pow(1 + active.growthRatePct / 100, Math.max(0, refAge - active.startAge)) : 0
+      for (const item of state.additionalSpending) {
+        if (item.recurring && refAge >= item.startAge) amt += item.amount
+      }
+      return amt
+    })
+
+    // Current series: directly from the projection — always matches the spending breakdown chart.
+    const dpMap = new Map(dataPoints.map(dp => [dp.year, dp.spendingLifestyle]))
+    const currentSeries = years.map(y => dpMap.get(y) ?? 0)
+
+    const sm         = whatIfs.spendingModifier
+    const smEnabled  = sm?.enabled ?? false
+    const isModified = smEnabled && (sm?.value.mode ?? 'base') !== 'base'
+
+    // When no modification is active, both lines should show the same values — use currentSeries
+    // for both so there's no divergence from the approximation. Only show baseSeries (grey dotted)
+    // as a contrast reference when a modification is actually in effect.
+    const greySeries = isModified ? baseSeries : currentSeries
+
+    const max = Math.max(...currentSeries)
+    const min = Math.min(...currentSeries)
+    const avg = currentSeries.reduce((a, b) => a + b, 0) / currentSeries.length
+
+    return {
+      spendingChartSeries: [
+        { type: 'scatter', mode: 'lines', x: years, y: greySeries,
+          line: { color: '#cbd5e1', width: 1.5, dash: 'dot' }, hoverinfo: 'none' },
+        { type: 'scatter', mode: 'lines', x: years, y: currentSeries,
+          line: { color: '#7B1515', width: 2 }, hoverinfo: 'none' },
+      ],
+      spendingStats: { max, avg, min },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataPoints, whatIfs.spendingModifier, state.spendingPhases, state.additionalSpending,
+      state.ageReferencePerson, state.personA.birthDate, state.personB.birthDate,
+      state.personA.planningEndAge, state.personB.planningEndAge])
+
   // ── Scenario controls state ────────────────────────────────────────────────
 
   const [savingScenario, setSavingScenario] = useState(false)
@@ -1947,6 +2003,76 @@ export function DashboardTab() {
                             </button>
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </WhatIfSection>
+
+            <WhatIfSection title="Lifestyle Spending">
+              {(() => {
+                const sm        = whatIfs.spendingModifier
+                const smEnabled = sm?.enabled ?? false
+                const smValue   = sm?.value ?? { mode: 'base' as const, amount: 50000 }
+                const setSM     = (partial: Partial<typeof smValue>) =>
+                  updateWhatIf('spendingModifier', { value: { ...smValue, ...partial } })
+                return (
+                  <div>
+                    <div className="flex items-stretch px-3 pt-2.5 pb-0.5 gap-2">
+                      <div className="flex-1 min-w-0">
+                        <PlotlyChart
+                          data={spendingChartSeries}
+                          layout={MARKET_CHART_LAYOUT}
+                          style={{ height: '72px' }}
+                        />
+                      </div>
+                      <div className="flex flex-col justify-around text-right py-1 shrink-0">
+                        {([['Max', spendingStats.max], ['Avg', spendingStats.avg], ['Min', spendingStats.min]] as [string, number][]).map(([lbl, val]) => (
+                          <div key={lbl}>
+                            <div className="text-[9px] text-slate-400 leading-none uppercase tracking-wide">{lbl}</div>
+                            <div className="text-xs font-semibold leading-tight" style={{ color: '#7B1515' }}>
+                              ${Math.round(val / 1000)}k
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Spending Profile toggle + selector */}
+                    <div className="flex items-center gap-3 px-3 py-2.5 border-t border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={smEnabled}
+                        onChange={e => updateWhatIf('spendingModifier', { enabled: e.target.checked, value: smValue })}
+                        className="w-4 h-4 rounded shrink-0 cursor-pointer"
+                        style={{ accentColor: '#7B1515' }}
+                      />
+                      <span className={`text-sm w-52 shrink-0 ${smEnabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
+                        Spending Profile
+                      </span>
+                      {smEnabled ? (
+                        <SelectInput
+                          label=""
+                          value={smValue.mode}
+                          onChange={v => setSM({ mode: v as 'base' | 'subsistence' | 'lean' })}
+                          options={[
+                            { value: 'base',        label: 'Base' },
+                            { value: 'subsistence', label: 'Subsistence' },
+                            { value: 'lean',        label: 'Lean' },
+                          ]}
+                        />
+                      ) : null}
+                    </div>
+                    {/* Amount input — only when a modifying profile is selected */}
+                    {smEnabled && smValue.mode !== 'base' && (
+                      <div className="border-t border-slate-100">
+                        <div className="flex items-center gap-3 px-3 py-2.5">
+                          <span className="text-sm text-slate-600 w-24 shrink-0">
+                            {smValue.mode === 'subsistence' ? 'Annual ($)' : 'Reduction ($)'}
+                          </span>
+                          <NumberInput label="" value={smValue.amount} onChange={v => setSM({ amount: v })}
+                            min={0} max={500000} step={1000} size="sm" />
+                        </div>
                       </div>
                     )}
                   </div>

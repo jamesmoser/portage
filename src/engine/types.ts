@@ -436,6 +436,7 @@ export interface WhatIfs {
   unexpectedExpense?: WhatIf<{ date: string; amount: number }>  // one-time household spending hit
   lifestyleChange?:   WhatIf<{ date: string; amount: number }>  // permanent recurring offset to lifestyle spending (may be negative)
   homeSale?:          WhatIf<{ date: string; amount: number; account: 'hisa' | 'nonRegA' | 'nonRegB' }>  // home sale / downsizing proceeds injected into a specific account
+  spendingModifier?:  WhatIf<{ mode: 'base' | 'subsistence' | 'lean'; amount: number }>  // base: no change; subsistence: replace all phases with flat constant; lean: subtract fixed amount from each phase
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────
