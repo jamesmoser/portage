@@ -1091,11 +1091,22 @@ export function DashboardTab() {
     { label: `Taxable — ${b}`, value: d => d.grossIncomeB, person: 'B' },
   ]
 
+  const splitCol: TableCol = {
+    label: 'Split',
+    value: d => d.pensionSplitPaid > 0 ? d.pensionSplitPaid : d.pensionSplitPaidB,
+    format: (_v, d) => {
+      if (d.pensionSplitPaid > 0)  return `A→B ${fmtT(d.pensionSplitPaid)}`
+      if (d.pensionSplitPaidB > 0) return `B→A ${fmtT(d.pensionSplitPaidB)}`
+      return '—'
+    },
+  }
+
   const taxTableCols: TableCol[] = taxOpen ? [
     { label: `Tax — ${a}`,      value: d => d.taxA,          person: 'A' },
     { label: `Tax — ${b}`,      value: d => d.taxB,          person: 'B' },
     { label: `Clawback — ${a}`, value: d => d.oasClawbackA,  person: 'A' },
     { label: `Clawback — ${b}`, value: d => d.oasClawbackB,  person: 'B' },
+    splitCol,
   ] : [
     { label: `Tax — ${a}`, value: d => d.taxA, person: 'A' },
     { label: `Tax — ${b}`, value: d => d.taxB, person: 'B' },
@@ -3114,7 +3125,9 @@ export function DashboardTab() {
                     </td>
                   ))}
                   {taxTableCols.map(col => (
-                    <td key={col.label} className="px-2 py-1 border border-slate-100 text-right text-red-600" style={colTint(col, i)}>{fmtT(col.value(d))}</td>
+                    <td key={col.label} className={`px-2 py-1 border border-slate-100 text-right ${col.format ? 'text-slate-600' : 'text-red-600'}`} style={colTint(col, i)}>
+                      {col.format ? col.format(col.value(d), d) : fmtT(col.value(d))}
+                    </td>
                   ))}
                   <td className="px-2 py-1 border border-slate-100 text-right font-medium">{fmt(d.totalHouseholdNet)}</td>
                   {spendingTableCols.map(col => (
