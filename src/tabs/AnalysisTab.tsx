@@ -462,9 +462,9 @@ export function AnalysisTab() {
           <div className="space-y-2 text-sm">
             <p>The meltdown optimizer sweeps the <strong>Gross Income Ceiling</strong> parameter of the Cover Spending Gap strategy to find the ceiling that minimises lifetime income tax paid.</p>
             <p>The <strong>meltdown phase</strong> runs from the year a person retires until the year before their RRSP converts to a RRIF. During this window the engine can proactively draw RRSP up to a gross income ceiling, filling tax brackets that would otherwise be wasted — reducing the mandatory RRIF minimums that follow, which are taxed at higher marginal rates.</p>
-            <p><strong>How to read the chart</strong> — The x-axis is the gross income ceiling in today's dollars. The y-axis is lifetime household tax (OAS clawback is counted as tax). The optimal ceiling (red dashed line) is where the curve reaches its minimum. The grey dotted line marks the income floor: the average gross income from non-RRSP sources in those years — below it, the ceiling has no effect. The amber dotted lines mark the OAS clawback start and the income at which OAS is fully clawed back. The sweep extends to the full clawback income so you can see whether a minimum exists inside or outside the clawback zone — for large RRSPs the meltdown savings can outweigh the clawback cost.</p>
+            <p><strong>How to read the chart</strong> — The x-axis is the gross income ceiling in today's dollars. The y-axis is lifetime household tax (OAS clawback is counted as tax). The red dashed line marks the optimal ceiling where the curve reaches its minimum. The grey dotted line marks the income floor: the average gross income from non-RRSP sources in those years — below it, the ceiling has no effect. A dotted amber line marks where the OAS clawback starts; a dashed amber line marks the income at which OAS is fully clawed back. The sweep extends past full clawback so you can see whether a minimum exists inside or outside the clawback zone — for large RRSPs the meltdown savings can outweigh the clawback cost.</p>
             <p><strong>Each person's sweep is independent</strong> — when sweeping one person's ceiling, the other's is held at zero. The result reflects the marginal contribution of each person's meltdown draws.</p>
-            <p><strong>Apply to Dashboard</strong> — writes the optimal ceilings to the Drawdown Strategy what-if in the Dashboard, enabling Cover Spending Gap with those values. You can then verify the full tax and portfolio impact on the Dashboard.</p>
+            <p><strong>Apply to Dashboard</strong> — changes the Dashboard drawdown strategy to Cover Spending Gap and updates the gross income ceiling to the optimal value found.</p>
             <p><strong>Dynamic sweep</strong> — the optimizer continues past the OAS full-clawback point until the curve has clearly turned upward (five consecutive data points all above the running minimum), or until a hard cap of 3× full-clawback income is reached. If the minimum is still not found, an amber warning is shown — this indicates that aggressive meltdown is beneficial throughout the entire realistic income range, typically because future RRIF minimums will always face higher marginal rates than the meltdown draws today.</p>
             <p>All reference thresholds (OAS clawback, bracket boundaries) are read from your Tax Settings — they update automatically if you change them.</p>
           </div>
@@ -614,7 +614,7 @@ export function AnalysisTab() {
                   Apply to Dashboard
                 </button>
                 <span className="text-xs text-slate-400">
-                  Enables the Cover Spending Gap strategy in the Dashboard what-if panel with the optimal ceilings above.
+                  Changes the Dashboard drawdown strategy to Cover Spending Gap and updates the optimal gross income ceiling.
                 </span>
               </div>
             </>
@@ -631,9 +631,10 @@ export function AnalysisTab() {
             <p>The CPP / OAS timing optimizer sweeps start ages to find the household-lifetime-benefit-maximising ages for each person independently.</p>
             <p><strong>CPP sweep (ages 60–70)</strong> — The objective is total household CPP collected across all plan years, including survivor benefits. Because the combined CPP cap for the surviving spouse scales with the <em>survivor's own deferral factor</em>, the optimal start age for one person depends on whether the other person is likely to predecease them: a later start by B raises B's cap, potentially allowing more of A's CPP to transfer on A's death.</p>
             <p><strong>OAS sweep (ages 65–70)</strong> — The objective is total household net OAS: gross OAS minus clawback paid. Each month of deferral past 65 adds +0.6% to the monthly benefit (maximum +36% at 70). For high-income households where OAS is fully clawed back, the optimal OAS start age may still be 65 because you collect more total benefits before the income threshold becomes binding.</p>
-            <p><strong>Independent sweeps</strong> — When sweeping one person's start age, the other's is held at the base plan value. The optimal ages are those that maximise lifetime benefit holding all other plan parameters constant.</p>
+            <p><strong>How to read the charts</strong> — Each chart shows a line connecting all tested start ages. The red filled dot marks the optimal age; a hollow grey circle marks the currently configured age (when it differs from optimal). All other ages are shown as small grey dots.</p>
+            <p><strong>Independent sweeps</strong> — When sweeping one person's start age, the other's is held at the currently configured value. The optimal ages are those that maximise lifetime benefit holding all other plan parameters constant.</p>
             <p><strong>Survivor benefits are automatic</strong> — the projection engine fully models CPP survivor logic (60% of deceased's effective monthly, capped by the combined maximum that scales with the survivor's deferral factor). No special configuration is needed.</p>
-            <p><strong>Apply to Dashboard</strong> — writes all four optimal start ages to the CPP/OAS what-if overrides in the Dashboard so you can verify the full tax and portfolio impact.</p>
+            <p><strong>Apply to Dashboard</strong> — sets all four CPP and OAS start ages to the optimal values in the Dashboard what-if overrides.</p>
           </div>
         }>
 
