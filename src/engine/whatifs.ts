@@ -230,6 +230,12 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     }
   }
 
+  // ── Home Sale / Downsizing ────────────────────────────────────────────────────
+  if (wi.homeSale?.enabled && wi.homeSale.value.amount > 0) {
+    const { date, amount, account } = wi.homeSale.value
+    s = { ...s, homeSaleEvent: { date, amount, account } }
+  }
+
   return s
 }
 

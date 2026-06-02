@@ -563,6 +563,11 @@ function generateAIContext(): string {
     const { date, amount } = wi.unexpectedExpense.value
     mods.push(`**Unexpected Expense:** One-time household spending of ${c(amount)} in ${date.slice(0, 4)}.`)
   }
+  if (wi.homeSale?.enabled && wi.homeSale.value.amount > 0) {
+    const { date, amount, account } = wi.homeSale.value
+    const acctLabel = account === 'hisa' ? 'HISA' : account === 'nonRegA' ? `${aName}'s Non-Reg` : `${bName}'s Non-Reg`
+    mods.push(`**Home Sale / Downsizing:** Net proceeds of ${c(amount)} deposited to ${acctLabel} in ${date.slice(0, 4)}. Non-taxable (principal residence exemption).`)
+  }
 
   if (mods.length === 0) {
     h('No modifications are currently active. The simulation reflects the base plan only.')

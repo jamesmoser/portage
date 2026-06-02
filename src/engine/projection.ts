@@ -198,6 +198,23 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       }
     }
 
+    // ── Home sale / downsizing proceeds ──────────────────────────────────────
+    // Non-taxable (principal residence exemption). Injected as nominal capital
+    // into the target account in the year of the sale date. ACB = full amount
+    // for non-reg (no embedded gain on fresh capital entry).
+    if (state.homeSaleEvent && getYear(state.homeSaleEvent.date) === year) {
+      const proceedsNom = state.homeSaleEvent.amount * Math.pow(1 + cpi, yearsFromNow)
+      if (state.homeSaleEvent.account === 'hisa') {
+        hisa += proceedsNom
+      } else if (state.homeSaleEvent.account === 'nonRegA') {
+        nonRegA += proceedsNom
+        nonRegAcbA += proceedsNom
+      } else if (state.homeSaleEvent.account === 'nonRegB') {
+        nonRegB += proceedsNom
+        nonRegAcbB += proceedsNom
+      }
+    }
+
     // ── RRIF minimums (annual — based on Jan 1 balance and Jan 1 age) ────────
     const isRrifA = aAlive && onOrAfter(dateStr, state.rrspA.rrifConversionDate)
     const isRrifB = bAlive && onOrAfter(dateStr, state.rrspB.rrifConversionDate)

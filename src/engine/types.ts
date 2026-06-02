@@ -436,6 +436,7 @@ export interface WhatIfs {
   layoffB?:          WhatIf<{ date: string; severance: number }>
   unexpectedExpense?: WhatIf<{ date: string; amount: number }>  // one-time household spending hit
   lifestyleChange?:   WhatIf<{ date: string; amount: number }>  // permanent recurring offset to lifestyle spending (may be negative)
+  homeSale?:          WhatIf<{ date: string; amount: number; account: 'hisa' | 'nonRegA' | 'nonRegB' }>  // home sale / downsizing proceeds injected into a specific account
 }
 
 // ─── Headline Metrics ─────────────────────────────────────────────────────────
@@ -529,6 +530,9 @@ export interface AppState {
   withdrawalStrategy: WithdrawalStrategy
 
   scenarios: Scenario[]
+
+  // Transient — populated by mergeWhatIfs when homeSale what-if is active; never persisted.
+  homeSaleEvent?: { date: string; amount: number; account: 'hisa' | 'nonRegA' | 'nonRegB' }
 }
 
 // ─── Projection Output ────────────────────────────────────────────────────────

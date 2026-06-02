@@ -2186,6 +2186,42 @@ export function DashboardTab() {
                   </div>
                 )
               })()}
+              {(() => {
+                const wi      = whatIfs.homeSale
+                const enabled = wi?.enabled ?? false
+                const date    = wi?.value?.date    ?? todayStr()
+                const amount  = wi?.value?.amount  ?? 0
+                const account = wi?.value?.account ?? 'hisa'
+                const set = (partial: { date?: string; amount?: number; account?: 'hisa' | 'nonRegA' | 'nonRegB' }) =>
+                  updateWhatIf('homeSale', { enabled: true, value: { date, amount, account, ...partial } })
+                const accountOptions = [
+                  { value: 'hisa',    label: 'HISA' },
+                  { value: 'nonRegA', label: `${aName} Non-Reg` },
+                  { value: 'nonRegB', label: `${bName} Non-Reg` },
+                ]
+                return (
+                  <div>
+                    <div className="px-3 py-2.5 flex items-center gap-3">
+                      <input type="checkbox" checked={enabled}
+                        onChange={e => updateWhatIf('homeSale', { enabled: e.target.checked, value: { date, amount, account } })}
+                        className="w-4 h-4 rounded shrink-0 cursor-pointer" style={{ accentColor: '#7B1515' }} />
+                      <span className={`text-sm w-52 shrink-0 ${enabled ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
+                        Home Sale / Downsizing
+                      </span>
+                      {enabled ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <DateInput label="Sale Date" value={date} onChange={v => set({ date: v })} />
+                          <NumberInput label="Net Proceeds ($)" value={amount} size="sm"
+                            onChange={v => set({ amount: v })} />
+                          <SelectInput label="Deposit To" value={account}
+                            onChange={v => set({ account: v as 'hisa' | 'nonRegA' | 'nonRegB' })}
+                            options={accountOptions} />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })()}
             </WhatIfSection>
 
           </div>

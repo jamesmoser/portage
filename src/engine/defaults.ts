@@ -162,6 +162,7 @@ export const DEFAULT_WHATIFS: WhatIfs = {
   layoffB: { enabled: false, value: { date: today, severance: 0 } },
   unexpectedExpense: { enabled: false, value: { date: today, amount: 0 } },
   lifestyleChange:   { enabled: false, value: { date: today, amount: 0 } },
+  homeSale:          { enabled: false, value: { date: today, amount: 0, account: 'hisa' as const } },
 }
 
 export const DEFAULT_STATE: AppState = {
