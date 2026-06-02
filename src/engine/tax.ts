@@ -215,40 +215,55 @@ export function calculateTax(
 // ─── Pension income splitting optimizer ──────────────────────────────────────
 
 /**
- * Try all pension-split percentages 0–50% (1% increments) and return
- * the split that minimizes combined household tax.
+ * Try all pension-split percentages 0–50% in both directions (1% increments)
+ * and return the transfer that minimizes combined household tax.
  *
- * eligiblePensionA: the portion of Person A's income eligible for splitting
- * (DB pension income + RRIF income if both are 65+, etc.)
+ * Returns a signed transfer amount in nominal dollars:
+ *   transfer > 0  →  A transferred to B  (A's pensionIncome decreases)
+ *   transfer < 0  →  B transferred to A  (B's pensionIncome decreases)
+ *   transfer = 0  →  no split beneficial
+ *
+ * Eligible income:
+ *   DB pension (RPP life annuity) is eligible at any age.
+ *   RRIF withdrawals are eligible at 65+.
  */
 export function optimizePensionSplit(
   inputA: TaxInput,
   inputB: TaxInput,
-  eligiblePensionA: number,
+  eligibleA: number,
+  eligibleB: number,
   settings: TaxSettings,
   yearsFromBase: number,
   cpiRatePct: number,
-): { splitPct: number; taxA: PersonTaxResult; taxB: PersonTaxResult } {
-  let bestSplit = 0
-  let bestTotal = Infinity
-  let bestA = calculateTax(inputA, settings, yearsFromBase, cpiRatePct)
-  let bestB = calculateTax(inputB, settings, yearsFromBase, cpiRatePct)
+): { transfer: number; taxA: PersonTaxResult; taxB: PersonTaxResult } {
+  const baseA = calculateTax(inputA, settings, yearsFromBase, cpiRatePct)
+  const baseB = calculateTax(inputB, settings, yearsFromBase, cpiRatePct)
+  let bestTransfer = 0
+  let bestTotal = baseA.totalTax + baseB.totalTax
+  let bestA = baseA
+  let bestB = baseB
 
-  for (let pct = 0; pct <= 50; pct++) {
-    const transfer = eligiblePensionA * (pct / 100)
-    const modA = { ...inputA, pensionIncome: inputA.pensionIncome - transfer }
-    const modB = { ...inputB, pensionIncome: inputB.pensionIncome + transfer }
-    const rA = calculateTax(modA, settings, yearsFromBase, cpiRatePct)
-    const rB = calculateTax(modB, settings, yearsFromBase, cpiRatePct)
+  // Sweep A → B
+  for (let pct = 1; pct <= 50; pct++) {
+    const t = eligibleA * (pct / 100)
+    const rA = calculateTax({ ...inputA, pensionIncome: inputA.pensionIncome - t }, settings, yearsFromBase, cpiRatePct)
+    const rB = calculateTax({ ...inputB, pensionIncome: inputB.pensionIncome + t }, settings, yearsFromBase, cpiRatePct)
     if (rA.totalTax + rB.totalTax < bestTotal) {
-      bestTotal = rA.totalTax + rB.totalTax
-      bestSplit = pct
-      bestA = rA
-      bestB = rB
+      bestTotal = rA.totalTax + rB.totalTax; bestTransfer = t; bestA = rA; bestB = rB
     }
   }
 
-  return { splitPct: bestSplit, taxA: bestA, taxB: bestB }
+  // Sweep B → A
+  for (let pct = 1; pct <= 50; pct++) {
+    const t = eligibleB * (pct / 100)
+    const rA = calculateTax({ ...inputA, pensionIncome: inputA.pensionIncome + t }, settings, yearsFromBase, cpiRatePct)
+    const rB = calculateTax({ ...inputB, pensionIncome: inputB.pensionIncome - t }, settings, yearsFromBase, cpiRatePct)
+    if (rA.totalTax + rB.totalTax < bestTotal) {
+      bestTotal = rA.totalTax + rB.totalTax; bestTransfer = -t; bestA = rA; bestB = rB
+    }
+  }
+
+  return { transfer: bestTransfer, taxA: bestA, taxB: bestB }
 }
 
 /** RRIF minimum withdrawal factors by age (CRA schedule). */

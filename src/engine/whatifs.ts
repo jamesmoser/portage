@@ -77,16 +77,6 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     s = { ...s, oasB: { ...s.oasB, startDate: date } }
   }
 
-  if (wi.pensionSplit.enabled) {
-    s = {
-      ...s, withdrawalStrategy: {
-        ...s.withdrawalStrategy,
-        pensionSplitMode: wi.pensionSplit.value.mode,
-        pensionSplitPct:  wi.pensionSplit.value.pct,
-      },
-    }
-  }
-
   if (wi.drawdownStrategy.enabled && wi.drawdownStrategy.value.strategyType !== 'none') {
     const ds = wi.drawdownStrategy.value
     s = {

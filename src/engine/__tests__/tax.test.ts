@@ -411,15 +411,16 @@ describe('rrifMinFactor', () => {
 // optimal split is ≤ the combined tax at 0%.
 
 describe('optimizePensionSplit', () => {
-  it('split percentage is always in [0, 50]', () => {
+  it('transfer is within ±50% of the eligible pool', () => {
     const r = optimizePensionSplit(
       { ...zero, pensionIncome: 80_000 },
       { ...zero },
-      80_000,
+      80_000, 0,
       S, 0, 2,
     )
-    expect(r.splitPct).toBeGreaterThanOrEqual(0)
-    expect(r.splitPct).toBeLessThanOrEqual(50)
+    // A→B: transfer positive, at most 50% of eligible A
+    expect(r.transfer).toBeGreaterThanOrEqual(0)
+    expect(r.transfer).toBeLessThanOrEqual(80_000 * 0.50 + 0.01)
   })
 
   it('splitting is beneficial when Person A has high pension and Person B has little income', () => {
@@ -428,10 +429,10 @@ describe('optimizePensionSplit', () => {
     const r = optimizePensionSplit(
       { ...zero, pensionIncome: 80_000, age: 65 },
       { ...zero, age: 65 },
-      80_000,
+      80_000, 0,
       S, 0, 2,
     )
-    expect(r.splitPct).toBeGreaterThan(0)
+    expect(r.transfer).toBeGreaterThan(0)
     const noSplitA = calc({ ...zero, pensionIncome: 80_000, age: 65 })
     const noSplitB = calc({ ...zero, age: 65 })
     expect(r.taxA.totalTax + r.taxB.totalTax).toBeLessThan(noSplitA.totalTax + noSplitB.totalTax)
@@ -442,7 +443,7 @@ describe('optimizePensionSplit', () => {
     const r = optimizePensionSplit(
       { ...zero, pensionIncome: 50_000, age: 65 },
       { ...zero, pensionIncome: 50_000, age: 65 },
-      50_000,
+      50_000, 50_000,
       S, 0, 2,
     )
     // Combined tax at optimal split should be ≤ no-split (it won't be lower here)
@@ -462,7 +463,7 @@ describe('optimizePensionSplit', () => {
       const r = optimizePensionSplit(
         { ...zero, pensionIncome: pensA, age: 65 },
         { ...zero, pensionIncome: pensB, age: 65 },
-        pensA,
+        pensA, pensB,
         S, 0, 2,
       )
       const noSplitA = calc({ ...zero, pensionIncome: pensA, age: 65 })
@@ -472,15 +473,29 @@ describe('optimizePensionSplit', () => {
     }
   })
 
-  it('cannot transfer more than 50% of eligible pension', () => {
-    // Even with extreme imbalance, max split is 50%
+  it('cannot transfer more than 50% of eligible pension in either direction', () => {
+    // A→B: transfer ≤ 50% of A's eligible
     const r = optimizePensionSplit(
       { ...zero, pensionIncome: 200_000, age: 65 },
       { ...zero, age: 65 },
-      200_000,
+      200_000, 0,
       S, 0, 2,
     )
-    expect(r.splitPct).toBeLessThanOrEqual(50)
+    expect(r.transfer).toBeLessThanOrEqual(200_000 * 0.50 + 0.01)
+  })
+
+  it('B→A split is chosen when B has higher pension income than A', () => {
+    // B has $80,000, A has $0 — optimizer should transfer from B to A
+    const r = optimizePensionSplit(
+      { ...zero, age: 65 },
+      { ...zero, pensionIncome: 80_000, age: 65 },
+      0, 80_000,
+      S, 0, 2,
+    )
+    expect(r.transfer).toBeLessThan(0)  // negative = B→A
+    const noSplitA = calc({ ...zero, age: 65 })
+    const noSplitB = calc({ ...zero, pensionIncome: 80_000, age: 65 })
+    expect(r.taxA.totalTax + r.taxB.totalTax).toBeLessThan(noSplitA.totalTax + noSplitB.totalTax)
   })
 })
 

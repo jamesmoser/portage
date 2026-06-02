@@ -1073,8 +1073,10 @@ export function DashboardTab() {
     { label: `OAS — ${b}`,    value: d => d.oasB,              person: 'B' },
     { label: `RRIF — ${a}`,   value: d => d.rrifA,             person: 'A' },
     { label: `RRIF — ${b}`,   value: d => d.rrifB,             person: 'B' },
-    { label: `Split Paid — ${a}`,  value: d => d.pensionSplitPaid,     person: 'A', splitPaid: true },
-    { label: `Split Rcvd — ${b}`,  value: d => d.pensionSplitReceived, person: 'B' },
+    { label: `Split Paid — ${a}`,  value: d => d.pensionSplitPaid,      person: 'A', splitPaid: true },
+    { label: `Split Rcvd — ${b}`,  value: d => d.pensionSplitReceived,  person: 'B' },
+    { label: `Split Paid — ${b}`,  value: d => d.pensionSplitPaidB,     person: 'B', splitPaid: true },
+    { label: `Split Rcvd — ${a}`,  value: d => d.pensionSplitReceivedA, person: 'A' },
     { label: `TFSA — ${a}`,   value: d => d.tfsaWithdrawalA,   person: 'A' },
     { label: `TFSA — ${b}`,   value: d => d.tfsaWithdrawalB,   person: 'B' },
     { label: `NR — ${a}`,       value: d => d.nonRegWithdrawalA, person: 'A' },
@@ -2079,23 +2081,6 @@ export function DashboardTab() {
                 enabled={whatIfs.oasStartAgeB.enabled}
                 onChange={(age, active) => updateWhatIf('oasStartAgeB', { enabled: active, value: age })}
               />
-            </WhatIfSection>
-
-            <WhatIfSection title="Withdrawal Strategy">
-              <WhatIfRow
-                enabled={whatIfs.pensionSplit.enabled}
-                onToggle={v => updateWhatIf('pensionSplit', {
-                  enabled: v,
-                  value: v
-                    ? { mode: 'manual', pct: whatIfs.pensionSplit.value.pct }
-                    : whatIfs.pensionSplit.value,
-                })}
-                label="Manual Pension Splitting"
-              >
-                <NumberInput label="Split (%)" value={whatIfs.pensionSplit.value.pct}
-                  onChange={v => updateWhatIf('pensionSplit', { value: { ...whatIfs.pensionSplit.value, pct: v } })}
-                  min={0} max={50} step={1} decimals={0} size="sm" />
-              </WhatIfRow>
             </WhatIfSection>
 
             <WhatIfSection title="One Shot Events">

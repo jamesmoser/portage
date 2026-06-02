@@ -852,15 +852,20 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
 
     const eligibleForSplitA = (aAlive ? dbBase_nom + dbBridge_nom : 0) +
       (personAAgeInt >= 65 && aAlive ? rrifA_nom : 0)
+    const eligibleForSplitB = (bAlive ? dbBaseB_nom + dbBridgeB_nom : 0) +
+      (personBAgeInt >= 65 && bAlive ? rrifB_nom : 0)
 
     let taxA, taxB, splitAmount = 0
+    let splitDirection: 'AtoB' | 'BtoA' | 'none' = 'none'
     if (withdrawalStrategy.pensionSplitMode === 'auto' && aAlive && bAlive) {
-      const opt = optimizePensionSplit(taxInputA, taxInputB, eligibleForSplitA, taxSettings, yearsFromNow, state.cpiRatePct)
+      const opt = optimizePensionSplit(taxInputA, taxInputB, eligibleForSplitA, eligibleForSplitB, taxSettings, yearsFromNow, state.cpiRatePct)
       taxA = opt.taxA; taxB = opt.taxB
-      splitAmount = eligibleForSplitA * (opt.splitPct / 100)
+      if (opt.transfer > 0)      { splitAmount = opt.transfer;  splitDirection = 'AtoB' }
+      else if (opt.transfer < 0) { splitAmount = -opt.transfer; splitDirection = 'BtoA' }
     } else {
       const manualPct = withdrawalStrategy.pensionSplitMode === 'manual' ? withdrawalStrategy.pensionSplitPct : 0
-      splitAmount  = eligibleForSplitA * (manualPct / 100)
+      splitAmount = eligibleForSplitA * (manualPct / 100)
+      if (splitAmount > 0) splitDirection = 'AtoB'
       taxA = calculateTax({ ...taxInputA, pensionIncome: taxInputA.pensionIncome - splitAmount }, taxSettings, yearsFromNow - baseYear + baseYear, state.cpiRatePct)
       taxB = calculateTax({ ...taxInputB, pensionIncome: taxInputB.pensionIncome + splitAmount }, taxSettings, yearsFromNow - baseYear + baseYear, state.cpiRatePct)
     }
@@ -948,13 +953,18 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
         const updInputB = { ...taxInputB, pensionIncome: dbBaseB_nom + dbBridgeB_nom + rrifB_nom }
         const eligSplitA2 = (aAlive ? dbBase_nom + dbBridge_nom : 0)
                           + (personAAgeInt >= 65 && aAlive ? rrifA_nom : 0)
+        const eligSplitB2 = (bAlive ? dbBaseB_nom + dbBridgeB_nom : 0)
+                          + (personBAgeInt >= 65 && bAlive ? rrifB_nom : 0)
         if (withdrawalStrategy.pensionSplitMode === 'auto' && aAlive && bAlive) {
-          const opt = optimizePensionSplit(updInputA, updInputB, eligSplitA2, taxSettings, yearsFromNow, state.cpiRatePct)
+          const opt = optimizePensionSplit(updInputA, updInputB, eligSplitA2, eligSplitB2, taxSettings, yearsFromNow, state.cpiRatePct)
           taxA = opt.taxA; taxB = opt.taxB
-          splitAmount = eligSplitA2 * (opt.splitPct / 100)
+          if (opt.transfer > 0)      { splitAmount = opt.transfer;  splitDirection = 'AtoB' }
+          else if (opt.transfer < 0) { splitAmount = -opt.transfer; splitDirection = 'BtoA' }
+          else                       { splitAmount = 0;             splitDirection = 'none' }
         } else {
           const manualPct = withdrawalStrategy.pensionSplitMode === 'manual' ? withdrawalStrategy.pensionSplitPct : 0
-          splitAmount  = eligSplitA2 * (manualPct / 100)
+          splitAmount = eligSplitA2 * (manualPct / 100)
+          splitDirection = splitAmount > 0 ? 'AtoB' : 'none'
           taxA = calculateTax({ ...updInputA, pensionIncome: updInputA.pensionIncome - splitAmount }, taxSettings, yearsFromNow, state.cpiRatePct)
           taxB = calculateTax({ ...updInputB, pensionIncome: updInputB.pensionIncome + splitAmount }, taxSettings, yearsFromNow, state.cpiRatePct)
         }
@@ -1266,8 +1276,10 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       hisaWithdrawal: pd(hisaWithdraw_nom),
       otherIncomeA: pd(otherTaxableA_nom + otherNonTaxA_nom),
       otherIncomeB: pd(otherTaxableB_nom + otherNonTaxB_nom),
-      pensionSplitPaid:     pd(aAlive && bAlive ? splitAmount : 0),
-      pensionSplitReceived: pd(aAlive && bAlive ? splitAmount : 0),
+      pensionSplitPaid:      pd(aAlive && bAlive && splitDirection === 'AtoB' ? splitAmount : 0),
+      pensionSplitReceived:  pd(aAlive && bAlive && splitDirection === 'AtoB' ? splitAmount : 0),
+      pensionSplitPaidB:     pd(aAlive && bAlive && splitDirection === 'BtoA' ? splitAmount : 0),
+      pensionSplitReceivedA: pd(aAlive && bAlive && splitDirection === 'BtoA' ? splitAmount : 0),
 
       grossIncomeA: pd(aAlive ? taxA.grossIncome : 0),
       grossIncomeB: pd(bAlive ? taxB.grossIncome : 0),

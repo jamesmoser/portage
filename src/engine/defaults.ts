@@ -137,7 +137,6 @@ export const DEFAULT_WHATIFS: WhatIfs = {
   cppStartAgeB:      { enabled: false, value: 65 },
   oasStartAgeA:      { enabled: false, value: 65 },
   oasStartAgeB:      { enabled: false, value: 65 },
-  pensionSplit:      { enabled: false, value: { mode: 'auto', pct: 0 } },
   drawdownStrategy:  {
     enabled: false,
     value: {

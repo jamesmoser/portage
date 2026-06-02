@@ -427,7 +427,6 @@ export interface WhatIfs {
   cppStartAgeB:      WhatIf<number>
   oasStartAgeA:      WhatIf<number>              // OAS start age (65–70)
   oasStartAgeB:      WhatIf<number>
-  pensionSplit:      WhatIf<{ mode: PensionSplitMode; pct: number }>
   drawdownStrategy:  WhatIf<DrawdownStrategyConfig>
   marketProfile:     WhatIf<MarketProfileConfig>
   retirementA:       WhatIf<RetirementWhatIfConfig>
@@ -564,8 +563,10 @@ export interface DataPoint {
   nonRegYieldB: number
   otherIncomeA: number
   otherIncomeB: number
-  pensionSplitPaid:     number  // amount A transferred to B via pension splitting (PD$); positive
-  pensionSplitReceived: number  // amount B received from A via pension splitting (PD$); positive
+  pensionSplitPaid:      number  // amount A transferred to B (A→B split); 0 when B→A (PD$)
+  pensionSplitReceived:  number  // amount B received from A (A→B split); 0 when B→A (PD$)
+  pensionSplitPaidB:     number  // amount B transferred to A (B→A split); 0 when A→B (PD$)
+  pensionSplitReceivedA: number  // amount A received from B (B→A split); 0 when A→B (PD$)
 
   hisaWithdrawal: number       // HISA drawn to fund gap or via explicit strategy (joint, PD$)
 

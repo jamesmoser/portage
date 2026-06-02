@@ -89,8 +89,8 @@ function generateAIContext(): string {
   const effCpi        = wi.cpiRate?.enabled        ? wi.cpiRate.value        : s.cpiRatePct
   const effReturnOff  = wi.returnRateOffset.enabled ? wi.returnRateOffset.value : 0
 
-  const effPSMode = wi.pensionSplit.enabled ? wi.pensionSplit.value.mode : s.withdrawalStrategy.pensionSplitMode
-  const effPSPct  = wi.pensionSplit.enabled ? wi.pensionSplit.value.pct  : s.withdrawalStrategy.pensionSplitPct
+  const effPSMode = s.withdrawalStrategy.pensionSplitMode
+  const effPSPct  = s.withdrawalStrategy.pensionSplitPct
 
   const effDrawdown: DrawdownStrategyConfig =
     (wi.drawdownStrategy.enabled && wi.drawdownStrategy.value.strategyType !== 'none')
@@ -427,7 +427,7 @@ function generateAIContext(): string {
   h(`- **Jurisdiction:** Ontario + Federal combined, 2026 bracket values, CPI-indexed forward annually`,
     `- **Capital gains inclusion:** ${pct(cgRate)} of net realized gains included in taxable income (${100 - cgRate}% exempt)`,
     `- **Eligible dividends:** Grossed up 38%; federal dividend tax credit ~15.0% of grossed-up amount; Ontario credit ~10.0%`,
-    `- **Pension income splitting:** ${psDesc}${wi.pensionSplit.enabled ? ` *(base: ${s.withdrawalStrategy.pensionSplitMode === 'auto' ? 'auto' : `manual ${pct(s.withdrawalStrategy.pensionSplitPct)}`})*` : ''}`,
+    `- **Pension income splitting:** ${psDesc}`,
     `- **OAS clawback:** 15% of net income above ~$95,323 (2026, CPI-indexed annually)`,
     `- **Ontario surtax:** 20% surcharge on Ontario tax above $5,818; additional 36% surcharge on Ontario tax above $7,446 (2026)`)
   br()
@@ -540,10 +540,6 @@ function generateAIContext(): string {
   if (wi.returnRateOffset.enabled && wi.returnRateOffset.value !== 0) {
     const sign = wi.returnRateOffset.value > 0 ? '+' : ''
     mods.push(`**Portfolio Returns:** All tiers shifted by ${sign}${pct(wi.returnRateOffset.value)}. Effective: ${pct(effRates.upTo55)} / ${pct(effRates.from55to65)} / ${pct(effRates.from65to70)} / ${pct(effRates.from70plus)} (base: ${pct(s.returnRates.upTo55)} / ${pct(s.returnRates.from55to65)} / ${pct(s.returnRates.from65to70)} / ${pct(s.returnRates.from70plus)}).`)
-  }
-  if (wi.pensionSplit.enabled) {
-    const v = wi.pensionSplit.value
-    mods.push(`**Pension Splitting:** ${v.mode === 'auto' ? 'Auto-optimized' : `Manual at ${pct(v.pct)}`} (base: ${s.withdrawalStrategy.pensionSplitMode === 'auto' ? 'auto' : `manual ${pct(s.withdrawalStrategy.pensionSplitPct)}`}).`)
   }
   if (wi.drawdownStrategy.enabled)
     mods.push(`**Drawdown Strategy:** Overridden to "${wi.drawdownStrategy.value.strategyType}" (see Section 6 for full details). Base plan strategy: "${s.withdrawalStrategy.drawdownStrategy}".`)
