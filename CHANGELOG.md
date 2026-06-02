@@ -5,6 +5,14 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.4.0] — 2026-06-02
+
+### Added
+- **Home Sale / Downsizing** one-shot event in the Dashboard modifications panel — injects net sale proceeds directly into HISA, Person A Non-Reg, or Person B Non-Reg in the year of the sale. Non-taxable (principal residence exemption); non-reg deposits increase ACB equally so no embedded capital gain is created on entry.
+- **Monte Carlo simulation** in the Dashboard — runs the plan hundreds of times with normally distributed return noise around the configured rate profile. Shows a fan chart (P10–P90 bands, best/worst case envelope, deterministic profile line in red), four headline stats (probability of success, depletion rate, earliest depletion age, median depletion age), and a milestone percentile table (P10/P25/P50/P75/P90 at Today, each retirement, each person's death, and end of plan).
+
+---
+
 ## [0.3.1] — 2026-06-01
 
 ### Changed

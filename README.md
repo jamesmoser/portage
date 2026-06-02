@@ -2,7 +2,7 @@
 
 A private, browser-based retirement planning tool for Canadian couples (Ontario). Built to model complex retirement scenarios with full transparency into the underlying calculations.
 
-**Version 0.3.1**
+**Version 0.4.0**
 
 ## Philosophy
 
