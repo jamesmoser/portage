@@ -334,29 +334,28 @@ export function AnalysisTab() {
           const mcTraces: Data[] = [
             // Outer band: P10 → P90
             { x: mcResult.years, y: mcResult.p10, type: 'scatter', mode: 'lines',
-              line: { color: 'rgba(0,0,0,0)', width: 0 }, showlegend: false, hoverinfo: 'skip' },
+              line: { color: '#94a3b8', width: 0 }, showlegend: false,
+              hovertemplate: '%{y:$,.0f}<extra>P10</extra>' },
             { x: mcResult.years, y: mcResult.p90, type: 'scatter', mode: 'lines',
               fill: 'tonexty', fillcolor: 'rgba(140,140,140,0.15)',
-              line: { color: 'rgba(0,0,0,0)', width: 0 }, name: 'P10–P90',
+              line: { color: '#94a3b8', width: 0 }, name: 'P10–P90',
               hovertemplate: '%{y:$,.0f}<extra>P90</extra>' },
             // Inner band: P25 → P75
             { x: mcResult.years, y: mcResult.p25, type: 'scatter', mode: 'lines',
-              line: { color: 'rgba(0,0,0,0)', width: 0 }, showlegend: false, hoverinfo: 'skip' },
+              line: { color: '#64748b', width: 0 }, showlegend: false,
+              hovertemplate: '%{y:$,.0f}<extra>P25</extra>' },
             { x: mcResult.years, y: mcResult.p75, type: 'scatter', mode: 'lines',
               fill: 'tonexty', fillcolor: 'rgba(100,100,100,0.20)',
-              line: { color: 'rgba(0,0,0,0)', width: 0 }, name: 'P25–P75',
+              line: { color: '#64748b', width: 0 }, name: 'P25–P75',
               hovertemplate: '%{y:$,.0f}<extra>P75</extra>' },
             // Median
             { x: mcResult.years, y: mcResult.p50, type: 'scatter', mode: 'lines',
               line: { color: '#94a3b8', width: 1.5 }, name: 'Median (P50)',
               hovertemplate: '%{y:$,.0f}<extra>Median</extra>' },
-            // Worst / best case envelope
+            // Worst case envelope
             { x: mcResult.years, y: mcResult.pMin, type: 'scatter', mode: 'lines',
               line: { color: '#1e293b', width: 1, dash: 'dot' }, name: 'Worst case',
               hovertemplate: '%{y:$,.0f}<extra>Worst</extra>' },
-            { x: mcResult.years, y: mcResult.pMax, type: 'scatter', mode: 'lines',
-              line: { color: '#1e293b', width: 1, dash: 'dot' }, name: 'Best case',
-              hovertemplate: '%{y:$,.0f}<extra>Best</extra>' },
             // Configured rate profile (deterministic)
             { x: dataPoints.map(d => d.year), y: dataPoints.map(d => d.totalPortfolio),
               type: 'scatter', mode: 'lines',
