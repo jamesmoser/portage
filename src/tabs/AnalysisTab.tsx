@@ -426,7 +426,7 @@ export function AnalysisTab() {
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs">
                       <th className="px-3 py-2 text-left font-medium">Milestone</th>
                       <th className="px-3 py-2 text-right font-medium">Year</th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-700">P10</th>
+                      <th className="px-3 py-2 text-right font-medium text-slate-700 bg-amber-50">P10</th>
                       <th className="px-3 py-2 text-right font-medium">P25</th>
                       <th className="px-3 py-2 text-right font-medium">P50</th>
                       <th className="px-3 py-2 text-right font-medium">P75</th>
@@ -438,7 +438,7 @@ export function AnalysisTab() {
                       <tr key={m.year} className="hover:bg-slate-50/50">
                         <td className="px-3 py-2 text-slate-600">{m.label}</td>
                         <td className="px-3 py-2 text-right text-slate-500 text-xs">{m.year}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmt(m.p10)}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-slate-800 bg-amber-50">{fmt(m.p10)}</td>
                         <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p25)}</td>
                         <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p50)}</td>
                         <td className="px-3 py-2 text-right text-slate-600">{fmt(m.p75)}</td>

@@ -1803,6 +1803,14 @@ export function DashboardTab() {
         <p className="mb-1"><span className="font-medium text-slate-700">Recovery</span> — Years until the shock has decayed to ~5% of its original magnitude.</p>
         <p className="mb-3"><span className="font-medium text-slate-700">Damping</span> — Controls the recovery character. Fully damped: pure exponential decay, returns stay below the flat rate throughout. Lightly damped: returns oscillate above and below the flat rate before settling (market overreaction and correction).</p>
 
+        <p className="font-semibold text-slate-700 mb-1">Lifestyle Spending</p>
+        <p className="mb-1">Replaces the spending profile used across the entire projection — including Monte Carlo simulations. The chart shows the base plan lifestyle spending (phases + recurring additional items) in grey, with the modified profile in red when active.</p>
+        <ul className="space-y-1 mb-3 ml-2 text-slate-600">
+          <li><span className="font-medium text-slate-700">Base</span> — No change. Spending phases and additional items from the Settings tab are used as entered.</li>
+          <li><span className="font-medium text-slate-700">Subsistence</span> — Replaces all spending phases with a single flat constant (today's dollars, no growth). Recurring additional spending items are also cleared — the entered amount is the total household lifestyle floor for every year of the plan.</li>
+          <li><span className="font-medium text-slate-700">Lean</span> — Subtracts a fixed annual amount from each spending phase, floored at $0. The shape of your spending plan (phase transitions, growth rates) is preserved, just shifted down uniformly. Recurring additional spending items are unchanged.</li>
+        </ul>
+
         <p className="font-semibold text-slate-700 mb-1">Inflation</p>
         <p className="mb-3">Overrides either or both inflation rates. <span className="font-medium text-slate-700">Personal inflation</span> deflates all outputs to present-day dollars and grows your spending phases. <span className="font-medium text-slate-700">CPI</span> indexes government benefits (CPP, OAS, GIS), DB pension escalation, and tax bracket thresholds forward each year.</p>
 
@@ -1826,9 +1834,6 @@ export function DashboardTab() {
           <li><span className="font-medium text-slate-700">Home Sale / Downsizing</span> — A one-time injection of net sale proceeds into a specific account in the calendar year of the specified date. The principal residence exemption means no tax is triggered by the sale itself. Enter the net amount after new housing costs, agent fees, and land transfer taxes. Proceeds deposited to a non-registered account increase both the balance and the adjusted cost base, so no embedded capital gain is created on entry.</li>
         </ul>
 
-        <p className="font-semibold text-slate-700 mb-1">Manual Pension Splitting</p>
-        <p className="mb-1">When <strong>off</strong>, the engine auto-optimizes pension splitting each year — testing every integer from 0–50% and picking the split that minimizes combined household tax. This is the default.</p>
-        <p>When <strong>on</strong>, the split is fixed at the entered percentage for every eligible year. The percentage is the share of {aName || 'Person A'}'s eligible pension income transferred to {bName || 'Person B'} for tax purposes (CRA maximum: 50%). Eligible income includes DB pension and RRIF withdrawals once {aName || 'Person A'} is 65 or older.</p>
       </>}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-3">

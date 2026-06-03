@@ -5,6 +5,25 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.0] — 2026-06-02
+
+### Added
+- **CPP/OAS Timing Optimizer** (Analysis tab) — sweeps CPP start ages 60–70 and OAS start ages 65–70 independently for each person; maximizes household lifetime CPP (including survivor benefit) and net OAS (gross minus clawback); line+marker charts with Optimal and Configured markers; "Apply to Dashboard" button sets all four start ages as what-if overrides
+- **Lifestyle Spending modifier** (Base Plan Modifications) — new what-if below Market with three modes: Base (no change), Subsistence (replaces all spending phases with a flat constant and clears recurring additional spending), Lean (subtracts a fixed amount from each phase); preview line chart matching the rate profile style with Max/Avg/Min stats; flows through the full projection and Monte Carlo automatically
+
+### Fixed
+- Pension split optimizer now sweeps both A→B and B→A directions and returns the globally optimal direction; previously only swept A→B
+- Pension split direction and amount now visible in the annual summary table (tax section, expanded view only) in compact `A→B $X` format
+- Monte Carlo best case (pMax) line removed — it compressed the useful P10–P90 band; worst case line retained as it shows portfolio depletion point
+- Monte Carlo P10 and P25 hover tooltips were silently skipped; now show correct percentile labels
+- Monte Carlo P90/P75 hover label backgrounds were transparent (unreadable); fixed by assigning visible trace colours
+- Monte Carlo P10 milestone column highlighted amber to draw focus to the conservative scenario
+
+### Changed
+- Base Plan Modifications info modal updated with Lifestyle Spending section; stale Manual Pension Splitting entry removed
+
+---
+
 ## [0.5.0] — 2026-06-02
 
 ### Added
