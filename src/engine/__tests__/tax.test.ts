@@ -371,10 +371,11 @@ describe('rrifMinFactor', () => {
     expect(rrifMinFactor(54)).toBeCloseTo(1 / (90 - 54), 6)
   })
 
-  it('table value at age 55 differs from the formula (intentional transition)', () => {
-    // CRA table at 55 = 0.0270; formula at 55 = 1/35 ≈ 0.02857
-    expect(rrifMinFactor(55)).toBe(0.0270)
-    expect(rrifMinFactor(55)).not.toBeCloseTo(1 / 35, 4)
+  it('formula is used up to age 70', () => {
+    // formula is 1 / (90 - age)
+    expect(rrifMinFactor(55)).toBeCloseTo(1 / 35, 4)
+    expect(rrifMinFactor(65)).toBeCloseTo(1 / 25, 4)
+    expect(rrifMinFactor(70)).toBeCloseTo(1 / 20, 4)
   })
 
   it('key table values', () => {
