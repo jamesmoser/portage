@@ -5,6 +5,13 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.1] — 2026-06-02
+
+### Fixed
+- Charts in Spending by Year (Settings), Monte Carlo, RRSP Meltdown Optimizer, and CPP/OAS Timing Optimizer cards were overflowing their card boundaries due to `height` being set inside the Plotly layout object instead of on the container element; moved to `style={{ height }}` on all affected charts
+
+---
+
 ## [0.6.0] — 2026-06-02
 
 ### Added

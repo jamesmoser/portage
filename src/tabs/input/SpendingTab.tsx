@@ -233,8 +233,8 @@ export function SpendingTab() {
             xaxis: xAxis,
             yaxis: { tickformat: ',.0f', title: { text: 'Annual Household Spending ($)', font: { size: 11 } } },
             barmode: 'stack',
-            height: 280,
           }}
+          style={{ height: 280 }}
         />
         <XAxisSelector value={xAxisMode} onChange={v => setXAxisMode(v as XAxisMode)} aName={personA.name || 'Person A'} bName={personB.name || 'Person B'} />
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 pb-1">

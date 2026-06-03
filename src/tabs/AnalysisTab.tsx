@@ -407,11 +407,11 @@ export function AnalysisTab() {
               <PlotlyChart
                 data={mcTraces}
                 layout={{
-                  height: 380,
                   yaxis: { tickformat: ',.0f', title: { text: 'Portfolio', font: { size: 11 } } },
                   xaxis: { title: { text: 'Year', font: { size: 11 } } },
                   legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
                 }}
+                style={{ height: 380 }}
               />
 
               {/* Milestone Px table */}
@@ -525,7 +525,6 @@ export function AnalysisTab() {
                       <PlotlyChart
                         data={[trace]}
                         layout={{
-                          height: 300,
                           shapes,
                           annotations,
                           xaxis: { tickformat: ',.0f', title: { text: 'Gross Income Ceiling ($)', font: { size: 11 } } },
@@ -533,6 +532,7 @@ export function AnalysisTab() {
                           showlegend: false,
                           margin: { t: 16, r: 16, b: 48, l: 72 },
                         }}
+                        style={{ height: 300 }}
                       />
                       <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div className="bg-white rounded border border-slate-200 p-2.5">
@@ -569,7 +569,6 @@ export function AnalysisTab() {
                       <PlotlyChart
                         data={[trace]}
                         layout={{
-                          height: 300,
                           shapes,
                           annotations,
                           xaxis: { tickformat: ',.0f', title: { text: 'Gross Income Ceiling ($)', font: { size: 11 } } },
@@ -577,6 +576,7 @@ export function AnalysisTab() {
                           showlegend: false,
                           margin: { t: 16, r: 16, b: 48, l: 72 },
                         }}
+                        style={{ height: 300 }}
                       />
                       <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div className="bg-white rounded border border-slate-200 p-2.5">
@@ -699,13 +699,13 @@ export function AnalysisTab() {
                       <PlotlyChart
                         data={[trace]}
                         layout={{
-                          height: 220,
                           annotations,
                           xaxis: { title: { text: `${aName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
                           yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
                           showlegend: false,
                           margin: { t: 12, r: 12, b: 48, l: 80 },
                         }}
+                        style={{ height: 220 }}
                       />
                     )
                   })()}
@@ -717,13 +717,13 @@ export function AnalysisTab() {
                       <PlotlyChart
                         data={[trace]}
                         layout={{
-                          height: 220,
                           annotations,
                           xaxis: { title: { text: `${bName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
                           yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
                           showlegend: false,
                           margin: { t: 12, r: 12, b: 48, l: 80 },
                         }}
+                        style={{ height: 220 }}
                       />
                     )
                   })()}
@@ -751,13 +751,13 @@ export function AnalysisTab() {
                       <PlotlyChart
                         data={[trace]}
                         layout={{
-                          height: 220,
                           annotations,
                           xaxis: { title: { text: `${aName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
                           yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
                           showlegend: false,
                           margin: { t: 12, r: 12, b: 48, l: 80 },
                         }}
+                        style={{ height: 220 }}
                       />
                     )
                   })()}
@@ -769,13 +769,13 @@ export function AnalysisTab() {
                       <PlotlyChart
                         data={[trace]}
                         layout={{
-                          height: 220,
                           annotations,
                           xaxis: { title: { text: `${bName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
                           yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
                           showlegend: false,
                           margin: { t: 12, r: 12, b: 48, l: 80 },
                         }}
+                        style={{ height: 220 }}
                       />
                     )
                   })()}
