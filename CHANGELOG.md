@@ -5,6 +5,13 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.2] — 2026-06-03
+
+### Fixed
+- Fixed RRIF minimum withdrawal factor calculations for ages under 71 to correctly use the formula `1 / (90 - age)` instead of hardcoded table values.
+
+---
+
 ## [0.6.1] — 2026-06-02
 
 ### Fixed
