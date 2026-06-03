@@ -111,7 +111,7 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 ### Docs
 - `CHANGELOG.md` created
 - `README.md`: added Bengen Rule and Guyton-Klinger to drawdown strategies, Lifestyle Change and flat rate profile to What-If section, rewrote Key Outcomes section to reflect current 4-group structure
-- `CLAUDE.md`: added version bump workflow
+- `PROJECT_INSTRUCTIONS.md`: added version bump workflow
 
 ---
 
