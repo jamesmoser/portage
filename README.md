@@ -86,20 +86,11 @@ Use the **Freeze** button to lock the current key outcomes, then load a scenario
 
 Outcome tiles organized into four groups, all with frozen scenario deltas (▲/▼ vs baseline). Clicking any tile opens a year-by-year detail table.
 
-**Portfolio** — total invested assets (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones:
-- At start, at Person A's retirement, at Person B's retirement, at peak, at Person A's death, at Person B's death
-
-**Spending Shortfall** — gaps where spending exceeds all income and configured withdrawals:
-- Years with shortfall, average annual shortfall, peak shortfall year
-
-**Net Income** — after-tax household income available for spending:
-- Average, minimum, and maximum annual net income over the plan
-
-**Tax** — combined federal + Ontario income tax:
-- Lifetime total, average effective rate, peak year
-
-**Government Benefits** — CPP and OAS outcomes:
-- CPP and OAS total collected, OAS clawback paid, CPP and OAS vs age-65-start comparison
+- **Portfolio** — total invested assets (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones:  at start, at Person A's retirement, at Person B's retirement, at peak, at Person A's death, at Person B's death
+- **Spending Shortfall** — gaps where spending exceeds all income and configured withdrawals:  years with shortfall, average annual shortfall, peak shortfall year
+- **Net Income** — after-tax household income available for spending:  average, minimum, and maximum annual net income over the plan
+- **Tax** — combined federal + Ontario income tax:  lifetime total, average effective rate, peak year
+- **Government Benefits** — CPP and OAS outcomes:  CPP and OAS total collected, OAS clawback paid, CPP and OAS vs age-65-start comparison
 
 ### Charts (Dashboard)
 
