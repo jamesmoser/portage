@@ -1,3 +1,5 @@
+<img width="132" height="132" alt="portage-icon" src="https://github.com/user-attachments/assets/71241c4a-ff1e-4b79-bfa1-c07c30d2866c" />
+
 # Portage — Canadian Retirement Wealth Planner
 
 A private, browser-based retirement planning tool for Canadian couples (Ontario). Built to model complex retirement scenarios with full transparency into the underlying calculations.
