@@ -6,10 +6,10 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 
 ## Philosophy
 
-- **Private by design** — all data lives in your browser's localStorage. Nothing is sent to any server.
-- **Present-day dollars** — all output is expressed in today's purchasing power, making year-over-year comparisons meaningful.
-- **Date-accurate** — calculations use exact calendar dates, not calendar years. Ages are converted to dates internally; the engine walks month-by-month for income pro-ration.
-- **Portable** — the entire application builds to a single self-contained HTML file (~5MB) with no external dependencies at runtime.
+- **Private by design** — all data lives in your browser's localStorage, nothing is sent to any server
+- **Present-day dollars** — all output is expressed in today's purchasing power, making year-over-year comparisons meaningful
+- **Date-accurate** — calculations use exact calendar dates but may display years, the engine calculates month-by-month for income pro-ration
+- **Portable** — the entire application builds to a single self-contained HTML file (~8MB) with no external dependencies at runtime
 
 ---
 
@@ -17,10 +17,10 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 
 ### Income Sources
 
-- **DB Pension** — defined benefit pension with CPI indexing (with optional annual cap), bridge benefit, CPP integration reduction at 65, early retirement reduction factor, survivor benefit percentage, and independent modelling per person
-- **CPP** — early/deferred start with full actuarial adjustment (−0.6%/month before age 65, +0.7%/month after age 65, maximum ±42%/36% at ages 70/60). Survivor CPP modelled at 60% of deceased's entitlement.
-- **OAS** — deferred start with +0.6%/month after age 65 (max +36% at 70). Clawback at 15% above the threshold (~$95,323 in 2026, CPI-indexed). Optional GIS supplement per person.
 - **Employment income** — per-person salary with configurable real growth rate, pro-rated to the month of retirement
+- **DB Pension** — defined benefit pension with CPI indexing, bridge benefit, CPP integration reduction at 65, early retirement reduction factor, survivor benefit percentage, and independent modelling per person
+- **CPP** — early/deferred start with full actuarial adjustment at ages 70/60 and survivor benefits calculated per CRA rules
+- **OAS** — deferred start with full actuarial adjustment at age 70, clawbacks caculated per CRA rules, and  Clawback at 15% above the optional GIS supplement per person
 - **Other income** — recurring or one-time items per person or joint, taxable/non-taxable flag, with start/end dates and real growth rate
 
 ### Investment Accounts
@@ -32,7 +32,7 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 
 ### Spending
 
-- **Spending phases** — multiple phases (e.g. Go-Go / Slow-Go / No-Go / Survivor) each with an annual amount and real growth rate. The survivor phase can be linked to the first death so its start date adjusts automatically.
+- **Spending phases** — multiple phases (e.g. Go-Go / Slow-Go / No-Go / Survivor) each with an annual amount and real growth rate; Survivor phase can be linked to the first death so its start date adjusts automatically
 - **Additional spending** — recurring or one-time items keyed to the reference person's age, in today's dollars
 
 ### Tax Engine (Ontario + Federal, 2026 reference year, CPI-indexed forward)
@@ -48,21 +48,22 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 
 Six strategies control how account withdrawals are orchestrated each year. All strategies respect mandatory RRIF minimums.
 
-- **None** — no proactive draws; accounts grow until RRIF minimums force withdrawals. Spending shortfalls are not covered.
+- **None** — no proactive draws; accounts grow until RRIF minimums force withdrawals; spending shortfalls are not covered
+- **Fixed Withdrawal** — explicit annual dollar amounts per person per account, CPI-indexed; draws fire regardless of need; shortfalls and surpluses are not automatically managed
+- **Fixed Percentage** — annual draw as a configurable percentage of balance with a floor minimum per account; Same approach — no automatic gap-filling
 - **Cover Spending Gap** — each year, any shortfall between net household income and spending is filled by drawing from accounts in a configured priority order, and any surplus is routed back into accounts. Operates in two phases per person:
   - *Meltdown phase* (retired, pre-RRIF): configurable proactive RRSP draw up to a gross income ceiling (intentional meltdown at lower rates), plus reactive deficit draws in priority order with per-account annual caps
   - *RRIF phase* (after RRIF conversion): mandatory minimums drawn first; remaining deficit filled from configured accounts; surplus routed as configured
-- **Fixed Withdrawal** — explicit annual dollar amounts per person per account, CPI-indexed. Draws fire regardless of need; shortfalls and surpluses are not automatically managed.
-- **Fixed Percentage** — annual draw as a configurable percentage of balance with a floor minimum per account. Same approach — no automatic gap-filling.
-- **Bengen Rule** — sets a year-1 draw amount as a percentage of portfolio (e.g. 4%), then inflation-indexes that dollar amount each subsequent year regardless of portfolio performance. Account draw order is configurable per person. Deficit and surplus can optionally flow through HISA.
-- **Guyton-Klinger** — starts like Bengen (inflation-indexed % of year-1 portfolio), but applies guardrail adjustments: if the current withdrawal rate rises above the upper guardrail (portfolio underperformance), the draw is cut by a configurable %; if it falls below the lower guardrail (outperformance), the draw is raised. An optional 15-year rule disables cuts in the final 15 years of each person's plan.
+- **Bengen Rule** — sets a year-1 draw amount as a percentage of portfolio (e.g. 4%), then inflation-indexes that dollar amount each subsequent year regardless of portfolio performance; account draw order is configurable per person. Deficit and surplus can optionally flow through HISA
+- **Guyton-Klinger Rule** — starts like Bengen (inflation-indexed % of year-1 portfolio), but applies guardrail adjustments: if the current withdrawal rate rises above the upper guardrail (portfolio underperformance), the draw is cut by a configurable %; if it falls below the lower guardrail (outperformance), the draw is raised; an optional 15-year rule disables cuts in the final 15 years of each person's plan
 
 ### What-If Analysis (Dashboard)
 
 Overlay modifications on the base plan without changing it. All effective values update instantly; the base plan is untouched.
 
-- Portfolio return rate offset (shifts all tiers uniformly)
+- Drawdown strategy and all parameters
 - Market return profile (flat, step, front-loaded, back-loaded, cyclical crest/trough, seeded noise) with outlook shift and amplitude scaling
+- Spending profile (subsistence, lean)
 - Personal inflation rate and CPI rate (with fixed-rate presets)
 - Longevity (planning end age) per person
 - Retirement date per person, with cascade toggles for pension start, RRSP/TFSA/non-reg contribution end dates
@@ -71,7 +72,7 @@ Overlay modifications on the base plan without changing it. All effective values
 - Unexpected one-time expense
 - Lifestyle change — a permanent recurring offset (positive or negative) to lifestyle spending starting from a chosen date
 - Pension splitting mode and percentage
-- Drawdown strategy and all parameters
+
 
 ### Scenarios
 
@@ -109,7 +110,7 @@ All charts have an independent x-axis selector (calendar year / Person A age / P
 
 ### Annual Summary Table
 
-Expandable column groups (Year, Income, Tax, Portfolio) with optional person colour tinting. Age labels show `(deceased)` past each person's planning end date.
+Detailed projection outcomes displayed as expandable column groups (Year, Income, Tax, Portfolio) with optional person colour tinting. Age labels show `(deceased)` past each person's planning end date.
 
 ---
 
