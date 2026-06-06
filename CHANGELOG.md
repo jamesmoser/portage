@@ -5,6 +5,13 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.7] — 2026-06-06
+
+### Changed
+- **Unique Download Filenames** — Updated exported JSON and markdown AI context filenames to include a unique compact timestamp (`-YYYY-MM-DD-HHmmss`) to prevent local download collisions and improve file organization.
+
+---
+
 ## [0.6.6] — 2026-06-06
 
 ### Changed

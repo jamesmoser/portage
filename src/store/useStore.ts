@@ -254,7 +254,8 @@ export const useStore = create<Store>()(
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `retirement-plan-${new Date().toISOString().slice(0, 10)}.json`
+      const timestamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '')
+      a.download = `retirement-plan-${timestamp}.json`
       a.click()
       URL.revokeObjectURL(url)
     },

@@ -627,7 +627,8 @@ function downloadAIContext() {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `portage-ai-context-${new Date().toISOString().slice(0, 10)}.md`
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '')
+  a.download = `portage-ai-context-${timestamp}.md`
   a.click()
   URL.revokeObjectURL(url)
 }
