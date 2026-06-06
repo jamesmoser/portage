@@ -1074,3 +1074,35 @@ describe('smoke test — survivor asset rollover exact amounts', () => {
     expect(dp(dataPoints, CY + 2).tfsaB).toBeCloseTo(50_000, 0)
   })
 })
+
+describe('survivor spending start age with longevity what-ifs', () => {
+  it('shifts survivor spending start age automatically when longevity is modified', () => {
+    const birthA = `${CY - 60}-01-01`
+    const birthB = `${CY - 55}-01-01`
+    const state = makeState(birthA, 90, `${CY}-01-01`, birthB, 95, `${CY}-01-01`, {
+      spendingPhases: [
+        { id: 'p0', label: 'Primary', startAge: 0, annualAmount: 10_000, growthRatePct: 0, linkedToFirstDeath: false },
+        { id: 'p1', label: 'Survivor', startAge: 85, annualAmount: 5_000, growthRatePct: 0, linkedToFirstDeath: true },
+      ],
+      ageReferencePerson: 'personA'
+    })
+
+    const dpBase = runProjection(state).dataPoints
+    // In CY + 29 (A is 89), spending should be 10,000 (still in phase 0)
+    expect(dp(dpBase, CY + 29).householdSpending).toBeCloseTo(10_000, 0)
+    // In CY + 31 (after A's death), spending should be 5_000 (survivor phase active)
+    expect(dp(dpBase, CY + 31).householdSpending).toBeCloseTo(5_000, 0)
+
+    // Now, apply a what-if longevity where A dies early at age 75 (CY + 15)
+    // The merged state will have A's planningEndAge = 75
+    const modifiedState = {
+      ...state,
+      personA: { ...state.personA, planningEndAge: 75 }
+    }
+    const dpMod = runProjection(modifiedState).dataPoints
+    // In CY + 14 (A is 74), spending should be 10,000
+    expect(dp(dpMod, CY + 14).householdSpending).toBeCloseTo(10_000, 0)
+    // In CY + 16 (after A dies at 75), spending should be 5,000 (survivor phase active early!)
+    expect(dp(dpMod, CY + 16).householdSpending).toBeCloseTo(5_000, 0)
+  })
+})

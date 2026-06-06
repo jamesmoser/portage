@@ -551,7 +551,17 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
     const activePhases = state.spendingPhases.filter((p, i, arr) =>
       i < arr.length - 1 || p.linkedToFirstDeath !== false
     )
-    const phaseCalcs = activePhases.map(p => {
+    const resolvedPhases = activePhases.map(p => {
+      if (p.linkedToFirstDeath) {
+        const deathA = dateAtDecimalAge(state.personA.birthDate, state.personA.planningEndAge)
+        const deathB = dateAtDecimalAge(state.personB.birthDate, state.personB.planningEndAge)
+        const firstDeath = deathA < deathB ? deathA : deathB
+        const startAge = Math.round(exactAgeAt(refBirth, firstDeath) * 10) / 10
+        return { ...p, startAge }
+      }
+      return p
+    })
+    const phaseCalcs = resolvedPhases.map(p => {
       const startDate = dateAtDecimalAge(refBirth, p.startAge)
       const spendYrs  = Math.max(0, exactAgeAt(refBirth, dateStr) - p.startAge)
       const annual    = p.annualAmount * inflFactor * Math.pow(1 + p.growthRatePct / 100, spendYrs)

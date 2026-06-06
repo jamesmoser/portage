@@ -5,6 +5,13 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.5] — 2026-06-06
+
+### Fixed
+- **Survivor Spending What-Ifs** — The survivor spending phase start age (when `linkedToFirstDeath` is enabled) now dynamically resolves based on the effective longevity settings, ensuring that what-if overrides to planning end ages automatically update the start of survivor spending in the projection.
+
+---
+
 ## [0.6.4] — 2026-06-06
 
 ### Fixed
