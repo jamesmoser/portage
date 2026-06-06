@@ -5,6 +5,19 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.3] — 2026-06-06
+
+### Added
+- **Foreign Tax Credit** — Added a 15% non-refundable Foreign Tax Credit (FTC) to the tax engine to credit back withholding tax paid at source on foreign equities (e.g. US/intl dividends) and prevent double taxation.
+
+### Fixed
+- **OAS Clawback Deduction** — Deduct the OAS clawback recovery tax from Net Income to calculate Taxable Income before applying Federal and Ontario tax brackets, correcting a bug that over-taxed users on the OAS amount they repaid.
+
+### Changed
+- Added a performance warning breadcrumb to the pension splitting optimizer function noting the linear sweep bottleneck for future optimization.
+
+---
+
 ## [0.6.2] — 2026-06-03
 
 ### Fixed
