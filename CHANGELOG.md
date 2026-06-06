@@ -5,6 +5,14 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.4] — 2026-06-06
+
+### Fixed
+- **CPP/OAS Start Date Clamping** — Added store-level validation that clamps CPP and OAS start dates to their eligible age ranges (CPP: `[60, 70]`, OAS: `[65, 70]`) automatically when birthdays or dates are modified.
+- **Optimizer Crash** — Fixed a crash in the government benefits optimizer when the user's configured base age was outside the swept range.
+
+---
+
 ## [0.6.3] — 2026-06-06
 
 ### Added
