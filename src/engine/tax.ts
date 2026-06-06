@@ -159,6 +159,7 @@ export function calculateTax(
   const fedPensionCredit = Math.min(eligiblePensionForCredit, s.federalPensionIncomeAmount) * fedLowestRate
   const fedEligibleDivCredit = eligibleGrossed * s.federalEligibleDivCredit
   const fedNonEligibleDivCredit = nonEligibleGrossed * s.federalNonEligibleDivCredit
+  const fedForeignTaxCredit = input.foreignIncome * 0.15
 
   const federalTax = Math.max(0,
     fedTaxBeforeCredits
@@ -167,6 +168,7 @@ export function calculateTax(
     - fedPensionCredit
     - fedEligibleDivCredit
     - fedNonEligibleDivCredit
+    - fedForeignTaxCredit
   ) + oasClawback
 
   // ── ONTARIO TAX ───────────────────────────────────────────────────────────
@@ -219,6 +221,12 @@ export function calculateTax(
 /**
  * Try all pension-split percentages 0–50% in both directions (1% increments)
  * and return the transfer that minimizes combined household tax.
+ *
+ * NOTE: This is a performance bottleneck. It performs a linear sweep of 100 tax
+ * calculations (50 in each direction). In Monte Carlo simulations, this is a hot
+ * path causing ~1.5M evaluations. If performance becomes an issue, optimize this
+ * using a ternary or binary search (as the combined tax curve relative to split %
+ * is largely monotonic/convex).
  *
  * Returns a signed transfer amount in nominal dollars:
  *   transfer > 0  →  A transferred to B  (A's pensionIncome decreases)

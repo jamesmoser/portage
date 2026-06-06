@@ -235,6 +235,32 @@ describe('capital gains', () => {
   })
 })
 
+// ─── Foreign tax credit ───────────────────────────────────────────────────────
+// Intent: foreign income is taxed at the full marginal rate, but US/intl dividends
+// generally face a 15% withholding tax at source, which the CRA credits back
+// dollar-for-dollar as a non-refundable Foreign Tax Credit.
+
+describe('foreign income and foreign tax credit', () => {
+  it('applies a 15% non-refundable foreign tax credit against federal tax', () => {
+    // Employment = $70,000, Foreign Income = $10,000. Total = $80,000.
+    // Federal tax without FTC for $80,000 is $10,292.73.
+    // FTC = 10,000 * 15% = $1,500.
+    // Expected federal tax = $10,292.73 - $1,500 = $8,792.73.
+    const r = calc({ ...zero, employmentIncome: 70_000, foreignIncome: 10_000 })
+    expect(r.federalTax).toBeCloseTo(10_292.73 - 1_500, 0)
+  })
+
+  it('foreign tax credit is non-refundable — cannot reduce federal tax below zero', () => {
+    // Foreign income of $50,000.
+    // Federal tax before FTC: 50,000 * 14% - BPA_credit = 7,000 - 2,303.28 = 4,696.72.
+    // FTC = 50,000 * 15% = $7,500.
+    // Since FTC ($7,500) > tax before FTC ($4,696.72), the federalTax should be exactly 0.
+    const r = calc({ ...zero, foreignIncome: 50_000 })
+    expect(r.federalTax).toBe(0)
+  })
+})
+
+
 // ─── OAS clawback ─────────────────────────────────────────────────────────────
 // Intent: when net income exceeds ~$95,323 (2026), 15% of the excess is recovered
 // as a clawback. The clawback cannot exceed the total OAS actually received that year.
