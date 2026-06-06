@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import type { AppState, WhatIfs, HeadlineMetrics, Scenario } from '../engine/types'
+import type { AppState, WhatIfs, HeadlineMetrics, Scenario, Person } from '../engine/types'
 import { DEFAULT_STATE, DEFAULT_WHATIFS } from '../engine/defaults'
+import { exactAgeAt, dateAtAge } from '../engine/dates'
 
 // ─── Main plan storage (base plan + scenarios → exported in JSON) ─────────────
 
@@ -132,7 +133,95 @@ export const useStore = create<Store>()(
     // ── Base plan mutations ───────────────────────────────────────────────────
 
     update: (key, value) => {
-      set(s => ({ ...s, [key]: value }))
+      set(s => {
+        let patch: Partial<Store> = { [key]: value }
+
+        if (key === 'personA') {
+          const p = value as Person
+          const ageCpp = exactAgeAt(p.birthDate, s.cppA.startDate)
+          let newCppStart = s.cppA.startDate
+          if (ageCpp < 60) newCppStart = dateAtAge(p.birthDate, 60)
+          else if (ageCpp > 70) newCppStart = dateAtAge(p.birthDate, 70)
+
+          const ageOas = exactAgeAt(p.birthDate, s.oasA.startDate)
+          let newOasStart = s.oasA.startDate
+          if (ageOas < 65) newOasStart = dateAtAge(p.birthDate, 65)
+          else if (ageOas > 70) newOasStart = dateAtAge(p.birthDate, 70)
+
+          if (newCppStart !== s.cppA.startDate) {
+            patch.cppA = { ...s.cppA, startDate: newCppStart }
+          }
+          if (newOasStart !== s.oasA.startDate) {
+            patch.oasA = { ...s.oasA, startDate: newOasStart }
+          }
+        }
+
+        if (key === 'personB') {
+          const p = value as Person
+          const ageCpp = exactAgeAt(p.birthDate, s.cppB.startDate)
+          let newCppStart = s.cppB.startDate
+          if (ageCpp < 60) newCppStart = dateAtAge(p.birthDate, 60)
+          else if (ageCpp > 70) newCppStart = dateAtAge(p.birthDate, 70)
+
+          const ageOas = exactAgeAt(p.birthDate, s.oasB.startDate)
+          let newOasStart = s.oasB.startDate
+          if (ageOas < 65) newOasStart = dateAtAge(p.birthDate, 65)
+          else if (ageOas > 70) newOasStart = dateAtAge(p.birthDate, 70)
+
+          if (newCppStart !== s.cppB.startDate) {
+            patch.cppB = { ...s.cppB, startDate: newCppStart }
+          }
+          if (newOasStart !== s.oasB.startDate) {
+            patch.oasB = { ...s.oasB, startDate: newOasStart }
+          }
+        }
+
+        if (key === 'cppA') {
+          const c = value as typeof s.cppA
+          const age = exactAgeAt(s.personA.birthDate, c.startDate)
+          let newStart = c.startDate
+          if (age < 60) newStart = dateAtAge(s.personA.birthDate, 60)
+          else if (age > 70) newStart = dateAtAge(s.personA.birthDate, 70)
+          if (newStart !== c.startDate) {
+            patch.cppA = { ...c, startDate: newStart }
+          }
+        }
+
+        if (key === 'cppB') {
+          const c = value as typeof s.cppB
+          const age = exactAgeAt(s.personB.birthDate, c.startDate)
+          let newStart = c.startDate
+          if (age < 60) newStart = dateAtAge(s.personB.birthDate, 60)
+          else if (age > 70) newStart = dateAtAge(s.personB.birthDate, 70)
+          if (newStart !== c.startDate) {
+            patch.cppB = { ...c, startDate: newStart }
+          }
+        }
+
+        if (key === 'oasA') {
+          const o = value as typeof s.oasA
+          const age = exactAgeAt(s.personA.birthDate, o.startDate)
+          let newStart = o.startDate
+          if (age < 65) newStart = dateAtAge(s.personA.birthDate, 65)
+          else if (age > 70) newStart = dateAtAge(s.personA.birthDate, 70)
+          if (newStart !== o.startDate) {
+            patch.oasA = { ...o, startDate: newStart }
+          }
+        }
+
+        if (key === 'oasB') {
+          const o = value as typeof s.oasB
+          const age = exactAgeAt(s.personB.birthDate, o.startDate)
+          let newStart = o.startDate
+          if (age < 65) newStart = dateAtAge(s.personB.birthDate, 65)
+          else if (age > 70) newStart = dateAtAge(s.personB.birthDate, 70)
+          if (newStart !== o.startDate) {
+            patch.oasB = { ...o, startDate: newStart }
+          }
+        }
+
+        return { ...s, ...patch }
+      })
       setTimeout(() => {
         const full = get()
         const appState = Object.fromEntries(

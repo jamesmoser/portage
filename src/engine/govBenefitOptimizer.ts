@@ -54,6 +54,10 @@ export interface GovBenefitOptimizerResult {
   baseCppAgeB: number
   baseOasAgeA: number
   baseOasAgeB: number
+
+  /** Lifetime benefits under the configured base plan. */
+  baseLifetimeCPP: number
+  baseLifetimeOASNet: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,6 +127,12 @@ export function runGovBenefitOptimizer(
   const baseOasAgeA = nearestIntAge(state.personA.birthDate, state.oasA.startDate)
   const baseOasAgeB = nearestIntAge(state.personB.birthDate, state.oasB.startDate)
 
+  // Run base projection once to get configured base lifetime benefits
+  const { dataPoints: baseDataPoints } = runProjection(state, rateSchedule)
+  const basePoint = buildPoint(0, baseDataPoints)
+  const baseLifetimeCPP = basePoint.lifetimeCPP
+  const baseLifetimeOASNet = basePoint.lifetimeOASNet
+
   // CPP sweeps
   const cppSweepA: GovBenefitSweepPoint[] = []
   for (let age = CPP_MIN; age <= CPP_MAX; age++) {
@@ -161,5 +171,6 @@ export function runGovBenefitOptimizer(
     optimalOasAgeA, optimalOasAgeB,
     baseCppAgeA, baseCppAgeB,
     baseOasAgeA, baseOasAgeB,
+    baseLifetimeCPP, baseLifetimeOASNet,
   }
 }

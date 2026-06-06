@@ -147,7 +147,7 @@ export function AnalysisTab() {
     }
 
     const optimalValue = values[ages.indexOf(optimalAge)]
-    const baseValue    = values[ages.indexOf(baseAge)]
+    const baseValue    = ages.indexOf(baseAge) !== -1 ? values[ages.indexOf(baseAge)] : undefined
 
     const annotations: object[] = [
       {
@@ -156,7 +156,7 @@ export function AnalysisTab() {
         font: { size: 9, color: '#7B1515' }, xanchor: 'center', yanchor: 'bottom',
       },
     ]
-    if (baseAge !== optimalAge) {
+    if (baseAge !== optimalAge && baseValue !== undefined) {
       annotations.push({
         x: baseAge, xref: 'x', y: baseValue, yref: 'y',
         text: 'Configured', showarrow: false, yshift: 12,
@@ -657,13 +657,13 @@ export function AnalysisTab() {
 
         {govResult && !govRunning && (() => {
           const cppDeltaA = govResult.cppSweepA.find(p => p.age === govResult.optimalCppAgeA)!.lifetimeCPP
-                           - govResult.cppSweepA.find(p => p.age === govResult.baseCppAgeA)!.lifetimeCPP
+                           - govResult.baseLifetimeCPP
           const cppDeltaB = govResult.cppSweepB.find(p => p.age === govResult.optimalCppAgeB)!.lifetimeCPP
-                           - govResult.cppSweepB.find(p => p.age === govResult.baseCppAgeB)!.lifetimeCPP
+                           - govResult.baseLifetimeCPP
           const oasDeltaA = govResult.oasSweepA.find(p => p.age === govResult.optimalOasAgeA)!.lifetimeOASNet
-                           - govResult.oasSweepA.find(p => p.age === govResult.baseOasAgeA)!.lifetimeOASNet
+                           - govResult.baseLifetimeOASNet
           const oasDeltaB = govResult.oasSweepB.find(p => p.age === govResult.optimalOasAgeB)!.lifetimeOASNet
-                           - govResult.oasSweepB.find(p => p.age === govResult.baseOasAgeB)!.lifetimeOASNet
+                           - govResult.baseLifetimeOASNet
 
           function deltaLabel(delta: number) {
             if (Math.abs(delta) < 500) return <span className="text-slate-400">no change vs configured</span>
