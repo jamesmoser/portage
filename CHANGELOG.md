@@ -5,6 +5,15 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.6.6] — 2026-06-06
+
+### Changed
+- **Analysis Tab Aesthetics** — Wrapped all simulation and optimizer cards in standard `CardGrid` elements and updated the root layout container to `space-y-4` to ensure section divider gaps match the Dashboard tab's layout spacing.
+- **Optimizer Re-ordering** — Swapped the order of the optimizer cards so that the CPP / OAS Timing Optimizer is positioned before the RRSP Meltdown Optimizer.
+- **Control Button Alignment** — Aligned the primary "Run" and "Re-run" buttons to the left of the input/configuration fields on all Analysis tab cards.
+
+---
+
 ## [0.6.5] — 2026-06-06
 
 ### Fixed
