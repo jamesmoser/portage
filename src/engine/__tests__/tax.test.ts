@@ -273,6 +273,15 @@ describe('OAS clawback', () => {
     const r = calc({ ...zero, employmentIncome: 200_000, age: 70 })
     expect(r.oasClawback).toBe(0)
   })
+
+  it('deducts clawback from net income to compute taxable income, reducing income tax', () => {
+    // With $100k employment and $8.5k OAS, clawback is $1,984.95.
+    // Taxable income is $108,556 - $1,984.95 = $106,571.05.
+    // Verify that federal and Ontario taxes are calculated based on taxableIncome.
+    const r = calc({ ...zero, oasIncome: 8_556, employmentIncome: 100_000, age: 70 })
+    expect(r.federalTax).toBeCloseTo(17_724.74, 0)
+    expect(r.ontarioTax).toBeCloseTo(7_099.33, 0)
+  })
 })
 
 // ─── Ontario surtax ───────────────────────────────────────────────────────────

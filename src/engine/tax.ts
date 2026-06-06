@@ -147,8 +147,10 @@ export function calculateTax(
   // DB pension is eligible at any age; RRIF income eligible at 65+
   const eligiblePensionForCredit = input.pensionIncome
 
+  const taxableIncome = Math.max(0, netIncome - oasClawback)
+
   // ── FEDERAL TAX ───────────────────────────────────────────────────────────
-  const fedTaxBeforeCredits = applyBrackets(netIncome, s.federalBrackets)
+  const fedTaxBeforeCredits = applyBrackets(taxableIncome, s.federalBrackets)
 
   // Non-refundable credits applied at the lowest federal bracket rate.
   const fedLowestRate = s.federalBrackets[0]?.rate ?? 0.15
@@ -168,7 +170,7 @@ export function calculateTax(
   ) + oasClawback
 
   // ── ONTARIO TAX ───────────────────────────────────────────────────────────
-  const ontTaxBeforeCredits = applyBrackets(netIncome, s.ontarioBrackets)
+  const ontTaxBeforeCredits = applyBrackets(taxableIncome, s.ontarioBrackets)
 
   const ontBPACredit = s.ontarioBPA * (s.ontarioBrackets[0]?.rate ?? 0.0505)
   const ontAgeCredit = ontarioAgeAmt * (s.ontarioBrackets[0]?.rate ?? 0.0505)
@@ -207,8 +209,8 @@ export function calculateTax(
     totalTax,
     netAfterTax: netIncome - totalTax,
     effectiveRate: netIncome > 0 ? totalTax / netIncome : 0,
-    marginalFederalRate: marginalRate(netIncome, s.federalBrackets),
-    marginalOntarioRate: marginalRate(netIncome, s.ontarioBrackets),
+    marginalFederalRate: marginalRate(taxableIncome, s.federalBrackets),
+    marginalOntarioRate: marginalRate(taxableIncome, s.ontarioBrackets),
   }
 }
 
