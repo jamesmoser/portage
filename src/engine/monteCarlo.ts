@@ -133,6 +133,12 @@ export interface MonteCarloOptions {
   equityAllocationPct?: number
   historicalStartYear?: number
   bootstrapBlockSize?: number
+  regime1ReturnPct?: number
+  regime1VolPct?: number
+  regime1Duration?: number
+  regime2ReturnPct?: number
+  regime2VolPct?: number
+  regime2Duration?: number
 }
 
 export interface MonteCarloResult {
@@ -249,6 +255,41 @@ export function runMonteCarlo(
         perturbedSchedule.push(Math.max(-0.5, draw))
         currentIdx++
         blockRemaining--
+      }
+    } else if (options.method === 'regime') {
+      const r1Ret = (options.regime1ReturnPct ?? 8.0) / 100
+      const r1Vol = (options.regime1VolPct ?? 10.0) / 100
+      const r1Dur = Math.max(1.001, options.regime1Duration ?? 6.0)
+      const r2Ret = (options.regime2ReturnPct ?? -4.0) / 100
+      const r2Vol = (options.regime2VolPct ?? 22.0) / 100
+      const r2Dur = Math.max(1.001, options.regime2Duration ?? 1.5)
+
+      const p12 = 1.0 / r1Dur
+      const p11 = 1.0 - p12
+      const p21 = 1.0 / r2Dur
+      const p22 = 1.0 - p21
+
+      // Steady state probability of Regime 1 to initialize the state
+      const startR1Prob = r1Dur / (r1Dur + r2Dur)
+      let activeRegime = Math.random() < startR1Prob ? 1 : 2
+
+      perturbedSchedule = []
+      for (let y = 0; y < n; y++) {
+        const mean = activeRegime === 1 ? r1Ret : r2Ret
+        const vol = activeRegime === 1 ? r1Vol : r2Vol
+        const draw = mean + randn() * vol
+        perturbedSchedule.push(Math.max(-0.5, draw))
+
+        // Decide transition for next year
+        if (activeRegime === 1) {
+          if (Math.random() > p11) {
+            activeRegime = 2
+          }
+        } else {
+          if (Math.random() > p22) {
+            activeRegime = 1
+          }
+        }
       }
     } else {
       perturbedSchedule = baseRates.map(r => {

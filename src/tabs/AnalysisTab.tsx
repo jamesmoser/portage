@@ -87,8 +87,54 @@ export function AnalysisTab() {
   const [mcBootstrapBlockSize, setMcBootstrapBlockSize] = useState(5)
   const [mcSimulations,   setMcSimulations]   = useState(500)
   const [mcVolatilityPct, setMcVolatilityPct] = useState(12)
+  
+  // Regime switching parameters
+  const [mcRegimePreset, setMcRegimePreset] = useState<'standard' | 'stagnation' | 'stagflation' | 'custom'>('standard')
+  const [mcRegime1ReturnPct, setMcRegime1ReturnPct] = useState(8.0)
+  const [mcRegime1VolPct, setMcRegime1VolPct] = useState(10.0)
+  const [mcRegime1Duration, setMcRegime1Duration] = useState(6.0)
+  const [mcRegime2ReturnPct, setMcRegime2ReturnPct] = useState(-4.0)
+  const [mcRegime2VolPct, setMcRegime2VolPct] = useState(22.0)
+  const [mcRegime2Duration, setMcRegime2Duration] = useState(1.5)
+
   const [mcResult,        setMcResult]        = useState<MonteCarloResult | null>(null)
   const [mcRunning,       setMcRunning]       = useState(false)
+
+  function handleRegimeChange(param: string, value: number) {
+    setMcRegimePreset('custom')
+    if (param === 'r1Ret') setMcRegime1ReturnPct(value)
+    else if (param === 'r1Vol') setMcRegime1VolPct(value)
+    else if (param === 'r1Dur') setMcRegime1Duration(value)
+    else if (param === 'r2Ret') setMcRegime2ReturnPct(value)
+    else if (param === 'r2Vol') setMcRegime2VolPct(value)
+    else if (param === 'r2Dur') setMcRegime2Duration(value)
+  }
+
+  function handleRegimePresetChange(preset: 'standard' | 'stagnation' | 'stagflation' | 'custom') {
+    setMcRegimePreset(preset)
+    if (preset === 'standard') {
+      setMcRegime1ReturnPct(8.0)
+      setMcRegime1VolPct(10.0)
+      setMcRegime1Duration(6.0)
+      setMcRegime2ReturnPct(-4.0)
+      setMcRegime2VolPct(22.0)
+      setMcRegime2Duration(1.5)
+    } else if (preset === 'stagnation') {
+      setMcRegime1ReturnPct(5.0)
+      setMcRegime1VolPct(10.0)
+      setMcRegime1Duration(4.0)
+      setMcRegime2ReturnPct(-2.0)
+      setMcRegime2VolPct(15.0)
+      setMcRegime2Duration(3.0)
+    } else if (preset === 'stagflation') {
+      setMcRegime1ReturnPct(3.0)
+      setMcRegime1VolPct(15.0)
+      setMcRegime1Duration(3.0)
+      setMcRegime2ReturnPct(-6.0)
+      setMcRegime2VolPct(25.0)
+      setMcRegime2Duration(2.0)
+    }
+  }
 
   function runMC() {
     setMcRunning(true)
@@ -106,6 +152,12 @@ export function AnalysisTab() {
         equityAllocationPct:           mcEquityAllocationPct,
         historicalStartYear:           mcHistoricalStartYear,
         bootstrapBlockSize:            mcBootstrapBlockSize,
+        regime1ReturnPct:              mcRegime1ReturnPct,
+        regime1VolPct:                 mcRegime1VolPct,
+        regime1Duration:               mcRegime1Duration,
+        regime2ReturnPct:              mcRegime2ReturnPct,
+        regime2VolPct:                 mcRegime2VolPct,
+        regime2Duration:               mcRegime2Duration,
       })
       setMcResult(result)
       setMcRunning(false)
@@ -329,6 +381,13 @@ export function AnalysisTab() {
             setMcBootstrapBlockSize(5)
             setMcSimulations(500)
             setMcVolatilityPct(12)
+            setMcRegimePreset('standard')
+            setMcRegime1ReturnPct(8.0)
+            setMcRegime1VolPct(10.0)
+            setMcRegime1Duration(6.0)
+            setMcRegime2ReturnPct(-4.0)
+            setMcRegime2VolPct(22.0)
+            setMcRegime2Duration(1.5)
             setMcResult(null)
           }}
           info={
@@ -341,6 +400,7 @@ export function AnalysisTab() {
                   <li><em>Dynamic Reduced CMA</em> — Lowers baseline expected return rates in the early years of the plan. The reduction starts at a maximum and decays linearly to 0% over a configured decay period (e.g. 10 years). This models short-term market headwinds (like high starting valuations) returning to historical norms.</li>
                   <li><em>Simple Bootstrap</em> — Non-parametric sampling. Draws random calendar-year returns directly from actual history (Shiller monthly dataset: 1871–2025) for a selected asset allocation and historical period.</li>
                   <li><em>Block Bootstrap</em> — Draws random *consecutive blocks* of historical returns (e.g. 5-year blocks) to preserve business cycles, multi-year recessions, and momentum in market sequences.</li>
+                  <li><em>Regime Switching</em> — Simulates economic expansions (long, high return, low volatility) and contractions (short, negative return, high volatility), with Markov transitions between the two regimes.</li>
                 </ul>
               </p>
               <p><strong>Historical Period</strong> — Filters the dataset for bootstrapping to specific economic epochs:
@@ -383,9 +443,24 @@ export function AnalysisTab() {
                 { value: 'dynamic', label: 'Dynamic Reduced CMA' },
                 { value: 'simple_bootstrap', label: 'Simple Bootstrap' },
                 { value: 'block_bootstrap', label: 'Block Bootstrap' },
-                { value: 'regime', label: 'Regime Switching (TBD)', disabled: true },
+                { value: 'regime', label: 'Regime Switching' },
               ]}
             />
+
+            {mcMethod === 'regime' && (
+              <SelectInput
+                label="Regime Preset"
+                value={mcRegimePreset}
+                onChange={v => handleRegimePresetChange(v as 'standard' | 'stagnation' | 'stagflation' | 'custom')}
+                options={[
+                  { value: 'standard', label: 'Standard Economic Cycles' },
+                  { value: 'stagnation', label: 'Secular Stagnation' },
+                  { value: 'stagflation', label: 'Stagflationary Era' },
+                  { value: 'custom', label: 'Custom Parameters' },
+                ]}
+                tooltip="Select a preset economic cycle profile or customize parameters manually below"
+              />
+            )}
 
             <NumberInput label="Simulations" value={mcSimulations} onChange={setMcSimulations}
               min={100} max={2000} step={100} decimals={0} size="sm" />
@@ -529,6 +604,52 @@ export function AnalysisTab() {
               </span>
             )}
           </div>
+
+          {mcMethod === 'regime' && (
+            <div className="mb-6 max-w-xl overflow-x-auto rounded border border-slate-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th colSpan={3} className="px-3 py-2 text-left font-medium text-slate-700">Regime Parameters</th>
+                  </tr>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm">
+                    <th className="px-3 py-2 text-left font-medium">Parameter</th>
+                    <th className="px-3 py-2 text-center font-medium">Regime 1 (Expansion / Bull)</th>
+                    <th className="px-3 py-2 text-center font-medium">Regime 2 (Contraction / Bear)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="px-3 py-2 text-slate-600">Expected Return (%)</td>
+                    <td className="px-3 py-2 text-center w-1/3">
+                      <NumberInput label="" value={mcRegime1ReturnPct} onChange={v => handleRegimeChange('r1Ret', v)} size="sm" decimals={1} step={0.1} />
+                    </td>
+                    <td className="px-3 py-2 text-center w-1/3">
+                      <NumberInput label="" value={mcRegime2ReturnPct} onChange={v => handleRegimeChange('r2Ret', v)} size="sm" decimals={1} step={0.1} />
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="px-3 py-2 text-slate-600">Volatility σ (%)</td>
+                    <td className="px-3 py-2 text-center">
+                      <NumberInput label="" value={mcRegime1VolPct} onChange={v => handleRegimeChange('r1Vol', v)} size="sm" decimals={1} step={0.1} min={1} max={50} />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <NumberInput label="" value={mcRegime2VolPct} onChange={v => handleRegimeChange('r2Vol', v)} size="sm" decimals={1} step={0.1} min={1} max={50} />
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="px-3 py-2 text-slate-600">Average Duration (Years)</td>
+                    <td className="px-3 py-2 text-center">
+                      <NumberInput label="" value={mcRegime1Duration} onChange={v => handleRegimeChange('r1Dur', v)} size="sm" decimals={1} step={0.5} min={0.5} max={50} />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <NumberInput label="" value={mcRegime2Duration} onChange={v => handleRegimeChange('r2Dur', v)} size="sm" decimals={1} step={0.5} min={0.5} max={50} />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
   
           {mcRunning && (
             <div className="flex items-center justify-center h-32 text-slate-400 text-sm">

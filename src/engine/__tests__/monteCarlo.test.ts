@@ -257,6 +257,66 @@ describe('runMonteCarlo', () => {
     // The exact P50 values will differ due to the structure of block sampling vs. point-wise sampling
     expect(simpleResult.p50[lastIdx]).not.toBe(blockResult.p50[lastIdx])
   })
+
+  it('runs Regime Switching Monte Carlo and returns valid structure', () => {
+    const result = runMonteCarlo(DEFAULT_STATE, undefined, {
+      method: 'regime',
+      simulations: 100,
+      volatilityPct: 12, // ignored in regime, but required by type
+      regime1ReturnPct: 8.0,
+      regime1VolPct: 10.0,
+      regime1Duration: 6.0,
+      regime2ReturnPct: -4.0,
+      regime2VolPct: 22.0,
+      regime2Duration: 1.5,
+    })
+
+    expect(result.simulationCount).toBe(100)
+    expect(result.years.length).toBeGreaterThan(0)
+    expect(result.p50.length).toBe(result.years.length)
+    expect(result.p10.length).toBe(result.years.length)
+    expect(result.p90.length).toBe(result.years.length)
+    expect(result.milestones.length).toBeGreaterThan(0)
+    expect(result.probabilityOfSuccess).toBeGreaterThanOrEqual(0)
+    expect(result.probabilityOfSuccess).toBeLessThanOrEqual(1)
+  })
+
+  it('yields lower median outcomes (P50) under Stagflationary Regime preset than Standard Cycles preset', () => {
+    const stateWithAssets = {
+      ...DEFAULT_STATE,
+      tfsaA: {
+        ...DEFAULT_STATE.tfsaA,
+        balance: 1000000,
+      },
+    }
+
+    const standardResult = runMonteCarlo(stateWithAssets, undefined, {
+      method: 'regime',
+      simulations: 150,
+      volatilityPct: 12,
+      regime1ReturnPct: 8.0,
+      regime1VolPct: 10.0,
+      regime1Duration: 6.0,
+      regime2ReturnPct: -4.0,
+      regime2VolPct: 22.0,
+      regime2Duration: 1.5,
+    })
+
+    const stagflationResult = runMonteCarlo(stateWithAssets, undefined, {
+      method: 'regime',
+      simulations: 150,
+      volatilityPct: 12,
+      regime1ReturnPct: 3.0,
+      regime1VolPct: 15.0,
+      regime1Duration: 3.0,
+      regime2ReturnPct: -6.0,
+      regime2VolPct: 25.0,
+      regime2Duration: 2.0,
+    })
+
+    const lastIdx = standardResult.years.length - 1
+    expect(stagflationResult.p50[lastIdx]).toBeLessThan(standardResult.p50[lastIdx])
+  })
 })
 
 describe('getHistoricalAnnualReturns', () => {
