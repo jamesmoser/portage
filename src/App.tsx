@@ -5,6 +5,7 @@ import portageIcon from './assets/portage-icon.png'
 
 import { DashboardTab }   from './tabs/DashboardTab'
 import { AnalysisTab }    from './tabs/AnalysisTab'
+import { HistoricalTab }  from './tabs/HistoricalTab'
 import { AssumptionsTab } from './tabs/AssumptionsTab'
 import { IncomeTab }      from './tabs/IncomeTab'
 import { InvestmentsTab } from './tabs/InvestmentsTab'
@@ -736,6 +737,7 @@ function VersionModal({ onClose }: { onClose: () => void }) {
 const DASHBOARD_TABS = [
   { id: 'dashboard', label: 'Dashboard', Component: DashboardTab },
   { id: 'analysis',  label: 'Analysis',  Component: AnalysisTab  },
+  { id: 'historical', label: 'Historical Run', Component: HistoricalTab },
 ]
 
 const INPUT_TABS = [
