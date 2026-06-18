@@ -5,6 +5,16 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.7.0] — 2026-06-18
+
+### Added
+- **Monte Carlo Enhancements** — Expanded the simulation engine to support multiple models: Traditional (Gaussian, Student's t, and Skewed Normal distributions), Constant CMA Reduction, Dynamic CMA Reduction (with linear decay), Simple Bootstrap, and Block Bootstrap (preserving business cycles).
+- **Markov Regime-Switching** — Added a two-state Markov simulation cycling between Expansion (Bull) and Contraction (Bear) regimes, with customizable parameters (expected return, volatility, and average duration) and steady-state starting initialization.
+- **Historical Sequence Stress Test** — Added a rolling sequence analyzer testing the plan against S&P 500 and bond market history from 1871 onwards.
+- **Dynamic Start Year Disabling** — Greyed out and disabled starting years in the historical dropdown that do not provide enough remaining data to complete the simulation's duration, automatically adjusting the selected value if the horizon changes.
+
+---
+
 ## [0.6.7] — 2026-06-06
 
 ### Changed
