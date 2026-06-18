@@ -2,7 +2,7 @@
 // Runs on the same effective plan (base plan + active what-ifs) as the Dashboard
 // but executes the engine multiple times to explore uncertainty and optimal parameters.
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { SectionCard } from '../components/SectionCard'
 import { CardGrid } from '../components/CardGrid'
@@ -172,12 +172,25 @@ export function AnalysisTab() {
   const refName = effectiveState.ageReferencePerson === 'personB' ? bName : aName
   const startAge = intAgeAt(refPerson.birthDate, jan1(currentYear))
 
+  const eA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
+  const eB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+  const endYear = Math.max(eA, eB)
+  const maxStartYearLimit = 2025 - (endYear - currentYear)
+
   // ── Historical Sequence Stress Test state ──────────────────────────────────
   const [histEqAllocation, setHistEqAllocation] = useState(60)
   const [histStartYear, setHistStartYear] = useState(1871)
   const [histResolution, setHistResolution] = useState<'annual' | 'monthly'>('monthly')
   const [histResult, setHistResult] = useState<HistoricalAnalysisResult | null>(null)
   const [histRunning, setHistRunning] = useState(false)
+
+  useEffect(() => {
+    if (histStartYear > maxStartYearLimit) {
+      const options = [2000, 1980, 1950, 1871]
+      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
+      setHistStartYear(best)
+    }
+  }, [maxStartYearLimit, histStartYear])
 
   function runHistAnalysis() {
     setHistRunning(true)
@@ -921,10 +934,10 @@ export function AnalysisTab() {
               value={histStartYear.toString()}
               onChange={v => setHistStartYear(parseInt(v))}
               options={[
-                { value: '1871', label: '1871 (Full History)' },
-                { value: '1950', label: '1950 (Modern Era)' },
-                { value: '1980', label: '1980 (Post-Stagflation)' },
-                { value: '2000', label: '2000 (21st Century)' },
+                { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
+                { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
+                { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
+                { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
               ]}
               tooltip="The starting year boundary for the simulation series"
             />
