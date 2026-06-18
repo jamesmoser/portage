@@ -1,4 +1,4 @@
-interface Option { value: string; label: string }
+interface Option { value: string; label: string; disabled?: boolean }
 
 interface Props {
   label: string
@@ -21,7 +21,7 @@ export function SelectInput({ label, value, onChange, options, tooltip, disabled
         disabled={disabled}
       >
         {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>
         ))}
       </select>
     </div>

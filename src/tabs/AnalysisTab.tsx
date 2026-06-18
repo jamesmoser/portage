@@ -8,6 +8,7 @@ import { SectionCard } from '../components/SectionCard'
 import { CardGrid } from '../components/CardGrid'
 import { SectionDivider } from '../components/SectionDivider'
 import { NumberInput } from '../components/NumberInput'
+import { SelectInput } from '../components/SelectInput'
 import { PlotlyChart } from '../components/PlotlyChart'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs } from '../engine/whatifs'
@@ -16,7 +17,7 @@ import type { AppState } from '../engine/types'
 import { DEFAULT_WHATIFS } from '../engine/defaults'
 import { generateRateSchedule } from '../engine/rateProfiles'
 import { runMonteCarlo } from '../engine/monteCarlo'
-import type { MonteCarloResult } from '../engine/monteCarlo'
+import type { MonteCarloResult, MonteCarloOptions } from '../engine/monteCarlo'
 import { runMeltdownOptimizer } from '../engine/meltdownOptimizer'
 import type { MeltdownOptimizerResult } from '../engine/meltdownOptimizer'
 import { runGovBenefitOptimizer } from '../engine/govBenefitOptimizer'
@@ -74,6 +75,16 @@ export function AnalysisTab() {
 
   // ── Monte Carlo state ─────────────────────────────────────────────────────
 
+  const [mcMethod,        setMcMethod]        = useState<MonteCarloOptions['method']>('traditional')
+  const [mcDistribution,  setMcDistribution]  = useState<NonNullable<MonteCarloOptions['distribution']>>('normal')
+  const [mcDegreesOfFreedom, setMcDegreesOfFreedom] = useState(4)
+  const [mcSkewness,      setMcSkewness]      = useState(-1.5)
+  const [mcCmaReductionPct, setMcCmaReductionPct] = useState(1.5)
+  const [mcDynamicCmaInitialReductionPct, setMcDynamicCmaInitialReductionPct] = useState(2.0)
+  const [mcDynamicCmaDecayYears, setMcDynamicCmaDecayYears] = useState(10)
+  const [mcEquityAllocationPct, setMcEquityAllocationPct] = useState(60)
+  const [mcHistoricalStartYear, setMcHistoricalStartYear] = useState(1871)
+  const [mcBootstrapBlockSize, setMcBootstrapBlockSize] = useState(5)
   const [mcSimulations,   setMcSimulations]   = useState(500)
   const [mcVolatilityPct, setMcVolatilityPct] = useState(12)
   const [mcResult,        setMcResult]        = useState<MonteCarloResult | null>(null)
@@ -83,8 +94,18 @@ export function AnalysisTab() {
     setMcRunning(true)
     setTimeout(() => {
       const result = runMonteCarlo(effectiveState, rateSchedule, {
-        simulations:   mcSimulations,
-        volatilityPct: mcVolatilityPct,
+        method:                        mcMethod,
+        simulations:                   mcSimulations,
+        volatilityPct:                 mcVolatilityPct,
+        distribution:                  mcDistribution,
+        degreesOfFreedom:              mcDegreesOfFreedom,
+        skewness:                      mcSkewness,
+        cmaReductionPct:               mcCmaReductionPct,
+        dynamicCmaInitialReductionPct: mcDynamicCmaInitialReductionPct,
+        dynamicCmaDecayYears:          mcDynamicCmaDecayYears,
+        equityAllocationPct:           mcEquityAllocationPct,
+        historicalStartYear:           mcHistoricalStartYear,
+        bootstrapBlockSize:            mcBootstrapBlockSize,
       })
       setMcResult(result)
       setMcRunning(false)
@@ -295,10 +316,50 @@ export function AnalysisTab() {
       <SectionDivider title="Probability Analysis" />
             <CardGrid>
   <SectionCard title="Monte Carlo Simulation" width="full"
-          onReset={() => { setMcSimulations(500); setMcVolatilityPct(12); setMcResult(null) }}
+          onReset={() => {
+            setMcMethod('traditional')
+            setMcDistribution('normal')
+            setMcDegreesOfFreedom(4)
+            setMcSkewness(-1.5)
+            setMcCmaReductionPct(1.5)
+            setMcDynamicCmaInitialReductionPct(2.0)
+            setMcDynamicCmaDecayYears(10)
+            setMcEquityAllocationPct(60)
+            setMcHistoricalStartYear(1871)
+            setMcBootstrapBlockSize(5)
+            setMcSimulations(500)
+            setMcVolatilityPct(12)
+            setMcResult(null)
+          }}
           info={
             <div className="space-y-2 text-sm">
               <p>Monte Carlo runs your plan hundreds of times, varying annual market returns randomly around the configured rate profile. Everything else — income, tax, spending phases, drawdown strategy, and all active modifications — is held fixed. Only market sequence varies.</p>
+              <p><strong>Monte Carlo Method</strong> — Choose the underlying simulation model:
+                <ul className="list-disc pl-4 mt-1 space-y-1">
+                  <li><em>Traditional</em> — Uses the baseline rate profile as the mean expected return.</li>
+                  <li><em>Reduced CMA</em> — Lowers the baseline expected return rates across the entire plan by a fixed reduction percentage to build in a conservative margin of safety.</li>
+                  <li><em>Dynamic Reduced CMA</em> — Lowers baseline expected return rates in the early years of the plan. The reduction starts at a maximum and decays linearly to 0% over a configured decay period (e.g. 10 years). This models short-term market headwinds (like high starting valuations) returning to historical norms.</li>
+                  <li><em>Simple Bootstrap</em> — Non-parametric sampling. Draws random calendar-year returns directly from actual history (Shiller monthly dataset: 1871–2025) for a selected asset allocation and historical period.</li>
+                  <li><em>Block Bootstrap</em> — Draws random *consecutive blocks* of historical returns (e.g. 5-year blocks) to preserve business cycles, multi-year recessions, and momentum in market sequences.</li>
+                </ul>
+              </p>
+              <p><strong>Historical Period</strong> — Filters the dataset for bootstrapping to specific economic epochs:
+                <ul className="list-disc pl-4 mt-1 space-y-1">
+                  <li><em>1871–2025</em> — Full history (155 years), capturing early industrial cycles, depressions, and wars.</li>
+                  <li><em>1950–2025</em> — Post-WWII modern era (76 years).</li>
+                  <li><em>1980–2025</em> — Post-Stagflation declining interest rate era (46 years).</li>
+                  <li><em>2000–2025</em> — 21st Century tech-bubble and recovery era (26 years).</li>
+                  <li><em>2015–2025</em> — Recent high-growth and high-volatility decade (11 years).</li>
+                </ul>
+              </p>
+              <p><strong>Noise Distribution</strong> — Sets the shape of the random market perturbations:
+                <ul className="list-disc pl-4 mt-1 space-y-1">
+                  <li><em>Normal (Gaussian)</em> — Standard symmetric bell curve.</li>
+                  <li><em>Student's t (Fat Tails)</em> — Models more frequent extreme positive and negative market shocks.</li>
+                  <li><em>Skewed Normal</em> — Introduces asymmetry. Negative skewness models sharp, severe market crashes and quieter bull markets.</li>
+                </ul>
+              </p>
+              <p>All distributions are mathematically standardized to preserve your exact configured mean return (adjusted by any CMA reduction) and volatility, changing only the shape and severity of extreme events.</p>
               <p><strong>Return Volatility (σ)</strong> — The standard deviation of annual return noise added to each year's base rate. 12% is a reasonable default for a balanced equity/bond portfolio. Lower values produce a tighter fan; higher values widen it.</p>
               <p><strong>Probability of Success</strong> — Percentage of simulations where the portfolio remains above zero at the final year of the plan. 90%+ is generally considered robust; below 70% warrants strategy changes.</p>
               <p><strong>Median Depletion Age</strong> — In simulations that do deplete, the median age of the reference person when the portfolio first reaches zero. Only shown when at least 5% of simulations deplete.</p>
@@ -307,16 +368,163 @@ export function AnalysisTab() {
           }>
   
           {/* Controls */}
-          <div className="flex items-center gap-4 mb-4 flex-wrap">
-            <button className="btn-primary self-end" onClick={runMC} disabled={mcRunning}>
+          <div className="flex items-end gap-4 mb-4 flex-wrap">
+            <button className="btn-primary" onClick={runMC} disabled={mcRunning}>
               {mcRunning ? 'Running…' : mcResult ? 'Re-run' : 'Run Simulation'}
             </button>
+
+            <SelectInput
+              label="Method"
+              value={mcMethod}
+              onChange={v => setMcMethod(v as MonteCarloOptions['method'])}
+              options={[
+                { value: 'traditional', label: 'Traditional' },
+                { value: 'reduced', label: 'Reduced CMA' },
+                { value: 'dynamic', label: 'Dynamic Reduced CMA' },
+                { value: 'simple_bootstrap', label: 'Simple Bootstrap' },
+                { value: 'block_bootstrap', label: 'Block Bootstrap' },
+                { value: 'regime', label: 'Regime Switching (TBD)', disabled: true },
+              ]}
+            />
+
             <NumberInput label="Simulations" value={mcSimulations} onChange={setMcSimulations}
               min={100} max={2000} step={100} decimals={0} size="sm" />
-            <NumberInput label="Volatility σ (%)" value={mcVolatilityPct} onChange={setMcVolatilityPct}
-              min={1} max={30} step={1} decimals={0} size="sm" />
+
+            {(mcMethod === 'simple_bootstrap' || mcMethod === 'block_bootstrap') && (
+              <>
+                <SelectInput
+                  label="Asset Allocation"
+                  value={mcEquityAllocationPct.toString()}
+                  onChange={v => setMcEquityAllocationPct(parseInt(v))}
+                  options={[
+                    { value: '100', label: '100% Equity / 0% Bond' },
+                    { value: '80', label: '80% Equity / 20% Bond' },
+                    { value: '60', label: '60% Equity / 40% Bond' },
+                    { value: '40', label: '40% Equity / 60% Bond' },
+                    { value: '20', label: '20% Equity / 80% Bond' },
+                  ]}
+                  tooltip="Compounds historical monthly returns for this target allocation"
+                />
+
+                <SelectInput
+                  label="Historical Period"
+                  value={mcHistoricalStartYear.toString()}
+                  onChange={v => setMcHistoricalStartYear(parseInt(v))}
+                  options={[
+                    { value: '1871', label: '1871–2025 (Full History)' },
+                    { value: '1950', label: '1950–2025 (Modern Era)' },
+                    { value: '1980', label: '1980–2025 (Post-Stagflation)' },
+                    { value: '2000', label: '2000–2025 (21st Century)' },
+                    { value: '2015', label: '2015–2025 (Recent Decade)' },
+                  ]}
+                  tooltip="Filters the historical dataset to only draw from this period"
+                />
+
+                {mcMethod === 'block_bootstrap' && (
+                  <NumberInput
+                    label="Block Size (Years)"
+                    value={mcBootstrapBlockSize}
+                    onChange={setMcBootstrapBlockSize}
+                    min={2}
+                    max={20}
+                    step={1}
+                    decimals={0}
+                    size="sm"
+                    tooltip="The number of consecutive years to draw from history as a single block"
+                  />
+                )}
+              </>
+            )}
+
+            {(mcMethod === 'traditional' || mcMethod === 'reduced' || mcMethod === 'dynamic') && (
+              <>
+                <NumberInput label="Volatility σ (%)" value={mcVolatilityPct} onChange={setMcVolatilityPct}
+                  min={1} max={30} step={1} decimals={0} size="sm" />
+
+                {mcMethod === 'reduced' && (
+                  <NumberInput
+                    label="CMA Reduction (%)"
+                    value={mcCmaReductionPct}
+                    onChange={setMcCmaReductionPct}
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    decimals={2}
+                    size="sm"
+                    tooltip="Subtracts a constant percentage from expected returns to stress-test plans conservatively"
+                  />
+                )}
+
+                {mcMethod === 'dynamic' && (
+                  <>
+                    <NumberInput
+                      label="Initial Reduction (%)"
+                      value={mcDynamicCmaInitialReductionPct}
+                      onChange={setMcDynamicCmaInitialReductionPct}
+                      min={0}
+                      max={10}
+                      step={0.1}
+                      decimals={2}
+                      size="sm"
+                      tooltip="Subtracts this expected return percentage in year 1"
+                    />
+                    <NumberInput
+                      label="Decay Period (Years)"
+                      value={mcDynamicCmaDecayYears}
+                      onChange={setMcDynamicCmaDecayYears}
+                      min={1}
+                      max={50}
+                      step={1}
+                      decimals={0}
+                      size="sm"
+                      tooltip="The number of years over which the reduction linearly decays to 0%"
+                    />
+                  </>
+                )}
+
+                <SelectInput
+                  label="Distribution"
+                  value={mcDistribution}
+                  onChange={v => setMcDistribution(v as NonNullable<MonteCarloOptions['distribution']>)}
+                  options={[
+                    { value: 'normal', label: 'Normal (Gaussian)' },
+                    { value: 'student_t', label: "Student's t (Fat Tails)" },
+                    { value: 'skewed_normal', label: 'Skewed Normal (Asymmetric)' },
+                  ]}
+                />
+
+                {mcDistribution === 'student_t' && (
+                  <NumberInput
+                    label="Deg. of Freedom (ν)"
+                    value={mcDegreesOfFreedom}
+                    onChange={setMcDegreesOfFreedom}
+                    min={3}
+                    max={30}
+                    step={1}
+                    decimals={0}
+                    size="sm"
+                    tooltip="Lower values create thicker/fatter tails (more extreme market moves)"
+                  />
+                )}
+
+                {mcDistribution === 'skewed_normal' && (
+                  <NumberInput
+                    label="Skewness (α)"
+                    value={mcSkewness}
+                    onChange={setMcSkewness}
+                    min={-5}
+                    max={5}
+                    step={0.1}
+                    decimals={1}
+                    size="sm"
+                    tooltip="Negative values represent negative skewness (larger/more frequent market crashes)"
+                  />
+                )}
+              </>
+            )}
+
             {mcResult && !mcRunning && (
-              <span className="text-xs text-slate-400 self-end pb-1">
+              <span className="text-xs text-slate-400 pb-1">
                 Last run: {mcResult.simulationCount.toLocaleString()} simulations
               </span>
             )}
