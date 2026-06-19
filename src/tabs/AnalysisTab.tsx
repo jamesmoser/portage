@@ -953,7 +953,7 @@ export function AnalysisTab() {
           {/* Controls */}
           <div className="flex items-end gap-4 mb-4 flex-wrap">
             <button className="btn-primary" onClick={runMC} disabled={mcRunning}>
-              {mcRunning ? 'Running…' : mcResult ? 'Re-run' : 'Run Simulation'}
+              {mcRunning ? 'Running…' : mcResult ? 'Re-Run' : 'Run'}
             </button>
 
             <SelectInput
@@ -1335,7 +1335,7 @@ export function AnalysisTab() {
           {/* Controls */}
           <div className="flex items-end gap-4 mb-4 flex-wrap">
             <button className="btn-primary" onClick={runHistAnalysis} disabled={histRunning}>
-              {histRunning ? 'Running…' : histResult ? 'Re-run Test' : 'Run Test'}
+              {histRunning ? 'Running…' : histResult ? 'Re-Run' : 'Run'}
             </button>
 
             <SelectInput
@@ -1520,7 +1520,7 @@ export function AnalysisTab() {
           {/* Controls */}
           <div className="flex items-end gap-4 mb-4 flex-wrap">
             <button className="btn-primary" onClick={runSweep} disabled={sweepRunning}>
-              {sweepRunning ? 'Running…' : sweepResult ? 'Re-run Sweep' : 'Run Sweep'}
+              {sweepRunning ? 'Running…' : sweepResult ? 'Re-Run' : 'Run'}
             </button>
 
             <SelectInput
@@ -1837,7 +1837,7 @@ export function AnalysisTab() {
                     onClick={handleRun}
                     disabled={coastRunning}
                   >
-                    {coastRunning ? 'Running…' : hasResult ? 'Re-run' : 'Run'}
+                    {coastRunning ? 'Running…' : hasResult ? 'Re-Run' : 'Run'}
                   </button>
 
                   <SelectInput
@@ -2056,7 +2056,7 @@ export function AnalysisTab() {
           {/* Controls */}
           <div className="flex items-center gap-4 mb-4 flex-wrap">
             <button className="btn-primary self-end" onClick={runGov} disabled={govRunning}>
-              {govRunning ? 'Optimizing…' : govResult ? 'Re-run' : 'Run Optimizer'}
+              {govRunning ? 'Optimizing…' : govResult ? 'Re-Run' : 'Run'}
             </button>
             {govResult && !govRunning && (
               <span className="text-xs text-slate-400 self-end pb-1">
@@ -2231,7 +2231,7 @@ export function AnalysisTab() {
           {/* Controls */}
           <div className="flex items-center gap-4 mb-4 flex-wrap">
             <button className="btn-primary self-end" onClick={runMelt} disabled={meltRunning}>
-              {meltRunning ? 'Optimizing…' : meltResult ? 'Re-run' : 'Run Optimizer'}
+              {meltRunning ? 'Optimizing…' : meltResult ? 'Re-Run' : 'Run'}
             </button>
             <NumberInput label="Sweep Steps" value={meltSteps} onChange={setMeltSteps}
               min={10} max={80} step={5} decimals={0} size="sm" />
