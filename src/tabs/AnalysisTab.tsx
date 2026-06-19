@@ -10,6 +10,7 @@ import { SectionDivider } from '../components/SectionDivider'
 import { NumberInput } from '../components/NumberInput'
 import { SelectInput } from '../components/SelectInput'
 import { PlotlyChart } from '../components/PlotlyChart'
+import { InfoPanel } from '../components/InfoPanel'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs } from '../engine/whatifs'
 import { getYear, dateAtAge, intAgeAt, jan1 } from '../engine/dates'
@@ -22,8 +23,8 @@ import { runMeltdownOptimizer } from '../engine/meltdownOptimizer'
 import type { MeltdownOptimizerResult } from '../engine/meltdownOptimizer'
 import { runGovBenefitOptimizer } from '../engine/govBenefitOptimizer'
 import type { GovBenefitOptimizerResult } from '../engine/govBenefitOptimizer'
-import { runHistoricalAnalysis } from '../engine/historicalAnalysis'
-import type { HistoricalAnalysisResult, HistoricalPathResult } from '../engine/historicalAnalysis'
+import { runHistoricalAnalysis, runSpendingSweep, interpolateMonotoneCubic } from '../engine/historicalAnalysis'
+import type { HistoricalAnalysisResult, HistoricalPathResult, SpendingSweepPoint } from '../engine/historicalAnalysis'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
@@ -263,6 +264,153 @@ export function AnalysisTab() {
     if (!histResult) return []
     return [...histResult.paths].sort((a, b) => a.finalBalance - b.finalBalance)
   }, [histResult])
+
+  // ── Sustainable Spending Sweep state ──────────────────────────────────────
+  const [sweepEqAllocation, setSweepEqAllocation] = useState(60)
+  const [sweepStartYear, setSweepStartYear] = useState(1871)
+  const sweepResolution = 'annual'
+  const [sweepResult, setSweepResult] = useState<{ points: SpendingSweepPoint[], currentSpending: number, currentSuccessRate: number } | null>(null)
+  const [sweepRunning, setSweepRunning] = useState(false)
+
+  useEffect(() => {
+    if (sweepStartYear > maxStartYearLimit) {
+      const options = [2000, 1980, 1950, 1871]
+      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
+      setSweepStartYear(best)
+    }
+  }, [maxStartYearLimit, sweepStartYear])
+
+  function runSweep() {
+    setSweepRunning(true)
+    setTimeout(() => {
+      const res = runSpendingSweep(effectiveState, {
+        equityAllocationPct: sweepEqAllocation,
+        historicalStartYear: sweepStartYear,
+        resolution: sweepResolution,
+      })
+      setSweepResult(res)
+      setSweepRunning(false)
+    }, 20)
+  }
+
+  // Compile Plotly Traces for Spending Sweep
+  const sweepChartTraces = useMemo<Data[]>(() => {
+    if (!sweepResult || sweepResult.points.length === 0) return []
+
+    const xVals = sweepResult.points.map(p => p.spending)
+    const yVals = sweepResult.points.map(p => p.successRate * 100)
+
+    const smoothed = interpolateMonotoneCubic(xVals, yVals, 100)
+
+    const traces: Data[] = [
+      // The Success Curve (smoothed monotone cubic)
+      {
+        x: smoothed.x,
+        y: smoothed.y,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Flat Spending Success Rate',
+        line: { color: '#7B1515', width: 2 },
+        hovertemplate: 'Base Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>'
+      },
+      // Actual simulated points as markers
+      {
+        x: xVals,
+        y: yVals,
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Simulated Levels',
+        marker: { color: '#7B1515', size: 6 },
+        hovertemplate: 'Simulated Base Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>',
+        showlegend: false
+      }
+    ]
+
+    // Add reference dot for user's actual configured plan
+    traces.push({
+      x: [sweepResult.currentSpending],
+      y: [sweepResult.currentSuccessRate * 100],
+      type: 'scatter',
+      mode: 'markers',
+      name: 'Your Configured Plan',
+      marker: { color: '#d97706', size: 12, symbol: 'diamond' },
+      hovertemplate: `<b>Your Configured Plan</b><br>Base Spending: $%{x:,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>`
+    })
+
+    // Add open circles for benchmarks (if in sweep range)
+    const benchmarks = [
+      { name: 'Lean FIRE', amount: 50000, color: '#64748b' },
+      { name: 'Avg. Household', amount: 80000, color: '#10b981' },
+      { name: 'Chubby FIRE', amount: 120000, color: '#3b82f6' },
+      { name: 'Fat FIRE', amount: 180000, color: '#ef4444' },
+    ]
+
+    const benchmarkPoints = benchmarks
+      .map(b => {
+        const pt = sweepResult.points.find(p => p.spending === b.amount)
+        if (!pt) return null
+        return {
+          x: pt.spending,
+          y: pt.successRate * 100,
+          color: b.color,
+          name: b.name
+        }
+      })
+      .filter((bp): bp is NonNullable<typeof bp> => bp !== null)
+
+    if (benchmarkPoints.length > 0) {
+      traces.push({
+        x: benchmarkPoints.map(bp => bp.x),
+        y: benchmarkPoints.map(bp => bp.y),
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Benchmarks',
+        marker: {
+          symbol: 'circle',
+          size: 14,
+          color: benchmarkPoints.map(() => 'rgba(0,0,0,0)'), // transparent fill
+          line: {
+            color: benchmarkPoints.map(bp => bp.color),
+            width: 2.5
+          }
+        },
+        hovertemplate: '<b>%{text}</b><br>Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>',
+        text: benchmarkPoints.map(bp => bp.name),
+        showlegend: false
+      })
+    }
+
+    return traces
+  }, [sweepResult])
+
+  const getClosestSuccessRate = (spending: number) => {
+    if (!sweepResult || sweepResult.points.length === 0) return '—'
+    if (spending < sweepResult.points[0].spending) {
+      return `≥ ${(sweepResult.points[0].successRate * 100).toFixed(1)}%`
+    }
+    if (spending > sweepResult.points[sweepResult.points.length - 1].spending) {
+      return `≤ ${(sweepResult.points[sweepResult.points.length - 1].successRate * 100).toFixed(1)}%`
+    }
+    let closest = sweepResult.points[0]
+    let minDiff = Math.abs(closest.spending - spending)
+    for (const p of sweepResult.points) {
+      const diff = Math.abs(p.spending - spending)
+      if (diff < minDiff) {
+        minDiff = diff
+        closest = p
+      }
+    }
+    return `${(closest.successRate * 100).toFixed(1)}%`
+  }
+
+  const p90SpendingLabel = useMemo(() => {
+    if (!sweepResult || sweepResult.points.length === 0) return '—'
+    const eligible = sweepResult.points.filter(p => p.successRate >= 0.9)
+    if (eligible.length === 0) {
+      return `< ${fmt(sweepResult.points[0].spending)}`
+    }
+    return fmt(eligible[eligible.length - 1].spending)
+  }, [sweepResult])
 
   // ── CPP / OAS optimizer state ─────────────────────────────────────────────
 
@@ -1063,6 +1211,189 @@ export function AnalysisTab() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Sustainable Spending Sweep"
+          width="full"
+          onReset={() => {
+            setSweepEqAllocation(60)
+            setSweepStartYear(1871)
+            setSweepResult(null)
+          }}
+          info={
+            <div className="space-y-2 text-sm">
+              <p>
+                The Sustainable Spending Sweep simulates your plan across a range of flat base retirement spending levels using historical rolling periods.
+              </p>
+              <p>
+                For each simulated spending level, the engine overrides all retirement spending phases with that flat level, clears additional/lumpy expenses for a clean baseline check, and calculates the historical success rate.
+              </p>
+              <p>
+                This allows you to visualize how sensitive your plan's viability is to different levels of ongoing basic retirement expenses.
+              </p>
+              <p>
+                The <strong>Flat Spending Success Rate</strong> curve (red line) simulates a simplified plan with constant baseline spending and no additional/lumpy expenses. Your <strong>Full Configured Plan</strong> (gold diamond) includes all your custom spending phases and extra/lumpy expenses. If your actual plan has higher spending later or large one-time expenses, the gold diamond will naturally sit below the red curve.
+              </p>
+            </div>
+          }
+        >
+          {/* Controls */}
+          <div className="flex items-end gap-4 mb-4 flex-wrap">
+            <button className="btn-primary" onClick={runSweep} disabled={sweepRunning}>
+              {sweepRunning ? 'Running…' : sweepResult ? 'Re-run Sweep' : 'Run Sweep'}
+            </button>
+
+            <SelectInput
+              label="Asset Allocation"
+              value={sweepEqAllocation.toString()}
+              onChange={v => setSweepEqAllocation(parseInt(v))}
+              options={[
+                { value: '100', label: '100% Equity / 0% Bond' },
+                { value: '80', label: '80% Equity / 20% Bond' },
+                { value: '60', label: '60% Equity / 40% Bond' },
+                { value: '40', label: '40% Equity / 60% Bond' },
+                { value: '20', label: '20% Equity / 80% Bond' },
+              ]}
+              tooltip="Target mix compiled dynamically from historical monthly returns"
+            />
+
+            <SelectInput
+              label="Historical Start Year"
+              value={sweepStartYear.toString()}
+              onChange={v => setSweepStartYear(parseInt(v))}
+              options={[
+                { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
+                { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
+                { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
+                { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
+              ]}
+              tooltip="The starting year boundary for the simulation series"
+            />
+
+            {sweepResult && !sweepRunning && (
+              <span className="text-xs text-slate-400 pb-1">
+                Last run: {sweepResult.points.length} spending levels simulated
+              </span>
+            )}
+          </div>
+
+          {sweepRunning && (
+            <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
+              Running spending sweep across rolling historical paths per spending level…
+            </div>
+          )}
+
+          {sweepResult && !sweepRunning && (
+            <div className="space-y-6">
+              {/* Stats tiles */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-500 font-medium">Full Plan Success Rate</div>
+                  <div className="text-3xl font-bold mt-1" style={{ color: '#d97706' }}>
+                    {(sweepResult.currentSuccessRate * 100).toFixed(1)}%
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Includes all configured spending phases and extra expenses
+                  </div>
+                </div>
+
+                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-500 font-medium">P90 Sustainable Spending</div>
+                  <div className="text-3xl font-bold mt-1 text-slate-800">
+                    {p90SpendingLabel}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Sustainable spending with at least 90% survival rate
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart & Benchmarks Table */}
+              <div className="flex flex-col lg:flex-row gap-6">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold mb-2 text-slate-700">Success Rate vs. Base Spending (rolling periods)</div>
+                  <PlotlyChart
+                    data={sweepChartTraces}
+                    layout={{
+                      yaxis: { 
+                        title: { text: 'Success Rate (%)', font: { size: 11 } },
+                        range: [0, 105] 
+                      },
+                      xaxis: { 
+                        tickformat: ',.0f', 
+                        title: { text: 'Flat Base Spending ($ / year)', font: { size: 11 } } 
+                      },
+                      legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                    }}
+                    style={{ height: 420 }}
+                  />
+                </div>
+
+                <div className="w-full lg:w-80 shrink-0">
+                  <div className="overflow-x-auto rounded border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Retirement Spending Benchmarks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2 text-slate-600">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#64748b' }} />
+                              <strong>Lean FIRE:</strong> {fmt(50000)}
+                            </div>
+                            <div className="text-[10px] text-slate-400 pl-4">Basic spending, Canadian average</div>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                            {getClosestSuccessRate(50000)}
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2 text-slate-600">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#10b981' }} />
+                              <strong>Avg. Household:</strong> {fmt(80000)}
+                            </div>
+                            <div className="text-[10px] text-slate-400 pl-4">Household spending, Canadian average</div>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                            {getClosestSuccessRate(80000)}
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2 text-slate-600">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#3b82f6' }} />
+                              <strong>Chubby FIRE:</strong> {fmt(120000)}
+                            </div>
+                            <div className="text-[10px] text-slate-400 pl-4">Active retirement, frequent travel</div>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                            {getClosestSuccessRate(120000)}
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2 text-slate-600">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#ef4444' }} />
+                              <strong>Fat FIRE:</strong> {fmt(180000)}
+                            </div>
+                            <div className="text-[10px] text-slate-400 pl-4">Premium lifestyle and travel budget</div>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                            {getClosestSuccessRate(180000)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
