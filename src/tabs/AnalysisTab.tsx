@@ -37,6 +37,7 @@ const fmt = (v: number) => _fmtObj.format(v)
 
 export function AnalysisTab() {
   const state = useStore()
+  const currentYear = new Date().getFullYear()
   const {
     whatIfs, ageReferencePerson, personA, personB,
     withdrawalStrategy, updateWhatIf,
@@ -168,7 +169,6 @@ export function AnalysisTab() {
   }
 
   // ── Common variables for Monte Carlo and Historical analysis ───────────────
-  const currentYear = new Date().getFullYear()
   const refPerson = effectiveState.ageReferencePerson === 'personB' ? effectiveState.personB : effectiveState.personA
   const refName = effectiveState.ageReferencePerson === 'personB' ? bName : aName
   const startAge = intAgeAt(refPerson.birthDate, jan1(currentYear))
@@ -525,6 +525,281 @@ export function AnalysisTab() {
         },
       },
     })
+  }
+
+  // ── Coast FIRE Calculator state ───────────────────────────────────────────
+  const [coastRateType, setCoastRateType] = useState<'plan' | 'historical'>('plan')
+  const [coastEqAllocation, setCoastEqAllocation] = useState(60)
+  const [coastStartYear, setCoastStartYear] = useState(1871)
+  const [coastMinSuccessRate, setCoastMinSuccessRate] = useState(100)
+  const [coastPlotMetric, setCoastPlotMetric] = useState<'worst' | 'median'>('worst')
+  const [coastPlanResult, setCoastPlanResult] = useState<{
+    coastYear: number | null
+    coastAge: number | null
+    currentPlanPathArray: number[]
+    stopTodayPathArray: number[]
+    stopCoastPathArray: number[]
+    agesArray: number[]
+    yearsArray: number[]
+  } | null>(null)
+  const [coastHistResult, setCoastHistResult] = useState<{
+    coastYear: number | null
+    coastAge: number | null
+    successRateToday: number
+    successRateCoast: number | null
+    currentPlanSuccessRate: number
+    currentPlanMedianPath: number[]
+    currentPlanWorstPath: number[]
+    stopTodayMedianPath: number[]
+    stopTodayWorstPath: number[]
+    stopCoastMedianPath: number[]
+    stopCoastWorstPath: number[]
+    agesArray: number[]
+    yearsArray: number[]
+  } | null>(null)
+  const [coastRunning, setCoastRunning] = useState(false)
+
+  const resetCoastCalculator = () => {
+    setCoastRateType('plan')
+    setCoastEqAllocation(60)
+    setCoastStartYear(1871)
+    setCoastMinSuccessRate(100)
+    setCoastPlotMetric('worst')
+    setCoastPlanResult(null)
+    setCoastHistResult(null)
+  }
+
+  // Helper to generate modified AppState for stopping contributions in year Y (household)
+  const getCoastState = (baseState: AppState, Y: number): AppState => {
+    let testState = {
+      ...baseState,
+      rrspA: { ...baseState.rrspA },
+      rrspB: { ...baseState.rrspB },
+      tfsaA: { ...baseState.tfsaA },
+      tfsaB: { ...baseState.tfsaB },
+      nonRegA: { ...baseState.nonRegA },
+      nonRegB: { ...baseState.nonRegB },
+    }
+    const lastDate = `${Y - 1}-12-31`
+    
+    if (testState.rrspA.contributionEndDate > lastDate) testState.rrspA.contributionEndDate = lastDate
+    if (testState.rrspA.spousalLastContributionDate > lastDate) testState.rrspA.spousalLastContributionDate = lastDate
+    if (testState.tfsaA.contributionEndDate > lastDate) testState.tfsaA.contributionEndDate = lastDate
+    if (testState.nonRegA.contributionEndDate > lastDate) testState.nonRegA.contributionEndDate = lastDate
+
+    if (testState.rrspB.contributionEndDate > lastDate) testState.rrspB.contributionEndDate = lastDate
+    if (testState.rrspB.spousalLastContributionDate > lastDate) testState.rrspB.spousalLastContributionDate = lastDate
+    if (testState.tfsaB.contributionEndDate > lastDate) testState.tfsaB.contributionEndDate = lastDate
+    if (testState.nonRegB.contributionEndDate > lastDate) testState.nonRegB.contributionEndDate = lastDate
+    
+    return testState
+  }
+
+  // Helper to compute median trajectory across historical paths
+  const getMedianPath = (paths: HistoricalPathResult[]): number[] => {
+    if (paths.length === 0) return []
+    const n = paths[0].portfolioBalances.length
+    const medianBalances: number[] = []
+    for (let i = 0; i < n; i++) {
+      const vals = paths.map(p => p.portfolioBalances[i] ?? 0).sort((a, b) => a - b)
+      const mid = Math.floor(vals.length / 2)
+      const medianVal = vals.length % 2 !== 0
+        ? vals[mid]
+        : (vals[mid - 1] + vals[mid]) / 2
+      medianBalances.push(medianVal)
+    }
+    return medianBalances
+  }
+
+  // Helper to compute worst-case trajectory across historical paths
+  const getWorstPath = (paths: HistoricalPathResult[]): number[] => {
+    if (paths.length === 0) return []
+    let worst = paths[0]
+    for (const p of paths) {
+      if (p.finalBalance < worst.finalBalance) {
+        worst = p
+      }
+    }
+    return worst.portfolioBalances
+  }
+
+  useEffect(() => {
+    if (coastStartYear > maxStartYearLimit) {
+      const options = [2000, 1980, 1950, 1871]
+      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
+      setCoastStartYear(best)
+    }
+  }, [maxStartYearLimit, coastStartYear])
+
+  // ── Coast FIRE Calculator — Plan Rates Simulation ─────────────────────────
+  const runCoastPlanCalculation = () => {
+    setCoastRunning(true)
+    setTimeout(() => {
+      // Helper to test if stopping contributions in year Y succeeds (no shortfall warnings)
+      const testCoastYear = (Y: number): boolean => {
+        const testState = getCoastState(effectiveState, Y)
+        const { warnings } = runProjection(testState, rateSchedule)
+        return !warnings.some(w => w.includes('shortfall'))
+      }
+
+      const basePlanSucceeds = (() => {
+        const { warnings } = runProjection(effectiveState, rateSchedule)
+        return !warnings.some(w => w.includes('shortfall'))
+      })()
+
+      let coastYearResult: number | null = null
+      if (basePlanSucceeds) {
+        let lastSucceeded = endYear
+        for (let Y = endYear; Y >= currentYear; Y--) {
+          if (testCoastYear(Y)) {
+            lastSucceeded = Y
+          } else {
+            break
+          }
+        }
+        coastYearResult = lastSucceeded
+      }
+
+      const coastAgeResult = coastYearResult !== null ? startAge + (coastYearResult - currentYear) : null
+
+      // Build chart paths (all the way to endYear)
+      const agesArray: number[] = []
+      const yearsArray: number[] = []
+      for (let year = currentYear; year <= endYear; year++) {
+        yearsArray.push(year)
+        agesArray.push(startAge + (year - currentYear))
+      }
+
+      // 1. Current Plan Path
+      const currentPlanPathArray = agesArray.map(age => {
+        const year = currentYear + (age - startAge)
+        const d = dataPoints.find(dp => dp.year === year)
+        return d ? d.totalPortfolio : 0
+      })
+
+      // 2. Stop Saving Today Path
+      const stopTodayState = getCoastState(effectiveState, currentYear)
+      const stopTodayProj = runProjection(stopTodayState, rateSchedule)
+      const stopTodayPathArray = agesArray.map(age => {
+        const year = currentYear + (age - startAge)
+        const d = stopTodayProj.dataPoints.find(dp => dp.year === year)
+        return d ? d.totalPortfolio : 0
+      })
+
+      // 3. Stop Saving at Coast Age Path (only if coastYearResult is valid and in future)
+      let stopCoastPathArray: number[] = []
+      if (coastYearResult !== null && coastYearResult > currentYear) {
+        const stopCoastState = getCoastState(effectiveState, coastYearResult)
+        const stopCoastProj = runProjection(stopCoastState, rateSchedule)
+        stopCoastPathArray = agesArray.map(age => {
+          const year = currentYear + (age - startAge)
+          const d = stopCoastProj.dataPoints.find(dp => dp.year === year)
+          return d ? d.totalPortfolio : 0
+        })
+      }
+
+      setCoastPlanResult({
+        coastYear: coastYearResult,
+        coastAge: coastAgeResult,
+        currentPlanPathArray,
+        stopTodayPathArray,
+        stopCoastPathArray,
+        agesArray,
+        yearsArray,
+      })
+      setCoastRunning(false)
+    }, 20)
+  }
+
+  const runCoastHistSimulation = () => {
+    setCoastRunning(true)
+    setTimeout(() => {
+      // 1. Run historical analysis on the base plan (Current Plan)
+      const histBase = runHistoricalAnalysis(effectiveState, {
+        equityAllocationPct: coastEqAllocation,
+        historicalStartYear: coastStartYear,
+        resolution: 'annual',
+      })
+
+      const baseSucceeds = histBase.successRate >= coastMinSuccessRate / 100
+
+      let coastYearResult: number | null = null
+      let histCoast: HistoricalAnalysisResult | null = null
+
+      if (baseSucceeds) {
+        // Helper to test a year
+        const testCoastYear = (Y: number): boolean => {
+          const testState = getCoastState(effectiveState, Y)
+          const hist = runHistoricalAnalysis(testState, {
+            equityAllocationPct: coastEqAllocation,
+            historicalStartYear: coastStartYear,
+            resolution: 'annual',
+          })
+          return hist.successRate >= coastMinSuccessRate / 100
+        }
+
+        // Work backwards from endYear to currentYear
+        let lastSucceeded = endYear
+        for (let Y = endYear; Y >= currentYear; Y--) {
+          if (testCoastYear(Y)) {
+            lastSucceeded = Y
+          } else {
+            break
+          }
+        }
+        coastYearResult = lastSucceeded
+
+        // Run historical analysis for the chosen Coast Year
+        if (coastYearResult !== null) {
+          const coastState = getCoastState(effectiveState, coastYearResult)
+          histCoast = runHistoricalAnalysis(coastState, {
+            equityAllocationPct: coastEqAllocation,
+            historicalStartYear: coastStartYear,
+            resolution: 'annual',
+          })
+        }
+      }
+
+      // Run historical analysis for Stop Saving Today
+      const todayState = getCoastState(effectiveState, currentYear)
+      const histToday = runHistoricalAnalysis(todayState, {
+        equityAllocationPct: coastEqAllocation,
+        historicalStartYear: coastStartYear,
+        resolution: 'annual',
+      })
+
+      // Compute median paths
+      const agesArr: number[] = []
+      const yearsArr: number[] = []
+      for (let year = currentYear; year <= endYear; year++) {
+        yearsArr.push(year)
+        agesArr.push(startAge + (year - currentYear))
+      }
+
+      const currentPlanMedianPath = getMedianPath(histBase.paths)
+      const currentPlanWorstPath = getWorstPath(histBase.paths)
+      const stopTodayMedianPath = getMedianPath(histToday.paths)
+      const stopTodayWorstPath = getWorstPath(histToday.paths)
+      const stopCoastMedianPath = histCoast ? getMedianPath(histCoast.paths) : []
+      const stopCoastWorstPath = histCoast ? getWorstPath(histCoast.paths) : []
+
+      setCoastHistResult({
+        coastYear: coastYearResult,
+        coastAge: coastYearResult !== null ? startAge + (coastYearResult - currentYear) : null,
+        successRateToday: histToday.successRate,
+        successRateCoast: histCoast ? histCoast.successRate : null,
+        currentPlanSuccessRate: histBase.successRate,
+        currentPlanMedianPath,
+        currentPlanWorstPath,
+        stopTodayMedianPath,
+        stopTodayWorstPath,
+        stopCoastMedianPath,
+        stopCoastWorstPath,
+        agesArray: agesArr,
+        yearsArray: yearsArr,
+      })
+      setCoastRunning(false)
+    }, 20)
   }
 
   // ── Meltdown chart builder ────────────────────────────────────────────────
@@ -1398,6 +1673,366 @@ export function AnalysisTab() {
               </div>
             </div>
           )}
+        </SectionCard>
+
+        {/* Coast FIRE Calculator */}
+        {/* Coast FIRE Calculator */}
+        <SectionCard
+          title="Coast FIRE Calculator"
+          width="full"
+          onReset={resetCoastCalculator}
+          info={
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Coast FIRE</strong> is the point where you have saved enough retirement assets that, even if you stop making all new contributions today, your existing portfolio will grow by compound interest alone to support your retirement at your target age.
+              </p>
+              <p>
+                Once you reach Coast FIRE, you only need to earn enough to cover your current living expenses (no active retirement savings required).
+              </p>
+              <p>
+                <strong>How it's calculated:</strong>
+              </p>
+              <p className="text-xs text-slate-600">
+                Unlike simple calculations that use mathematical SWR approximations, this calculator runs the <strong>entire Canadian tax and projection engine</strong> year-by-year working backwards from the end of your plan, testing stopping dates to find the earliest year you can stop household contributions without experiencing any spending shortfalls.
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-xs text-slate-600">
+                <li><strong>Current Plan Path</strong> — Shows your portfolio trajectory under your current contribution schedule.</li>
+                <li><strong>Stop Saving Today</strong> — Simulates the portfolio trajectory if all future contributions are immediately set to $0 starting today.</li>
+                <li><strong>Stop Saving at Coast Age</strong> — Shows the trajectory if you keep saving until your Coast FIRE age, and then stop all contributions. Where this path diverges is the exact milestone age you can "coast" from.</li>
+              </ul>
+              <p>
+                <em>This account-based analysis automatically includes all pensions, government benefits (CPP/OAS), lumpy expenses (such as home sales), inflation, and tax brackets. It can also stress-test your plan against actual historical market sequences.</em>
+              </p>
+            </div>
+          }
+        >
+          {(() => {
+            const refPerson = effectiveState.ageReferencePerson === 'personB' ? effectiveState.personB : effectiveState.personA
+            const refName = effectiveState.ageReferencePerson === 'personB' ? bName : aName
+            const startAge = intAgeAt(refPerson.birthDate, jan1(currentYear))
+            const planningEndAge = refPerson.planningEndAge
+
+            const hasResult = coastRateType === 'plan' ? (coastPlanResult !== null) : (coastHistResult !== null)
+            const currentAssetsVal = dataPoints[0]?.totalPortfolio ?? 0
+
+            const retirementAgeA = intAgeAt(effectiveState.personA.birthDate, effectiveState.personA.retirementDate)
+            const retirementAgeB = effectiveState.personB.birthDate
+              ? intAgeAt(effectiveState.personB.birthDate, effectiveState.personB.retirementDate)
+              : null
+            const hasSpouse = !!effectiveState.personB.name
+
+            // Extract the result values if ready
+            const result = coastRateType === 'plan' ? coastPlanResult! : coastHistResult!
+            const coastYear = result?.coastYear ?? null
+            const coastAge = result?.coastAge ?? null
+            const agesArray = result?.agesArray ?? []
+            const yearsArray = result?.yearsArray ?? []
+
+            const isCoastFireToday = coastYear === currentYear
+
+            const currentPlanPath = coastRateType === 'plan'
+              ? coastPlanResult?.currentPlanPathArray ?? []
+              : (coastPlotMetric === 'worst' ? coastHistResult?.currentPlanWorstPath ?? [] : coastHistResult?.currentPlanMedianPath ?? [])
+
+            const stopTodayPath = coastRateType === 'plan'
+              ? coastPlanResult?.stopTodayPathArray ?? []
+              : (coastPlotMetric === 'worst' ? coastHistResult?.stopTodayWorstPath ?? [] : coastHistResult?.stopTodayMedianPath ?? [])
+
+            const stopCoastPath = coastRateType === 'plan'
+              ? coastPlanResult?.stopCoastPathArray ?? []
+              : (coastPlotMetric === 'worst' ? coastHistResult?.stopCoastWorstPath ?? [] : coastHistResult?.stopCoastMedianPath ?? [])
+
+            const isSucceedingToday = coastRateType === 'plan'
+              ? isCoastFireToday
+              : (coastHistResult !== null && coastHistResult.successRateToday >= coastMinSuccessRate / 100)
+
+            const currentPlanName = coastRateType === 'plan'
+              ? 'Current Plan (With Contributions)'
+              : `Current Plan (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.currentPlanSuccessRate ?? 0) * 100).toFixed(0)}%)`
+
+            const stopTodayName = coastRateType === 'plan'
+              ? (isCoastFireToday ? 'Compounding Only (Stop Saving Today - Succeeds)' : 'Compounding Only (Stop Saving Today - Depletes)')
+              : `Compounding Only (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.successRateToday ?? 0) * 100).toFixed(0)}%)`
+
+            const stopCoastName = coastRateType === 'plan'
+              ? `Stop Saving at Coast Age ${coastAge} (Succeeds)`
+              : `Stop Saving at Coast Age ${coastAge} (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.successRateCoast ?? 0) * 100).toFixed(0)}%)`
+
+            const coastChartTraces: Data[] = [
+              {
+                x: agesArray,
+                y: currentPlanPath,
+                customdata: yearsArray,
+                type: 'scatter',
+                mode: 'lines',
+                name: currentPlanName,
+                line: { color: '#d97706', width: 2 },
+                hovertemplate: 'Current Plan<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
+              },
+              {
+                x: agesArray,
+                y: stopTodayPath,
+                customdata: yearsArray,
+                type: 'scatter',
+                mode: 'lines',
+                name: stopTodayName,
+                line: { color: isSucceedingToday ? '#10b981' : '#ef4444', width: 2 },
+                hovertemplate: 'Stop Saving Today<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
+              }
+            ]
+
+            if (coastYear !== null && coastYear > currentYear) {
+              coastChartTraces.push({
+                x: agesArray,
+                y: stopCoastPath,
+                customdata: yearsArray,
+                type: 'scatter',
+                mode: 'lines',
+                name: stopCoastName,
+                line: { color: '#10b981', width: 2.5 },
+                hovertemplate: 'Stop Saving at Coast Age<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
+              })
+            }
+
+            const shapes: any[] = []
+            const annotations: any[] = []
+
+            if (hasResult && coastAge !== null) {
+              shapes.push({
+                type: 'line',
+                x0: coastAge,
+                x1: coastAge,
+                y0: 0,
+                y1: 1,
+                yref: 'paper',
+                line: { color: '#10b981', dash: 'dash', width: 2 }
+              })
+              annotations.push({
+                x: coastAge,
+                xref: 'x',
+                y: 0.05,
+                yref: 'paper',
+                text: `<b>Coast Age: ${coastAge}</b>`,
+                showarrow: false,
+                font: { size: 10, color: '#10b981' },
+                xanchor: 'left',
+                yanchor: 'bottom'
+              })
+            }
+
+            const handleRun = () => {
+              if (coastRateType === 'plan') {
+                runCoastPlanCalculation()
+              } else {
+                runCoastHistSimulation()
+              }
+            }
+
+            return (
+              <div className="space-y-4">
+                {/* Controls */}
+                <div className="flex items-end gap-4 mb-4 flex-wrap">
+                  <button
+                    className="btn-primary"
+                    onClick={handleRun}
+                    disabled={coastRunning}
+                  >
+                    {coastRunning ? 'Running…' : hasResult ? 'Re-run' : 'Run'}
+                  </button>
+
+                  <SelectInput
+                    label="Rate Simulation Type"
+                    value={coastRateType}
+                    onChange={v => setCoastRateType(v as 'plan' | 'historical')}
+                    options={[
+                      { value: 'plan', label: 'Plan Rates' },
+                      { value: 'historical', label: 'Historical Rates' }
+                    ]}
+                    tooltip="Choose whether to evaluate Coast FIRE using the flat rates defined in your plan, or stress-test against actual historical market data."
+                  />
+
+                  {coastRateType === 'historical' && (
+                    <>
+                      <SelectInput
+                        label="Historical Path to Plot"
+                        value={coastPlotMetric}
+                        onChange={v => setCoastPlotMetric(v as 'worst' | 'median')}
+                        options={[
+                          { value: 'worst', label: 'Worst-Case Path (Downside Risk)' },
+                          { value: 'median', label: 'Median Path (50th Percentile)' }
+                        ]}
+                        tooltip="Choose whether the chart plots the worst-case historical sequence (the gating factor for success) or the median (average) outcome."
+                      />
+
+                      <SelectInput
+                        label="Asset Allocation"
+                        value={coastEqAllocation.toString()}
+                        onChange={v => setCoastEqAllocation(parseInt(v))}
+                        options={[
+                          { value: '100', label: '100% Equity / 0% Bond' },
+                          { value: '80', label: '80% Equity / 20% Bond' },
+                          { value: '60', label: '60% Equity / 40% Bond' },
+                          { value: '40', label: '40% Equity / 60% Bond' },
+                          { value: '20', label: '20% Equity / 80% Bond' },
+                        ]}
+                        tooltip="Target mix compiled dynamically from historical monthly returns"
+                      />
+
+                      <SelectInput
+                        label="Historical Start Year"
+                        value={coastStartYear.toString()}
+                        onChange={v => setCoastStartYear(parseInt(v))}
+                        options={[
+                          { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
+                          { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
+                          { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
+                          { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
+                        ]}
+                        tooltip="The starting year boundary for the simulation series"
+                      />
+
+                      <SelectInput
+                        label="Min Success Rate Required"
+                        value={coastMinSuccessRate.toString()}
+                        onChange={v => setCoastMinSuccessRate(parseInt(v))}
+                        options={[
+                          { value: '100', label: '100% (No Depletions)' },
+                          { value: '95', label: '95% Success Rate' },
+                          { value: '90', label: '90% Success Rate' },
+                        ]}
+                        tooltip="The minimum historical success rate required to consider a retirement year successful."
+                      />
+                    </>
+                  )}
+                </div>
+
+                {/* Loading State */}
+                {coastRunning && (
+                  <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                      <span>Running simulation…</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* No Result Placeholder */}
+                {!coastRunning && !hasResult && (
+                  <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+                    <span>Select options and click "Run" to calculate Coast FIRE.</span>
+                  </div>
+                )}
+
+                {/* Results Panel */}
+                {!coastRunning && hasResult && (
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Plotly Chart (Left Side) */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold mb-2 text-slate-700">
+                        Coast FIRE Portfolio Trajectory ({coastRateType === 'plan' ? `Constant Return` : `Historical ${coastPlotMetric === 'worst' ? 'Worst Cases' : 'Medians'}`} to Year {endYear})
+                      </div>
+                      <PlotlyChart
+                        data={coastChartTraces}
+                        layout={{
+                          yaxis: { tickformat: ',.0f', title: { text: 'Portfolio Balance ($)', font: { size: 11 } } },
+                          xaxis: { title: { text: `${refName}'s Age`, font: { size: 11 } } },
+                          legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                          shapes,
+                          annotations
+                        }}
+                        style={{ height: 380 }}
+                      />
+                    </div>
+
+                    {/* Status Alert Box (Right Side) */}
+                    <div className="w-full lg:w-96 shrink-0 flex flex-col justify-center">
+                      {coastRateType === 'plan' ? (
+                        <>
+                          {isCoastFireToday ? (
+                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-800 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1">
+                                <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Coast FIRE Achieved!
+                              </div>
+                              <p className="text-xs text-emerald-700 leading-relaxed">
+                                Your current plan is already in Coast FIRE. You can stop making future contributions starting <strong>today (Age {startAge} / Year {currentYear})</strong> and your portfolio is projected to successfully cover all retirement spending and lumpy expenses through the end of the plan (Year {endYear}).
+                              </p>
+                            </div>
+                          ) : coastYear !== null ? (
+                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-blue-800 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1">
+                                <svg className="w-5 h-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" fill="none" />
+                                </svg>
+                                On Track to Coast at Age {coastAge}
+                              </div>
+                              <p className="text-xs text-blue-700 leading-relaxed">
+                                If you stop contributions today, your portfolio is projected to deplete before the end of the plan. However, by continuing your planned contributions for <strong>{coastYear! - currentYear} more years</strong>, you will reach Coast FIRE status at <strong>Age {coastAge} (Year {coastYear!})</strong>. Beyond that point, all future contributions can safely be stopped.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1">
+                                <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                Contributions Required
+                              </div>
+                              <p className="text-xs text-amber-700 leading-relaxed">
+                                Your current plan is not yet projected to reach Coast FIRE before retirement. Even if you contribute all the way to retirement, the plan is projected to experience a spending shortfall. Consider increasing savings or adjusting your retirement spending.
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {isCoastFireToday ? (
+                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-800 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1">
+                                <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Coast FIRE Achieved!
+                              </div>
+                              <p className="text-xs text-emerald-700 leading-relaxed">
+                                Your current plan is already in Coast FIRE. You can stop making future contributions starting <strong>today (Age {startAge} / Year {currentYear})</strong> and your portfolio is projected to successfully cover all retirement spending and lumpy expenses in at least <strong>{coastMinSuccessRate}%</strong> of historical rolling periods.
+                              </p>
+                            </div>
+                          ) : coastYear !== null ? (
+                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-blue-800 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1">
+                                <svg className="w-5 h-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" fill="none" />
+                                </svg>
+                                On Track to Coast at Age {coastAge}
+                              </div>
+                              <p className="text-xs text-blue-700 leading-relaxed">
+                                If you stop contributions today, your portfolio does not meet the {coastMinSuccessRate}% required success rate. However, by continuing your planned contributions for <strong>{coastYear! - currentYear} more years</strong>, you will reach Coast FIRE status at <strong>Age {coastAge} (Year {coastYear!})</strong> with a <strong>{(coastHistResult!.successRateCoast! * 100).toFixed(0)}%</strong> historical success rate. Beyond that point, all future contributions can safely be stopped.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1">
+                                <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                Contributions Required
+                              </div>
+                              <p className="text-xs text-amber-700 leading-relaxed">
+                                Your current plan is not projected to reach Coast FIRE. Even with contributions to the end of the plan, the historical success rate is <strong>{(coastHistResult!.currentPlanSuccessRate * 100).toFixed(0)}%</strong> (less than your required {coastMinSuccessRate}%). Consider increasing savings, adjusting retirement spending, or lowering your required success rate.
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </SectionCard>
       </CardGrid>
 
