@@ -5,6 +5,17 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.7.1] — 2026-06-18
+
+### Added
+- **Monotone Cubic Smoothing** — Integrated monotone cubic interpolation for the historical spending sweep success rate curve, preventing overshoot and keeping rates bounded.
+- **Retirement Spending Benchmarks Highlight** — Added color-coded open circles on the success rate chart for in-range benchmarks (Lean FIRE, Avg. Household, Chubby FIRE, and Fat FIRE) with matching solid dot indicators next to their titles in the sidebar.
+
+### Changed
+- **Updated Benchmark Descriptions** — Set Lean FIRE description to "Basic spending, Canadian average" and Avg. Household description to "Household spending, Canadian average".
+
+---
+
 ## [0.7.0] — 2026-06-18
 
 ### Added
