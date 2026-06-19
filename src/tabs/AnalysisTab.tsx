@@ -1121,11 +1121,7 @@ export function AnalysisTab() {
               </>
             )}
 
-            {mcResult && !mcRunning && (
-              <span className="text-xs text-slate-400 pb-1">
-                Last run: {mcResult.simulationCount.toLocaleString()} simulations
-              </span>
-            )}
+
           </div>
 
           {mcMethod === 'regime' && (
@@ -1376,11 +1372,7 @@ export function AnalysisTab() {
               tooltip="Annual uses January starts only; Monthly runs 12x more paths starting in any month"
             />
 
-            {histResult && !histRunning && (
-              <span className="text-xs text-slate-400 pb-1">
-                Last run: {histResult.totalCount} historical periods simulated
-              </span>
-            )}
+
           </div>
 
           {histRunning && (
@@ -1550,11 +1542,7 @@ export function AnalysisTab() {
               tooltip="The starting year boundary for the simulation series"
             />
 
-            {sweepResult && !sweepRunning && (
-              <span className="text-xs text-slate-400 pb-1">
-                Last run: {sweepResult.points.length} spending levels simulated
-              </span>
-            )}
+
           </div>
 
           {sweepRunning && (
@@ -2058,11 +2046,7 @@ export function AnalysisTab() {
             <button className="btn-primary self-end" onClick={runGov} disabled={govRunning}>
               {govRunning ? 'Optimizing…' : govResult ? 'Re-Run' : 'Run'}
             </button>
-            {govResult && !govRunning && (
-              <span className="text-xs text-slate-400 self-end pb-1">
-                34 projection runs completed
-              </span>
-            )}
+
           </div>
   
           {govRunning && (
@@ -2235,11 +2219,7 @@ export function AnalysisTab() {
             </button>
             <NumberInput label="Sweep Steps" value={meltSteps} onChange={setMeltSteps}
               min={10} max={80} step={5} decimals={0} size="sm" />
-            {meltResult && !meltRunning && (
-              <span className="text-xs text-slate-400 self-end pb-1">
-                {meltResult.sweepA.length + meltResult.sweepB.length + 1} projection runs
-              </span>
-            )}
+
           </div>
   
           {meltRunning && (
