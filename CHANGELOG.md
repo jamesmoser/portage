@@ -5,6 +5,17 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.8.0] — 2026-06-20
+
+### Added
+- **Coast FIRE Calculator** — Added a backwards-solving simulator that runs the full Canadian tax and decumulation projection engine to find the exact age/year you can stop saving and let compound growth cover retirement retirement spending under Plan or Historical Rates.
+- **Sustainable Spending Rate Simulation** — Added a Rate Simulation selector (Plan vs Historical Rates) and Plan Rates sweep calculation to the Sustainable Spending Sweep card.
+
+### Changed
+- **Analysis Tab UI Standardizations** — Standardized layout spacing, headers, buttons ("Run" / "Re-Run"), loading panels, placeholders, and charts across all Analysis tab cards.
+- **Color Palettes** — Standardized color palettes for charts and benchmarks across the Analysis cards to match the global design system.
+- **Modals Reference Updates** — Updated info modals on all Analysis tab cards to clearly explain which parameters are overridden and which are preserved during sweeps/simulations.
+
 ## [0.7.1] — 2026-06-18
 
 ### Added

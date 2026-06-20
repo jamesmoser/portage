@@ -4,7 +4,7 @@
 
 A private, browser-based retirement planning tool for Canadian couples (Ontario). Built to model complex retirement scenarios with full transparency into the underlying calculations.
 
-**Version 0.7.1**
+**Version 0.8.0**
 
 ## Philosophy
 
@@ -45,6 +45,7 @@ A private, browser-based retirement planning tool for Canadian couples (Ontario)
 - Age amount, pension income amount, basic personal amount — all CPI-indexed
 - Ontario surtax: 20% on Ontario tax above $5,818; additional 36% above $7,446
 - OAS clawback at 15% above the annual threshold
+- Foreign Tax Credit (FTC) — 15% non-refundable credit for withholding tax paid at source on foreign investments (e.g. US/intl dividends) to prevent double taxation
 
 ### Withdrawal / Drawdown Strategies
 
@@ -104,6 +105,22 @@ All charts have an independent x-axis selector (calendar year / Person A age / P
 ### Annual Summary Table
 
 Detailed projection outcomes displayed as expandable column groups (Year, Income, Tax, Portfolio) with optional person colour tinting. Age labels show `(deceased)` past each person's planning end date.
+
+### Optimizers & Simulations (Analysis Tab)
+
+Detailed analysis tools to stress-test your plan under varying market conditions and optimize specific tax and retirement options:
+
+- **Monte Carlo Simulation** — Runs your plan hundreds of times with randomized annual market return sequences. Supports multiple simulation models:
+  - *Traditional* (using baseline expected return as the mean with Gaussian, Student's t, or Skewed Normal noise distributions).
+  - *Constant CMA Reduction* (reducing expected returns by a fixed safety margin).
+  - *Dynamic CMA Reduction* (reducing returns in the early years with a decay factor to model near-term market headwinds).
+  - *Simple / Block Bootstrap* (drawing random single years or consecutive multi-year blocks of S&P 500 & bond returns directly from historical data since 1871).
+  - *Regime Switching* (two-state Markov chain cycling between expansion/bull and contraction/bear regimes with custom transit probabilities).
+- **Historical Sequence Stress Test** — Evaluates your plan against chronological rolling periods from S&P 500 and bond market history (1871–present). Supports annual or monthly start date resolution (simulating ~1,500 monthly paths to capture peak/trough timing). Highlights the worst and best historical periods.
+- **Sustainable Spending Sweep** — Evaluates your plan across a range of flat base retirement spending levels using configured plan rates or historical rolling sequences. Identifies the maximum sustainable basic retirement spending at a selected success rate target, highlighting Lean, Average, Chubby, and Fat FIRE benchmarks with monotone cubic interpolation to prevent rate overshoots.
+- **Coast FIRE Calculator** — Calculates the exact age and calendar year you can stop making future savings contributions (TFSA, RRSP, and Non-Registered) and let compound interest grow your existing assets to support your retirement spending, evaluated using the full tax and decumulation projection engine under Plan or Historical Rates.
+- **CPP / OAS Timing Optimizer** — Sweeps all start combinations (CPP ages 60–70; OAS ages 65–70) to find the household-lifetime-benefit-maximizing start ages for each spouse independently. Accurately models survivor benefit combined caps and OAS clawback thresholds. Allows applying the optimal start ages to the Dashboard with one click.
+- **RRSP Meltdown Optimizer** — Sweeps the proactive meltdown gross income ceiling for the *Cover Spending Gap* drawdown strategy to find the level that minimizes lifetime household income taxes (including OAS clawback impact) between retirement and RRIF conversion.
 
 ---
 
