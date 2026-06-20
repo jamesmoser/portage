@@ -253,7 +253,7 @@ export function AnalysisTab() {
       type: 'scatter',
       mode: 'lines',
       name: `Best Case (${bestPath.label})`,
-      line: { color: '#10b981', width: 3 },
+      line: { color: '#166534', width: 3 },
       hovertemplate: `<b>Best: ${bestPath.label}</b><br>Age: %{x}<br>Portfolio: %{y:$,.0f}<extra></extra>`
     })
 
@@ -340,9 +340,9 @@ export function AnalysisTab() {
     // Add open circles for benchmarks (if in sweep range)
     const benchmarks = [
       { name: 'Lean FIRE', amount: 50000, color: '#64748b' },
-      { name: 'Avg. Household', amount: 80000, color: '#10b981' },
-      { name: 'Chubby FIRE', amount: 120000, color: '#3b82f6' },
-      { name: 'Fat FIRE', amount: 180000, color: '#ef4444' },
+      { name: 'Avg. Household', amount: 80000, color: '#166534' },
+      { name: 'Chubby FIRE', amount: 120000, color: '#1e40af' },
+      { name: 'Fat FIRE', amount: 180000, color: '#d97706' },
     ]
 
     const benchmarkPoints = benchmarks
@@ -1659,7 +1659,7 @@ export function AnalysisTab() {
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3 py-2 text-slate-600">
                             <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#10b981' }} />
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#166534' }} />
                               <strong>Avg. Household:</strong> {fmt(80000)}
                             </div>
                             <div className="text-[10px] text-slate-400 pl-4">Household spending, Canadian average</div>
@@ -1671,7 +1671,7 @@ export function AnalysisTab() {
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3 py-2 text-slate-600">
                             <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#3b82f6' }} />
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#1e40af' }} />
                               <strong>Chubby FIRE:</strong> {fmt(120000)}
                             </div>
                             <div className="text-[10px] text-slate-400 pl-4">Active retirement, frequent travel</div>
@@ -1683,7 +1683,7 @@ export function AnalysisTab() {
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3 py-2 text-slate-600">
                             <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#ef4444' }} />
+                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#d97706' }} />
                               <strong>Fat FIRE:</strong> {fmt(180000)}
                             </div>
                             <div className="text-[10px] text-slate-400 pl-4">Premium lifestyle and travel budget</div>
@@ -1803,7 +1803,7 @@ export function AnalysisTab() {
                 type: 'scatter',
                 mode: 'lines',
                 name: stopTodayName,
-                line: { color: isSucceedingToday ? '#10b981' : '#ef4444', width: 2 },
+                line: { color: isSucceedingToday ? '#166534' : '#7B1515', width: 2 },
                 hovertemplate: 'Stop Saving Today<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
               }
             ]
@@ -1816,7 +1816,7 @@ export function AnalysisTab() {
                 type: 'scatter',
                 mode: 'lines',
                 name: stopCoastName,
-                line: { color: '#10b981', width: 2.5 },
+                line: { color: '#166534', width: 2.5 },
                 hovertemplate: 'Stop Saving at Coast Age<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
               })
             }
@@ -1832,7 +1832,7 @@ export function AnalysisTab() {
                 y0: 0,
                 y1: 1,
                 yref: 'paper',
-                line: { color: '#10b981', dash: 'dash', width: 2 }
+                line: { color: '#166534', dash: 'dash', width: 2 }
               })
               annotations.push({
                 x: coastAge,
@@ -1841,7 +1841,7 @@ export function AnalysisTab() {
                 yref: 'paper',
                 text: `<b>Coast Age: ${coastAge}</b>`,
                 showarrow: false,
-                font: { size: 10, color: '#10b981' },
+                font: { size: 10, color: '#166534' },
                 xanchor: 'left',
                 yanchor: 'bottom'
               })
