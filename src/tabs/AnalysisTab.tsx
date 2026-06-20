@@ -991,7 +991,12 @@ export function AnalysisTab() {
           }}
           info={
             <div className="space-y-2 text-sm">
-              <p>Monte Carlo runs your plan hundreds of times, varying annual market returns randomly around the configured rate profile. Everything else — income, tax, spending phases, drawdown strategy, and all active modifications — is held fixed. Only market sequence varies.</p>
+              <p>
+                Monte Carlo runs your plan hundreds of times, varying annual market returns randomly around the configured rate profile. Only market sequence varies.
+              </p>
+              <p className="text-xs text-slate-500 italic">
+                It overrides your plan's configured expected return rates with randomized sequences of market returns. All other plan details—such as expected inflation, income, tax, spending phases, additional/lumpy expenses, and drawdown strategy—remain exactly as configured in your plan.
+              </p>
               <p><strong>Monte Carlo Method</strong> — Choose the underlying simulation model:
                 <ul className="list-disc pl-4 mt-1 space-y-1">
                   <li><em>Traditional</em> — Uses the baseline rate profile as the mean expected return.</li>
@@ -1407,6 +1412,9 @@ export function AnalysisTab() {
                 The Historical Rolling Periods Analyzer runs your plan against actual chronological windows of historical market data. 
                 Unlike randomized Monte Carlo methods, this preserves the exact multi-year inflation, interest rate, and stock cycles (e.g. the 1929 Great Depression, the 1970s Stagflation) as they occurred.
               </p>
+              <p className="text-xs text-slate-500 italic">
+                It overrides your plan's configured expected return rates with actual historical market returns based on your selected <strong>Asset Allocation</strong>. All other plan details—such as expected inflation, income, tax, spending phases, additional expenses, and drawdown strategy—remain exactly as configured in your plan.
+              </p>
               <p><strong>Start Date Resolution:</strong>
                 <ul className="list-disc pl-4 mt-1 space-y-1">
                   <li><em>Annual (Jan 1st):</em> Simulates paths starting on Jan 1st of each calendar year (~125 paths).</li>
@@ -1605,11 +1613,14 @@ export function AnalysisTab() {
               <p>
                 For each simulated spending level, the engine overrides all retirement spending phases with that flat level, clears additional/lumpy expenses for a clean baseline check, and calculates the success rate.
               </p>
+              <p className="text-xs text-slate-500 italic">
+                Under <strong>Plan Rates</strong>, the simulation uses your plan's configured return rates. Under <strong>Historical Rates</strong>, it overrides return rates with chronological market returns based on the selected <strong>Asset Allocation</strong>. All other plan details—such as expected inflation, income, tax, and drawdown strategy—remain exactly as configured in your plan.
+              </p>
               <p>
                 This allows you to visualize how sensitive your plan's viability is to different levels of ongoing basic retirement expenses.
               </p>
               <p>
-                The <strong>Flat Spending Success Rate</strong> curve (red line) simulates a simplified plan with constant baseline spending and no additional/lumpy expenses. Your <strong>Full Configured Plan</strong> (gold diamond) includes all your custom spending phases and extra/lumpy expenses. If your actual plan has higher spending later or large one-time expenses, the gold diamond will naturally sit below the red curve.
+                The <strong>Configured Plan Success Rate</strong> stats card displays the success rate of your plan exactly as configured (including all custom spending phases and additional/lumpy expenses). The curve plots the success rate of a simplified baseline plan with a flat spending level and no additional/lumpy expenses.
               </p>
             </div>
           }
@@ -1829,8 +1840,11 @@ export function AnalysisTab() {
                 <li><strong>Stop Saving Today</strong> — Simulates the portfolio trajectory if all future contributions are immediately set to $0 starting today.</li>
                 <li><strong>Stop Saving at Coast Age</strong> — Shows the trajectory if you keep saving until your Coast FIRE age, and then stop all contributions. Where this path diverges is the exact milestone age you can "coast" from.</li>
               </ul>
+              <p className="text-xs text-slate-500 italic">
+                To test stopping dates, the calculator overrides future retirement contributions (TFSA, RRSP, and Non-Registered) to $0 starting in the test year. Under <strong>Plan Rates</strong>, it uses the plan's configured return rates. Under <strong>Historical Rates</strong>, it overrides return rates with chronological market returns based on the selected <strong>Asset Allocation</strong>. All other plan details—such as expected inflation, income, tax, spending phases, additional/lumpy expenses, and drawdown strategy—remain exactly as configured in your plan.
+              </p>
               <p>
-                <em>This account-based analysis automatically includes all pensions, government benefits (CPP/OAS), lumpy expenses (such as home sales), inflation, and tax brackets. It can also stress-test your plan against actual historical market sequences.</em>
+                <em>This account-based analysis automatically includes all pensions, government benefits (CPP/OAS), lumpy expenses (such as home sales), inflation, and tax brackets.</em>
               </p>
             </div>
           }
@@ -2179,6 +2193,9 @@ export function AnalysisTab() {
           info={
             <div className="space-y-2 text-sm">
               <p>The CPP / OAS timing optimizer sweeps start ages to find the household-lifetime-benefit-maximising ages for each person independently.</p>
+              <p className="text-xs text-slate-500 italic">
+                The optimizer temporarily overrides your plan's configured <strong>CPP and OAS start ages</strong> to sweep all combinations. All other plan settings—such as expected return rates, inflation, income, spending phases, additional/lumpy expenses, and other dashboard overrides—remain exactly as configured in your plan.
+              </p>
               <p><strong>CPP sweep (ages 60–70)</strong> — The objective is total household CPP collected across all plan years, including survivor benefits. Because the combined CPP cap for the surviving spouse scales with the <em>survivor's own deferral factor</em>, the optimal start age for one person depends on whether the other person is likely to predecease them: a later start by B raises B's cap, potentially allowing more of A's CPP to transfer on A's death.</p>
               <p><strong>OAS sweep (ages 65–70)</strong> — The objective is total household net OAS: gross OAS minus clawback paid. Each month of deferral past 65 adds +0.6% to the monthly benefit (maximum +36% at 70). For high-income households where OAS is fully clawed back, the optimal OAS start age may still be 65 because you collect more total benefits before the income threshold becomes binding.</p>
               <p><strong>How to read the charts</strong> — Each chart shows a line connecting all tested start ages. The red filled dot marks the optimal age; a hollow grey circle marks the currently configured age (when it differs from optimal). All other ages are shown as small grey dots.</p>
@@ -2380,6 +2397,9 @@ export function AnalysisTab() {
           info={
             <div className="space-y-2 text-sm">
               <p>The meltdown optimizer sweeps the <strong>Gross Income Ceiling</strong> parameter of the Cover Spending Gap strategy to find the ceiling that minimises lifetime income tax paid.</p>
+              <p className="text-xs text-slate-500 italic">
+                The optimizer temporarily overrides your plan's configured <strong>Drawdown Strategy</strong> to Cover Spending Gap and sweeps the <strong>Gross Income Ceiling</strong> for each person. All other plan details—such as expected return rates, inflation, income, spending phases, TFSA/Non-Registered contribution rules, and other dashboard overrides—remain exactly as configured in your plan.
+              </p>
               <p>The <strong>meltdown phase</strong> runs from the year a person retires until the year before their RRSP converts to a RRIF. During this window the engine can proactively draw RRSP up to a gross income ceiling, filling tax brackets that would otherwise be wasted — reducing the mandatory RRIF minimums that follow, which are taxed at higher marginal rates.</p>
               <p><strong>How to read the chart</strong> — The x-axis is the gross income ceiling in today's dollars. The y-axis is lifetime household tax (OAS clawback is counted as tax). The red dashed line marks the optimal ceiling where the curve reaches its minimum. The grey dotted line marks the income floor: the average gross income from non-RRSP sources in those years — below it, the ceiling has no effect. A dotted amber line marks where the OAS clawback starts; a dashed amber line marks the income at which OAS is fully clawed back. The sweep extends past full clawback so you can see whether a minimum exists inside or outside the clawback zone — for large RRSPs the meltdown savings can outweigh the clawback cost.</p>
               <p><strong>Each person's sweep is independent</strong> — when sweeping one person's ceiling, the other's is held at zero. The result reflects the marginal contribution of each person's meltdown draws.</p>
