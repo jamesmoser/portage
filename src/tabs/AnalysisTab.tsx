@@ -1264,15 +1264,18 @@ export function AnalysisTab() {
                 </div>
   
                 {/* Fan chart */}
-                <PlotlyChart
-                  data={mcTraces}
-                  layout={{
-                    yaxis: { tickformat: ',.0f', title: { text: 'Portfolio', font: { size: 11 } } },
-                    xaxis: { title: { text: 'Year', font: { size: 11 } } },
-                    legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
-                  }}
-                  style={{ height: 380 }}
-                />
+                <div>
+                  <div className="text-sm font-semibold mb-2 text-slate-700">Monte Carlo Portfolio Projections</div>
+                  <PlotlyChart
+                    data={mcTraces}
+                    layout={{
+                      yaxis: { tickformat: ',.0f', title: { text: 'Portfolio', font: { size: 11 } } },
+                      xaxis: { title: { text: 'Year', font: { size: 11 } } },
+                      legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                    }}
+                    style={{ height: 380 }}
+                  />
+                </div>
   
                 {/* Milestone Px table */}
                 <div className="mt-4 overflow-x-auto rounded border border-slate-200">
@@ -1406,42 +1409,42 @@ export function AnalysisTab() {
               <div className="space-y-6">
               {/* Stats tiles */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-500 font-medium">Historical Success Rate</div>
-                  <div className="text-3xl font-bold mt-1" style={{ color: '#7B1515' }}>
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-400">Historical Success Rate</div>
+                  <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
                     {(histResult.successRate * 100).toFixed(1)}%
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400">
                     {histResult.paths.length - histResult.depletionCount} of {histResult.paths.length} periods survived
                   </div>
                 </div>
 
-                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-500 font-medium">Worst Start Period</div>
-                  <div className="text-lg font-bold mt-1 text-slate-700 truncate">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-400">Worst Start Period</div>
+                  <div className="text-2xl font-bold mt-0.5 truncate" style={{ color: '#7B1515' }}>
                     {histResult.worstYearLabel}
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400">
                     Ended with {histResult.worstYearBalance < 1000 ? 'Depletion' : fmt(histResult.worstYearBalance)}
                   </div>
                 </div>
 
-                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-500 font-medium">Best Start Period</div>
-                  <div className="text-lg font-bold mt-1 text-slate-700 truncate">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-400">Best Start Period</div>
+                  <div className="text-2xl font-bold mt-0.5 truncate" style={{ color: '#7B1515' }}>
                     {histResult.bestYearLabel}
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400">
                     Ended with {fmt(histResult.bestYearBalance)}
                   </div>
                 </div>
 
-                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-500 font-medium">Median Final Balance</div>
-                  <div className="text-lg font-bold mt-1 text-slate-700 truncate">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-400">Median Final Balance</div>
+                  <div className="text-2xl font-bold mt-0.5 truncate" style={{ color: '#7B1515' }}>
                     {fmt(histResult.medianFinalBalance)}
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400">
                     todays value across all periods
                   </div>
                 </div>
@@ -1449,7 +1452,7 @@ export function AnalysisTab() {
 
               {/* Spaghetti Plot */}
               <div>
-                <div className="text-sm font-semibold mb-2 text-slate-700">Historical Portfolio Paths (aligned by age)</div>
+                <div className="text-sm font-semibold mb-2 text-slate-700">Projections for Historical Periods Since {histStartYear}</div>
                 <PlotlyChart
                   data={histChartTraces}
                   layout={{
@@ -1462,44 +1465,46 @@ export function AnalysisTab() {
               </div>
 
               {/* Scrollable details table of historical periods */}
-              <div>
-                <div className="text-sm font-semibold mb-2 text-slate-700">All Historical Simulation Paths (Worst First)</div>
-                <div className="overflow-x-auto rounded border border-slate-200 max-h-80 overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 sticky top-0 z-10">
-                        <th className="px-3 py-2 text-left font-medium">Start Year</th>
-                        <th className="px-3 py-2 text-center font-medium">Status</th>
-                        <th className="px-3 py-2 text-center font-medium">Depletion Age</th>
-                        <th className="px-3 py-2 text-right font-medium">Final Portfolio Balance</th>
+              <div className="overflow-x-auto rounded border border-slate-200 max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-slate-50">
+                    <tr className="bg-slate-50">
+                      <th colSpan={4} className="px-3 py-2 text-left font-medium text-slate-700 shadow-[inset_0_-1px_0_0_#e2e8f0]">
+                        Historical Periods Sorted By Performance
+                      </th>
+                    </tr>
+                    <tr className="bg-slate-50 text-slate-500">
+                      <th className="px-3 py-2 text-left font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Start Year</th>
+                      <th className="px-3 py-2 text-center font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Status</th>
+                      <th className="px-3 py-2 text-center font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Depletion Age</th>
+                      <th className="px-3 py-2 text-right font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Final Portfolio Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {histSortedPaths.map((p, idx) => (
+                      <tr key={idx} className={`hover:bg-slate-50/50 ${p.depleted ? 'bg-red-50/20' : ''}`}>
+                        <td className="px-3 py-2 font-medium text-slate-700">{p.label}</td>
+                        <td className="px-3 py-2 text-center">
+                          {p.depleted ? (
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">
+                              Depleted
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+                              Succeeded
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center text-slate-600">
+                          {p.depleted && p.depletionAge ? `${p.depletionAge} yrs` : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-slate-700">
+                          {fmt(p.finalBalance)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {histSortedPaths.map((p, idx) => (
-                        <tr key={idx} className={`hover:bg-slate-50/50 ${p.depleted ? 'bg-red-50/20' : ''}`}>
-                          <td className="px-3 py-2 font-medium text-slate-700">{p.label}</td>
-                          <td className="px-3 py-2 text-center">
-                            {p.depleted ? (
-                              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">
-                                Depleted
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                Succeeded
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-center text-slate-600">
-                            {p.depleted && p.depletionAge ? `${p.depletionAge} yrs` : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono text-slate-700">
-                            {fmt(p.finalBalance)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
             </>
@@ -1588,22 +1593,22 @@ export function AnalysisTab() {
               <div className="space-y-6">
               {/* Stats tiles */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-500 font-medium">Full Plan Success Rate</div>
-                  <div className="text-3xl font-bold mt-1" style={{ color: '#d97706' }}>
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-400">Full Plan Success Rate</div>
+                  <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
                     {(sweepResult.currentSuccessRate * 100).toFixed(1)}%
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400">
                     Includes all configured spending phases and extra expenses
                   </div>
                 </div>
 
-                <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-500 font-medium">P90 Sustainable Spending</div>
-                  <div className="text-3xl font-bold mt-1 text-slate-800">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                  <div className="text-xs text-slate-400">P90 Sustainable Spending</div>
+                  <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
                     {p90SpendingLabel}
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400">
                     Sustainable spending with at least 90% survival rate
                   </div>
                 </div>
@@ -1612,7 +1617,7 @@ export function AnalysisTab() {
               {/* Chart & Benchmarks Table */}
               <div className="flex flex-col lg:flex-row gap-6">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold mb-2 text-slate-700">Success Rate vs. Base Spending (rolling periods)</div>
+                  <div className="text-sm font-semibold mb-2 text-slate-700">Success Rate at Base Spending Levels</div>
                   <PlotlyChart
                     data={sweepChartTraces}
                     layout={{
@@ -1953,7 +1958,9 @@ export function AnalysisTab() {
                     {/* Plotly Chart (Left Side) */}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold mb-2 text-slate-700">
-                        Coast FIRE Portfolio Trajectory ({coastRateType === 'plan' ? `Constant Return` : `Historical ${coastPlotMetric === 'worst' ? 'Worst Cases' : 'Medians'}`} to Year {endYear})
+                        {coastRateType === 'plan'
+                          ? 'Projections based on Configured Plan Rates'
+                          : `Projections for Historical Periods Since ${coastStartYear}`}
                       </div>
                       <PlotlyChart
                         data={coastChartTraces}
@@ -2127,15 +2134,15 @@ export function AnalysisTab() {
                   {/* ── CPP column ── */}
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                         <div className="text-xs text-slate-400">{aName} — CPP Start</div>
-                        <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeA}</div>
-                        <div className="text-xs mt-0.5">{deltaLabel(cppDeltaA)}</div>
+                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeA}</div>
+                        <div className="text-xs text-slate-400">{deltaLabel(cppDeltaA)}</div>
                       </div>
-                      <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                         <div className="text-xs text-slate-400">{bName} — CPP Start</div>
-                        <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeB}</div>
-                        <div className="text-xs mt-0.5">{deltaLabel(cppDeltaB)}</div>
+                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeB}</div>
+                        <div className="text-xs text-slate-400">{deltaLabel(cppDeltaB)}</div>
                       </div>
                     </div>
                     {(() => {
@@ -2143,17 +2150,22 @@ export function AnalysisTab() {
                         govResult.cppSweepA, 'cpp', govResult.optimalCppAgeA, govResult.baseCppAgeA,
                       )
                       return (
-                        <PlotlyChart
-                          data={[trace]}
-                          layout={{
-                            annotations,
-                            xaxis: { title: { text: `${aName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
-                            yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
-                            showlegend: false,
-                            margin: { t: 12, r: 12, b: 48, l: 80 },
-                          }}
-                          style={{ height: 220 }}
-                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-700 mb-1">
+                            {aName} — CPP Sweep
+                          </div>
+                          <PlotlyChart
+                            data={[trace]}
+                            layout={{
+                              annotations,
+                              xaxis: { title: { text: `${aName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
+                              yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
+                              showlegend: false,
+                              margin: { t: 12, r: 12, b: 48, l: 80 },
+                            }}
+                            style={{ height: 220 }}
+                          />
+                        </div>
                       )
                     })()}
                     {(() => {
@@ -2161,17 +2173,22 @@ export function AnalysisTab() {
                         govResult.cppSweepB, 'cpp', govResult.optimalCppAgeB, govResult.baseCppAgeB,
                       )
                       return (
-                        <PlotlyChart
-                          data={[trace]}
-                          layout={{
-                            annotations,
-                            xaxis: { title: { text: `${bName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
-                            yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
-                            showlegend: false,
-                            margin: { t: 12, r: 12, b: 48, l: 80 },
-                          }}
-                          style={{ height: 220 }}
-                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-700 mb-1">
+                            {bName} — CPP Sweep
+                          </div>
+                          <PlotlyChart
+                            data={[trace]}
+                            layout={{
+                              annotations,
+                              xaxis: { title: { text: `${bName}'s CPP Start Age`, font: { size: 11 } }, dtick: 1 },
+                              yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household CPP ($)', font: { size: 11 } } },
+                              showlegend: false,
+                              margin: { t: 12, r: 12, b: 48, l: 80 },
+                            }}
+                            style={{ height: 220 }}
+                          />
+                        </div>
                       )
                     })()}
                   </div>
@@ -2179,15 +2196,15 @@ export function AnalysisTab() {
                   {/* ── OAS column ── */}
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                         <div className="text-xs text-slate-400">{aName} — OAS Start</div>
-                        <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeA}</div>
-                        <div className="text-xs mt-0.5">{deltaLabel(oasDeltaA)}</div>
+                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeA}</div>
+                        <div className="text-xs text-slate-400">{deltaLabel(oasDeltaA)}</div>
                       </div>
-                      <div className="bg-white rounded border border-slate-200 p-2.5">
+                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                         <div className="text-xs text-slate-400">{bName} — OAS Start</div>
-                        <div className="text-xl font-bold" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeB}</div>
-                        <div className="text-xs mt-0.5">{deltaLabel(oasDeltaB)}</div>
+                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeB}</div>
+                        <div className="text-xs text-slate-400">{deltaLabel(oasDeltaB)}</div>
                       </div>
                     </div>
                     {(() => {
@@ -2195,17 +2212,22 @@ export function AnalysisTab() {
                         govResult.oasSweepA, 'oas', govResult.optimalOasAgeA, govResult.baseOasAgeA,
                       )
                       return (
-                        <PlotlyChart
-                          data={[trace]}
-                          layout={{
-                            annotations,
-                            xaxis: { title: { text: `${aName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
-                            yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
-                            showlegend: false,
-                            margin: { t: 12, r: 12, b: 48, l: 80 },
-                          }}
-                          style={{ height: 220 }}
-                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-700 mb-1">
+                            {aName} — OAS Sweep
+                          </div>
+                          <PlotlyChart
+                            data={[trace]}
+                            layout={{
+                              annotations,
+                              xaxis: { title: { text: `${aName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
+                              yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
+                              showlegend: false,
+                              margin: { t: 12, r: 12, b: 48, l: 80 },
+                            }}
+                            style={{ height: 220 }}
+                          />
+                        </div>
                       )
                     })()}
                     {(() => {
@@ -2213,17 +2235,22 @@ export function AnalysisTab() {
                         govResult.oasSweepB, 'oas', govResult.optimalOasAgeB, govResult.baseOasAgeB,
                       )
                       return (
-                        <PlotlyChart
-                          data={[trace]}
-                          layout={{
-                            annotations,
-                            xaxis: { title: { text: `${bName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
-                            yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
-                            showlegend: false,
-                            margin: { t: 12, r: 12, b: 48, l: 80 },
-                          }}
-                          style={{ height: 220 }}
-                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-700 mb-1">
+                            {bName} — OAS Sweep
+                          </div>
+                          <PlotlyChart
+                            data={[trace]}
+                            layout={{
+                              annotations,
+                              xaxis: { title: { text: `${bName}'s OAS Start Age`, font: { size: 11 } }, dtick: 1 },
+                              yaxis: { tickformat: ',.0f', title: { text: 'Lifetime Household Net OAS ($)', font: { size: 11 } } },
+                              showlegend: false,
+                              margin: { t: 12, r: 12, b: 48, l: 80 },
+                            }}
+                            style={{ height: 220 }}
+                          />
+                        </div>
                       )
                     })()}
                   </div>
@@ -2334,15 +2361,17 @@ export function AnalysisTab() {
                           style={{ height: 300 }}
                         />
                         <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                          <div className="bg-white rounded border border-slate-200 p-2.5">
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                             <div className="text-xs text-slate-400">Optimal Ceiling</div>
-                            <div className="font-bold" style={{ color: '#7B1515' }}>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
                               {meltResult.optimalCeilingA !== null ? fmt(meltResult.optimalCeilingA) : '—'}
                             </div>
                           </div>
-                          <div className="bg-white rounded border border-slate-200 p-2.5">
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                             <div className="text-xs text-slate-400">Income Floor</div>
-                            <div className="font-semibold text-slate-700">{fmt(meltResult.incomeFloorA)}</div>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                              {fmt(meltResult.incomeFloorA)}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2378,15 +2407,17 @@ export function AnalysisTab() {
                           style={{ height: 300 }}
                         />
                         <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                          <div className="bg-white rounded border border-slate-200 p-2.5">
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                             <div className="text-xs text-slate-400">Optimal Ceiling</div>
-                            <div className="font-bold" style={{ color: '#7B1515' }}>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
                               {meltResult.optimalCeilingB !== null ? fmt(meltResult.optimalCeilingB) : '—'}
                             </div>
                           </div>
-                          <div className="bg-white rounded border border-slate-200 p-2.5">
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                             <div className="text-xs text-slate-400">Income Floor</div>
-                            <div className="font-semibold text-slate-700">{fmt(meltResult.incomeFloorB)}</div>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                              {fmt(meltResult.incomeFloorB)}
+                            </div>
                           </div>
                         </div>
                       </div>
