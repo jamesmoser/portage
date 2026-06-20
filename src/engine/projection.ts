@@ -215,6 +215,19 @@ export function runProjection(state: AppState, rateSchedule?: number[]): Project
       }
     }
 
+    if (state.insuranceEvent && state.insuranceEvent.year === year) {
+      const proceedsNom = state.insuranceEvent.amount
+      if (state.insuranceEvent.account === 'hisa') {
+        hisa += proceedsNom
+      } else if (state.insuranceEvent.account === 'nonRegA') {
+        nonRegA += proceedsNom
+        nonRegAcbA += proceedsNom
+      } else if (state.insuranceEvent.account === 'nonRegB') {
+        nonRegB += proceedsNom
+        nonRegAcbB += proceedsNom
+      }
+    }
+
     // ── RRIF minimums (annual — based on Jan 1 balance and Jan 1 age) ────────
     const isRrifA = aAlive && onOrAfter(dateStr, state.rrspA.rrifConversionDate)
     const isRrifB = bAlive && onOrAfter(dateStr, state.rrspB.rrifConversionDate)

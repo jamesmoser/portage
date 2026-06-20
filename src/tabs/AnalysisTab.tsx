@@ -25,6 +25,8 @@ import { runGovBenefitOptimizer } from '../engine/govBenefitOptimizer'
 import type { GovBenefitOptimizerResult } from '../engine/govBenefitOptimizer'
 import { runHistoricalAnalysis, runSpendingSweep, interpolateMonotoneCubic } from '../engine/historicalAnalysis'
 import type { HistoricalAnalysisResult, HistoricalPathResult, SpendingSweepPoint } from '../engine/historicalAnalysis'
+import { runInsuranceAnalysis } from '../engine/insuranceAnalyser'
+import type { InsuranceAnalyserResult, InsuranceSweepPoint } from '../engine/insuranceAnalyser'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
@@ -876,6 +878,33 @@ export function AnalysisTab() {
       setCoastActiveResultType('historical')
       setCoastRunning(false)
     }, 20)
+  }
+
+  // ── Life Insurance Needs Analyser state ───────────────────────────────────
+  const [insDepositAccount, setInsDepositAccount] = useState<'hisa' | 'nonReg'>('hisa')
+  const [insSweepStart, setInsSweepStart] = useState<'current' | 'retirement'>('current')
+  const [insCurrencyMode, setInsCurrencyMode] = useState<'pd' | 'nominal'>('nominal')
+  const [insResult, setInsResult] = useState<InsuranceAnalyserResult | null>(null)
+  const [insRunning, setInsRunning] = useState(false)
+
+  function runInsAnalyser() {
+    setInsRunning(true)
+    setTimeout(() => {
+      const res = runInsuranceAnalysis(effectiveState, rateSchedule, {
+        depositAccount: insDepositAccount,
+        sweepStart: insSweepStart,
+        stepSize: 1,
+      })
+      setInsResult(res)
+      setInsRunning(false)
+    }, 20)
+  }
+
+  function resetInsAnalyser() {
+    setInsDepositAccount('hisa')
+    setInsSweepStart('current')
+    setInsCurrencyMode('nominal')
+    setInsResult(null)
   }
 
   // ── Meltdown chart builder ────────────────────────────────────────────────
@@ -2178,6 +2207,313 @@ export function AnalysisTab() {
                     </div>
                   </div>
                   </>
+                )}
+              </>
+            )
+          })()}
+        </SectionCard>
+
+        {/* ── Life Insurance Needs Analyser ─────────────────────────────────────────── */}
+        <SectionCard
+          title="Life Insurance Needs Analyser"
+          width="full"
+          onReset={resetInsAnalyser}
+          info={
+            <div className="space-y-2 text-sm">
+              <p>
+                The <strong>Life Insurance Needs Analyser</strong> sweeps combinations of death ages for both spouses to calculate the exact lump sum of life insurance needed at the time of the first death to fund all future spending goals without shortfalls.
+              </p>
+              <p>
+                <strong>Exact calculation via Bisection Search</strong> — Unlike static shortfall sums, the analyser uses a binary root-finding algorithm, running the entire projection engine repeatedly. This determines the exact nominal payout needed to prevent shortfalls, fully accounting for spousal rollovers, tax bracket changes (filing as single), CPP/OAS survivor benefits, and drawdown strategy sequencing.
+              </p>
+              <p className="text-xs text-slate-500 italic">
+                All calculations use your current plan's configured return rates, tax settings, and drawdown strategy. If a survivor phase is configured in your spending plan, it is automatically applied upon first death.
+              </p>
+              <p><strong>Deposit Destination:</strong>
+                <ul className="list-disc pl-4 mt-1 space-y-1">
+                  <li><em>HISA:</em> Injects the payout into the joint HISA cash pool, growing at HISA interest rates.</li>
+                  <li><em>Surviving Spouse's Non-Registered Account:</em> Injects the payout into the survivor's taxable portfolio, generating interest/dividends and calculating the exact annual tax drag and potential OAS clawback impact.</li>
+                </ul>
+              </p>
+              <p><strong>Sweep Range:</strong> Choose whether the sweep starts from your <em>Current Age</em> (recommended to capture pre-retirement coverage gaps) or <em>Retirement Age</em>. The sweep ends at the maximum planned death age of either spouse.</p>
+              <p><strong>Display Mode:</strong> Toggle between <em>Today's Dollars</em> (present purchasing power) and <em>Nominal Policy Value</em> (the actual nominal policy size you would need to buy today to cover that death year).</p>
+            </div>
+          }
+        >
+          {/* Controls */}
+          <div className="flex items-end gap-4 mb-4 flex-wrap">
+            <button className="btn-primary" onClick={runInsAnalyser} disabled={insRunning}>
+              {insRunning ? 'Running…' : insResult ? 'Re-Run' : 'Run'}
+            </button>
+
+            <SelectInput
+              label="Deposit Destination"
+              value={insDepositAccount}
+              onChange={v => setInsDepositAccount(v as 'hisa' | 'nonReg')}
+              options={[
+                { value: 'hisa', label: 'HISA' },
+                { value: 'nonReg', label: 'Surviving Non-Reg' },
+              ]}
+              tooltip="Where the insurance benefit is deposited at the time of death"
+            />
+
+            <SelectInput
+              label="Sweep Start"
+              value={insSweepStart}
+              onChange={v => setInsSweepStart(v as 'current' | 'retirement')}
+              options={[
+                { value: 'current', label: 'Current Age' },
+                { value: 'retirement', label: 'Retirement Age' },
+              ]}
+              tooltip="The starting age for sweeping spouse death ages"
+            />
+          </div>
+
+          {insRunning && (
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running life insurance analyser…</span>
+              </div>
+            </div>
+          )}
+
+          {!insRunning && !insResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Select options and click "Run" to analyze life insurance needs.</span>
+            </div>
+          )}
+
+          {insResult && !insRunning && (() => {
+            const isPd = insCurrencyMode === 'pd'
+            const currencyLabel = isPd ? "today's $" : "nominal"
+            const zData = insResult.sweep2D.map(row => row.map(p => isPd ? p.lumpSumPd : p.lumpSumNom)) || []
+            const maxZ = zData.length > 0 ? Math.max(...zData.flatMap(row => row)) : 0
+            const zmin = 0
+            const zmax = Math.max(100000, maxZ)
+
+            // Find peak points across the entire 2D sweep (not capped at baseline surviving spouse death age)
+            const jamesEarlyPoints = insResult.sweep2D.flatMap(row => row.filter(p => p.beneficiary === 'personB'))
+            const peakPointA = jamesEarlyPoints.reduce((prev, curr) => {
+              const valPrev = isPd ? prev.lumpSumPd : prev.lumpSumNom
+              const valCurr = isPd ? curr.lumpSumPd : curr.lumpSumNom
+              return valCurr > valPrev ? curr : prev
+            }, jamesEarlyPoints[0] || insResult.sweep1D_A[0])
+
+            const sandiEarlyPoints = insResult.sweep2D.flatMap(row => row.filter(p => p.beneficiary === 'personA'))
+            const peakPointB = sandiEarlyPoints.reduce((prev, curr) => {
+              const valPrev = isPd ? prev.lumpSumPd : prev.lumpSumNom
+              const valCurr = isPd ? curr.lumpSumPd : curr.lumpSumNom
+              return valCurr > valPrev ? curr : prev
+            }, sandiEarlyPoints[0] || insResult.sweep1D_B[0])
+
+            // Find configured planning death age points
+            const confPointA = insResult.sweep1D_A.find(p => p.ageA === effectiveState.personA.planningEndAge) || insResult.sweep1D_A[insResult.sweep1D_A.length - 1]
+            const confPointB = insResult.sweep1D_B.find(p => p.ageB === effectiveState.personB.planningEndAge) || insResult.sweep1D_B[insResult.sweep1D_B.length - 1]
+
+            // Calculate min/max ages for heatmap guidelines
+            const minAgeA = Math.min(...insResult.sweep2D.map(row => row[0].ageA))
+            const maxAgeA = Math.max(...insResult.sweep2D.map(row => row[0].ageA))
+            const minAgeB = Math.min(...insResult.sweep2D[0].map(p => p.ageB))
+            const maxAgeB = Math.max(...insResult.sweep2D[0].map(p => p.ageB))
+
+            return (
+              <>
+                <div className="border-t border-slate-200 my-6" />
+
+                {/* Display Mode Segmented Control */}
+                <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
+                  <div className="text-sm font-semibold text-slate-800">
+                    Required Life Insurance
+                  </div>
+                  <div className="inline-flex rounded-md shadow-sm bg-slate-100 p-0.5" role="group">
+                    <button
+                      type="button"
+                      onClick={() => setInsCurrencyMode('nominal')}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                        insCurrencyMode === 'nominal'
+                          ? 'bg-white text-slate-800 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Nominal Policy Face Value
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInsCurrencyMode('pd')}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                        insCurrencyMode === 'pd'
+                          ? 'bg-white text-slate-800 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Today's Dollars
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats Tiles */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  {/* Person A Peak */}
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs font-semibold text-slate-500">Life Insurance Needed for {aName} (Peak)</div>
+                    <div className="text-xl font-bold mt-1 text-red-800">
+                      {fmt(isPd ? peakPointA.lumpSumPd : peakPointA.lumpSumNom)}
+                    </div>
+                    <div className="text-slate-400 mt-1" style={{ fontSize: '10px', lineHeight: '1.2' }}>
+                      {aName} dies at <span className="font-semibold text-slate-600">{peakPointA.ageA}</span>, {bName} survives until <span className="font-semibold text-slate-600">{peakPointA.ageB}</span>
+                    </div>
+                  </div>
+
+                  {/* Person A Configured */}
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs font-semibold text-slate-500">Life Insurance Needed for {aName} (At {bName}'s Death)</div>
+                    <div className="text-xl font-bold mt-1 text-red-800">
+                      {fmt(isPd ? confPointA.lumpSumPd : confPointA.lumpSumNom)}
+                    </div>
+                    <div className="text-slate-400 mt-1" style={{ fontSize: '10px', lineHeight: '1.2' }}>
+                      {aName} dies at <span className="font-semibold text-slate-600">{confPointA.ageA}</span>, {bName} survives until <span className="font-semibold text-slate-600">{confPointA.ageB}</span>
+                    </div>
+                  </div>
+
+                  {/* Person B Peak */}
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs font-semibold text-slate-500">Life Insurance Needed for {bName} (Peak)</div>
+                    <div className="text-xl font-bold mt-1 text-red-800">
+                      {fmt(isPd ? peakPointB.lumpSumPd : peakPointB.lumpSumNom)}
+                    </div>
+                    <div className="text-slate-400 mt-1" style={{ fontSize: '10px', lineHeight: '1.2' }}>
+                      {bName} dies at <span className="font-semibold text-slate-600">{peakPointB.ageB}</span>, {aName} survives until <span className="font-semibold text-slate-600">{peakPointB.ageA}</span>
+                    </div>
+                  </div>
+
+                  {/* Person B Configured */}
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs font-semibold text-slate-500">Life Insurance Needed for {bName} (At {aName}'s Death)</div>
+                    <div className="text-xl font-bold mt-1 text-red-800">
+                      {fmt(isPd ? confPointB.lumpSumPd : confPointB.lumpSumNom)}
+                    </div>
+                    <div className="text-slate-400 mt-1" style={{ fontSize: '10px', lineHeight: '1.2' }}>
+                      {bName} dies at <span className="font-semibold text-slate-600">{confPointB.ageB}</span>, {aName} survives until <span className="font-semibold text-slate-600">{confPointB.ageA}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Heatmap Section */}
+                <div>
+                  <div className="text-sm font-semibold mb-2 text-slate-700">
+                    Required Life Insurance Heatmap
+                  </div>
+                  <PlotlyChart
+                    data={[
+                      {
+                         x: insResult.sweep2D[0]?.map(p => p.ageB) || [],
+                        y: insResult.sweep2D.map(row => row[0].ageA) || [],
+                        z: zData,
+                        type: 'heatmap',
+                        zmin: zmin,
+                        zmax: zmax,
+                        colorscale: [
+                          [0, '#f8fafc'],       // Slate-50 background (no insurance needed)
+                          [0.01, '#fee2e2'],    // Soft red-100 (some insurance needed)
+                          [1.0, '#7B1515']      // Brand red (max insurance needed)
+                        ],
+                        showscale: true,
+                        colorbar: {
+                          title: { text: isPd ? "Today's $" : "Nominal $", font: { size: 11 } },
+                          thickness: 15,
+                          len: 0.8
+                        },
+                        hovertemplate: `${aName} dies age %{y}<br>${bName} dies age %{x}<br>Required: $%{z:,.0f}<extra></extra>`
+                      }
+                    ]}
+                    layout={{
+                      xaxis: {
+                        title: { text: `${bName}'s Age at Death`, font: { size: 12 } },
+                        gridcolor: '#e2e8f0',
+                        dtick: 5,
+                        range: [minAgeB - 0.5, maxAgeB + 0.5]
+                      },
+                      yaxis: {
+                        title: { text: `${aName}'s Age at Death`, font: { size: 12 } },
+                        gridcolor: '#e2e8f0',
+                        dtick: 5,
+                        range: [minAgeA - 0.5, maxAgeA + 0.5]
+                      },
+                      shapes: [
+                        // Vertical guideline at Sandi (B)'s configured plan death age
+                        {
+                          type: 'line',
+                          xref: 'x',
+                          yref: 'y',
+                          x0: effectiveState.personB.planningEndAge,
+                          y0: minAgeA,
+                          x1: effectiveState.personB.planningEndAge,
+                          y1: maxAgeA,
+                          line: {
+                            color: '#475569',
+                            width: 2,
+                            dash: 'dash'
+                          }
+                        },
+                        // Horizontal guideline at James (A)'s configured plan death age
+                        {
+                          type: 'line',
+                          xref: 'x',
+                          yref: 'y',
+                          x0: minAgeB,
+                          y0: effectiveState.personA.planningEndAge,
+                          x1: maxAgeB,
+                          y1: effectiveState.personA.planningEndAge,
+                          line: {
+                            color: '#475569',
+                            width: 2,
+                            dash: 'dash'
+                          }
+                        }
+                      ],
+                      annotations: [
+                        {
+                          x: effectiveState.personB.planningEndAge,
+                          y: effectiveState.personA.planningEndAge,
+                          text: `Plan Configured Death Ages<br>(${aName}: ${effectiveState.personA.planningEndAge}, ${bName}: ${effectiveState.personB.planningEndAge})`,
+                          showarrow: true,
+                          arrowhead: 2,
+                          arrowcolor: '#1e293b',
+                          arrowsize: 1,
+                          arrowwidth: 1.5,
+                          ax: -80,
+                          ay: -50,
+                          bgcolor: 'rgba(255, 255, 255, 0.95)',
+                          bordercolor: '#475569',
+                          borderwidth: 1,
+                          borderpad: 4,
+                          font: {
+                            size: 10,
+                            color: '#1e293b'
+                          }
+                        }
+                      ],
+                      margin: { t: 20, r: 20, b: 40, l: 70 },
+                      height: 440,
+                    }}
+                  />
+                </div>
+
+                {/* Base Plan Shortfall Alert below the chart */}
+                {insResult.baselineShortfall && (
+                  <div className="mt-4">
+                    <InfoPanel>
+                      <div>
+                        <div className="font-semibold text-slate-800">Base Plan Shortfall Detected</div>
+                        <div className="mt-0.5 text-xs text-slate-600 leading-relaxed">
+                          Your baseline retirement plan already has spending shortfalls under normal longevity assumptions. 
+                          The insurance needed calculations above only reflect the <em>additional</em> lump sum needed to cover gaps caused specifically by early deaths, 
+                          assuming the baseline plan is otherwise funded.
+                        </div>
+                      </div>
+                    </InfoPanel>
+                  </div>
                 )}
               </>
             )

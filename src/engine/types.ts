@@ -533,6 +533,7 @@ export interface AppState {
 
   // Transient — populated by mergeWhatIfs when homeSale what-if is active; never persisted.
   homeSaleEvent?: { date: string; amount: number; account: 'hisa' | 'nonRegA' | 'nonRegB' }
+  insuranceEvent?: { year: number; amount: number; account: 'hisa' | 'nonRegA' | 'nonRegB' }
 }
 
 // ─── Projection Output ────────────────────────────────────────────────────────
