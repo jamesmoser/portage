@@ -1171,8 +1171,17 @@ export function AnalysisTab() {
           )}
   
           {mcRunning && (
-            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
-              Running {mcSimulations.toLocaleString()} simulations…
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running simulation…</span>
+              </div>
+            </div>
+          )}
+
+          {!mcRunning && !mcResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Select options and click "Run" to simulate Monte Carlo outcomes.</span>
             </div>
           )}
   
@@ -1215,6 +1224,7 @@ export function AnalysisTab() {
   
             return (
               <>
+                <div className="border-t border-slate-200 my-6" />
                 {/* Stats tiles */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
@@ -1376,13 +1386,24 @@ export function AnalysisTab() {
           </div>
 
           {histRunning && (
-            <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
-              Running {histResolution === 'monthly' ? '~1,500' : '~120'} rolling historical projections…
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running simulation…</span>
+              </div>
+            </div>
+          )}
+
+          {!histRunning && !histResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Select options and click "Run" to stress-test historical rolling periods.</span>
             </div>
           )}
 
           {histResult && !histRunning && (
-            <div className="space-y-6">
+            <>
+              <div className="border-t border-slate-200 my-6" />
+              <div className="space-y-6">
               {/* Stats tiles */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
@@ -1481,6 +1502,7 @@ export function AnalysisTab() {
                 </div>
               </div>
             </div>
+            </>
           )}
         </SectionCard>
 
@@ -1546,13 +1568,24 @@ export function AnalysisTab() {
           </div>
 
           {sweepRunning && (
-            <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
-              Running spending sweep across rolling historical paths per spending level…
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running simulation…</span>
+              </div>
+            </div>
+          )}
+
+          {!sweepRunning && !sweepResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Select options and click "Run" to sweep sustainable spending levels.</span>
             </div>
           )}
 
           {sweepResult && !sweepRunning && (
-            <div className="space-y-6">
+            <>
+              <div className="border-t border-slate-200 my-6" />
+              <div className="space-y-6">
               {/* Stats tiles */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="bg-white rounded border border-slate-200 shadow-sm p-3 text-center">
@@ -1660,6 +1693,7 @@ export function AnalysisTab() {
                 </div>
               </div>
             </div>
+            </>
           )}
         </SectionCard>
 
@@ -1906,14 +1940,16 @@ export function AnalysisTab() {
 
                 {/* No Result Placeholder */}
                 {!coastRunning && !hasResult && (
-                  <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+                  <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
                     <span>Select options and click "Run" to calculate Coast FIRE.</span>
                   </div>
                 )}
 
                 {/* Results Panel */}
                 {!coastRunning && hasResult && (
-                  <div className="flex flex-col lg:flex-row gap-6">
+                  <>
+                    <div className="border-t border-slate-200 my-6" />
+                    <div className="flex flex-col lg:flex-row gap-6">
                     {/* Plotly Chart (Left Side) */}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold mb-2 text-slate-700">
@@ -2017,6 +2053,7 @@ export function AnalysisTab() {
                       )}
                     </div>
                   </div>
+                  </>
                 )}
               </div>
             )
@@ -2050,8 +2087,17 @@ export function AnalysisTab() {
           </div>
   
           {govRunning && (
-            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
-              Running 34 projections across CPP and OAS start ages…
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running optimizer…</span>
+              </div>
+            </div>
+          )}
+
+          {!govRunning && !govResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Click "Run" to optimize CPP / OAS start ages.</span>
             </div>
           )}
   
@@ -2074,6 +2120,7 @@ export function AnalysisTab() {
   
             return (
               <>
+                <div className="border-t border-slate-200 my-6" />
                 {/* Two-column layout: CPP left, OAS right */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
   
@@ -2223,8 +2270,17 @@ export function AnalysisTab() {
           </div>
   
           {meltRunning && (
-            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
-              Running {(meltSteps + 1) * ((effectiveState.rrspA.balance > 0 || effectiveState.rrspB.balance > 0) ? 2 : 1)} projection sweeps…
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running optimizer…</span>
+              </div>
+            </div>
+          )}
+
+          {!meltRunning && !meltResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Select options and click "Run" to optimize RRSP meltdown ceiling.</span>
             </div>
           )}
   
@@ -2233,9 +2289,12 @@ export function AnalysisTab() {
   
             if (!hasMeltdownA && !hasMeltdownB) {
               return (
-                <p className="text-sm text-slate-500 py-4">
-                  Neither person has a meltdown phase under the current plan. A meltdown phase exists between retirement and RRIF conversion — verify that retirement dates precede the RRIF conversion dates in the Investments tab.
-                </p>
+                <>
+                  <div className="border-t border-slate-200 my-6" />
+                  <p className="text-sm text-slate-500 py-4">
+                    Neither person has a meltdown phase under the current plan. A meltdown phase exists between retirement and RRIF conversion — verify that retirement dates precede the RRIF conversion dates in the Investments tab.
+                  </p>
+                </>
               )
             }
   
@@ -2243,6 +2302,7 @@ export function AnalysisTab() {
   
             return (
               <>
+                <div className="border-t border-slate-200 my-6" />
                 <div className={`grid gap-6 ${bothActive ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
   
                   {/* ── Person A sweep ── */}
