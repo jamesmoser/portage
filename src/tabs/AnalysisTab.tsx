@@ -266,6 +266,8 @@ export function AnalysisTab() {
   }, [histResult])
 
   // ── Sustainable Spending Sweep state ──────────────────────────────────────
+  const [sweepRateType, setSweepRateType] = useState<'plan' | 'historical'>('plan')
+  const [sweepActiveResultType, setSweepActiveResultType] = useState<'plan' | 'historical' | null>(null)
   const [sweepEqAllocation, setSweepEqAllocation] = useState(60)
   const [sweepStartYear, setSweepStartYear] = useState(1871)
   const sweepResolution = 'annual'
@@ -280,15 +282,94 @@ export function AnalysisTab() {
     }
   }, [maxStartYearLimit, sweepStartYear])
 
+  const runSpendingSweepPlan = (
+    state: AppState,
+    rateSched?: number[]
+  ): { points: SpendingSweepPoint[], currentSpending: number, currentSuccessRate: number } => {
+    const retPhases = state.spendingPhases.filter(p => p.annualAmount > 0)
+    const refSpend = retPhases.length > 0 ? retPhases[0].annualAmount : 50000
+
+    const sweepMin = Math.max(10000, Math.floor((refSpend * 0.4) / 10000) * 10000)
+    const sweepMax = Math.max(100000, Math.ceil((refSpend * 2.0) / 10000) * 10000)
+    const step = 10000
+
+    const firstRetirementDate = state.personA.retirementDate <= state.personB.retirementDate
+      ? state.personA.retirementDate
+      : state.personB.retirementDate
+    const refPerson = state.ageReferencePerson === 'personB' ? state.personB : state.personA
+    const retirementAgeForRef = intAgeAt(refPerson.birthDate, firstRetirementDate)
+
+    const points: SpendingSweepPoint[] = []
+
+    for (let sVal = sweepMin; sVal <= sweepMax; sVal += step) {
+      let tempState: AppState = {
+        ...state,
+        spendingPhases: [
+          {
+            id: 'flat-override',
+            label: 'Flat Retirement Spending',
+            startAge: retirementAgeForRef,
+            annualAmount: sVal,
+            growthRatePct: 0
+          }
+        ],
+        additionalSpending: []
+      }
+
+      if (tempState.withdrawalStrategy.drawdownStrategy === 'none') {
+        tempState = {
+          ...tempState,
+          withdrawalStrategy: {
+            ...tempState.withdrawalStrategy,
+            drawdownStrategy: 'spendGap'
+          }
+        }
+      }
+
+      const { dataPoints } = runProjection(tempState, rateSched)
+      const depleted = dataPoints.some(dp => dp.totalPortfolio < 1000)
+      points.push({
+        spending: sVal,
+        successRate: depleted ? 0 : 1
+      })
+    }
+
+    let currentRefState = state
+    if (currentRefState.withdrawalStrategy.drawdownStrategy === 'none') {
+      currentRefState = {
+        ...currentRefState,
+        withdrawalStrategy: {
+          ...currentRefState.withdrawalStrategy,
+          drawdownStrategy: 'spendGap'
+        }
+      }
+    }
+    const { dataPoints } = runProjection(currentRefState, rateSched)
+    const currentDepleted = dataPoints.some(dp => dp.totalPortfolio < 1000)
+
+    return {
+      points,
+      currentSpending: refSpend,
+      currentSuccessRate: currentDepleted ? 0 : 1
+    }
+  }
+
   function runSweep() {
     setSweepRunning(true)
     setTimeout(() => {
-      const res = runSpendingSweep(effectiveState, {
-        equityAllocationPct: sweepEqAllocation,
-        historicalStartYear: sweepStartYear,
-        resolution: sweepResolution,
-      })
-      setSweepResult(res)
+      if (sweepRateType === 'plan') {
+        const res = runSpendingSweepPlan(effectiveState, rateSchedule)
+        setSweepResult(res)
+        setSweepActiveResultType('plan')
+      } else {
+        const res = runSpendingSweep(effectiveState, {
+          equityAllocationPct: sweepEqAllocation,
+          historicalStartYear: sweepStartYear,
+          resolution: sweepResolution,
+        })
+        setSweepResult(res)
+        setSweepActiveResultType('historical')
+      }
       setSweepRunning(false)
     }, 20)
   }
@@ -326,16 +407,7 @@ export function AnalysisTab() {
       }
     ]
 
-    // Add reference dot for user's actual configured plan
-    traces.push({
-      x: [sweepResult.currentSpending],
-      y: [sweepResult.currentSuccessRate * 100],
-      type: 'scatter',
-      mode: 'markers',
-      name: 'Your Configured Plan',
-      marker: { color: '#d97706', size: 12, symbol: 'diamond' },
-      hovertemplate: `<b>Your Configured Plan</b><br>Base Spending: $%{x:,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>`
-    })
+
 
     // Add open circles for benchmarks (if in sweep range)
     const benchmarks = [
@@ -1519,17 +1591,19 @@ export function AnalysisTab() {
           title="Sustainable Spending Sweep"
           width="full"
           onReset={() => {
+            setSweepResult(null)
+            setSweepRateType('plan')
             setSweepEqAllocation(60)
             setSweepStartYear(1871)
-            setSweepResult(null)
+            setSweepActiveResultType(null)
           }}
           info={
             <div className="space-y-2 text-sm">
               <p>
-                The Sustainable Spending Sweep simulates your plan across a range of flat base retirement spending levels using historical rolling periods.
+                The Sustainable Spending Sweep simulates your plan across a range of flat base retirement spending levels using historical rolling periods or plan rates.
               </p>
               <p>
-                For each simulated spending level, the engine overrides all retirement spending phases with that flat level, clears additional/lumpy expenses for a clean baseline check, and calculates the historical success rate.
+                For each simulated spending level, the engine overrides all retirement spending phases with that flat level, clears additional/lumpy expenses for a clean baseline check, and calculates the success rate.
               </p>
               <p>
                 This allows you to visualize how sensitive your plan's viability is to different levels of ongoing basic retirement expenses.
@@ -1547,33 +1621,46 @@ export function AnalysisTab() {
             </button>
 
             <SelectInput
-              label="Asset Allocation"
-              value={sweepEqAllocation.toString()}
-              onChange={v => setSweepEqAllocation(parseInt(v))}
+              label="Rate Simulation"
+              value={sweepRateType}
+              onChange={v => setSweepRateType(v as 'plan' | 'historical')}
               options={[
-                { value: '100', label: '100% Equity / 0% Bond' },
-                { value: '80', label: '80% Equity / 20% Bond' },
-                { value: '60', label: '60% Equity / 40% Bond' },
-                { value: '40', label: '40% Equity / 60% Bond' },
-                { value: '20', label: '20% Equity / 80% Bond' },
+                { value: 'plan', label: 'Plan Rates' },
+                { value: 'historical', label: 'Historical Rates' }
               ]}
-              tooltip="Target mix compiled dynamically from historical monthly returns"
+              tooltip="Choose whether to evaluate sustainable spending using the flat rates defined in your plan, or stress-test against actual historical market data."
             />
 
-            <SelectInput
-              label="Period"
-              value={sweepStartYear.toString()}
-              onChange={v => setSweepStartYear(parseInt(v))}
-              options={[
-                { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
-                { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
-                { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
-                { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
-              ]}
-              tooltip="The starting year boundary for the simulation series"
-            />
+            {sweepRateType === 'historical' && (
+              <>
+                <SelectInput
+                  label="Asset Allocation"
+                  value={sweepEqAllocation.toString()}
+                  onChange={v => setSweepEqAllocation(parseInt(v))}
+                  options={[
+                    { value: '100', label: '100% Equity / 0% Bond' },
+                    { value: '80', label: '80% Equity / 20% Bond' },
+                    { value: '60', label: '60% Equity / 40% Bond' },
+                    { value: '40', label: '40% Equity / 60% Bond' },
+                    { value: '20', label: '20% Equity / 80% Bond' },
+                  ]}
+                  tooltip="Target mix compiled dynamically from historical monthly returns"
+                />
 
-
+                <SelectInput
+                  label="Period"
+                  value={sweepStartYear.toString()}
+                  onChange={v => setSweepStartYear(parseInt(v))}
+                  options={[
+                    { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
+                    { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
+                    { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
+                    { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
+                  ]}
+                  tooltip="The starting year boundary for the simulation series"
+                />
+              </>
+            )}
           </div>
 
           {sweepRunning && (
@@ -1591,119 +1678,130 @@ export function AnalysisTab() {
             </div>
           )}
 
-          {sweepResult && !sweepRunning && (
-            <>
-              <div className="border-t border-slate-200 my-6" />
-              <div className="space-y-6">
-              {/* Stats tiles */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-400">Full Plan Success Rate</div>
-                  <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                    {(sweepResult.currentSuccessRate * 100).toFixed(1)}%
+          {sweepResult && !sweepRunning && (() => {
+            const activeType = sweepActiveResultType ?? sweepRateType
+            return (
+              <>
+                <div className="border-t border-slate-200 my-6" />
+                <div className="space-y-6">
+                {/* Stats tiles */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs text-slate-400">Configured Plan Success Rate</div>
+                    <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                      {(sweepResult.currentSuccessRate * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Includes all configured spending phases and extra expenses
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-400">
-                    Includes all configured spending phases and extra expenses
+
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs text-slate-400">
+                      {activeType === 'plan' ? 'Sustainable Spending' : 'P90 Sustainable Spending'}
+                    </div>
+                    <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                      {p90SpendingLabel}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {activeType === 'plan'
+                        ? 'Maximum base spending supported under configured plan rates'
+                        : 'Sustainable spending with at least 90% survival rate'}
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                  <div className="text-xs text-slate-400">P90 Sustainable Spending</div>
-                  <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                    {p90SpendingLabel}
+                {/* Chart & Benchmarks Table */}
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold mb-2 text-slate-700">
+                      {activeType === 'plan'
+                        ? 'Success Rate based on Configured Plan Rates'
+                        : 'Success Rate at Base Spending Levels'}
+                    </div>
+                    <PlotlyChart
+                      data={sweepChartTraces}
+                      layout={{
+                        yaxis: { 
+                          title: { text: 'Success Rate (%)', font: { size: 11 } },
+                          range: [0, 105] 
+                        },
+                        xaxis: { 
+                          tickformat: ',.0f', 
+                          title: { text: 'Flat Base Spending ($ / year)', font: { size: 11 } } 
+                        },
+                        legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                      }}
+                      style={{ height: 420 }}
+                    />
                   </div>
-                  <div className="text-xs text-slate-400">
-                    Sustainable spending with at least 90% survival rate
+
+                  <div className="w-full lg:w-80 shrink-0">
+                    <div className="overflow-x-auto rounded border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Retirement Spending Benchmarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 text-slate-600">
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#64748b' }} />
+                                <strong>Lean FIRE:</strong> {fmt(50000)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 pl-4">Basic spending, Canadian average</div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                              {getClosestSuccessRate(50000)}
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 text-slate-600">
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#166534' }} />
+                                <strong>Avg. Household:</strong> {fmt(80000)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 pl-4">Household spending, Canadian average</div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                              {getClosestSuccessRate(80000)}
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 text-slate-600">
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#1e40af' }} />
+                                <strong>Chubby FIRE:</strong> {fmt(120000)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 pl-4">Active retirement, frequent travel</div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                              {getClosestSuccessRate(120000)}
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 text-slate-600">
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#d97706' }} />
+                                <strong>Fat FIRE:</strong> {fmt(180000)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 pl-4">Premium lifestyle and travel budget</div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
+                              {getClosestSuccessRate(180000)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
-
-              {/* Chart & Benchmarks Table */}
-              <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold mb-2 text-slate-700">Success Rate at Base Spending Levels</div>
-                  <PlotlyChart
-                    data={sweepChartTraces}
-                    layout={{
-                      yaxis: { 
-                        title: { text: 'Success Rate (%)', font: { size: 11 } },
-                        range: [0, 105] 
-                      },
-                      xaxis: { 
-                        tickformat: ',.0f', 
-                        title: { text: 'Flat Base Spending ($ / year)', font: { size: 11 } } 
-                      },
-                      legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
-                    }}
-                    style={{ height: 420 }}
-                  />
-                </div>
-
-                <div className="w-full lg:w-80 shrink-0">
-                  <div className="overflow-x-auto rounded border border-slate-200">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">Retirement Spending Benchmarks</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        <tr className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2 text-slate-600">
-                            <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#64748b' }} />
-                              <strong>Lean FIRE:</strong> {fmt(50000)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 pl-4">Basic spending, Canadian average</div>
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
-                            {getClosestSuccessRate(50000)}
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2 text-slate-600">
-                            <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#166534' }} />
-                              <strong>Avg. Household:</strong> {fmt(80000)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 pl-4">Household spending, Canadian average</div>
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
-                            {getClosestSuccessRate(80000)}
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2 text-slate-600">
-                            <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#1e40af' }} />
-                              <strong>Chubby FIRE:</strong> {fmt(120000)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 pl-4">Active retirement, frequent travel</div>
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
-                            {getClosestSuccessRate(120000)}
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2 text-slate-600">
-                            <div className="flex items-center gap-1.5">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#d97706' }} />
-                              <strong>Fat FIRE:</strong> {fmt(180000)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 pl-4">Premium lifestyle and travel budget</div>
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
-                            {getClosestSuccessRate(180000)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </>
-          )}
+              </>
+            )
+          })()}
         </SectionCard>
 
         {/* Coast FIRE Calculator */}
