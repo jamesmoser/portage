@@ -15,7 +15,7 @@ export function SelectInput({ label, value, onChange, options, tooltip, disabled
     <div className={className} title={tooltip}>
       <label className="label-text">{label}</label>
       <select
-        className="input-field"
+        className="input-field min-w-[186px]"
         value={value}
         onChange={e => onChange(e.target.value)}
         disabled={disabled}

@@ -1359,7 +1359,7 @@ export function AnalysisTab() {
             />
 
             <SelectInput
-              label="Historical Start Year"
+              label="Period"
               value={histStartYear.toString()}
               onChange={v => setHistStartYear(parseInt(v))}
               options={[
@@ -1372,12 +1372,12 @@ export function AnalysisTab() {
             />
 
             <SelectInput
-              label="Start Date Resolution"
+              label="Resolution"
               value={histResolution}
               onChange={v => setHistResolution(v as 'annual' | 'monthly')}
               options={[
-                { value: 'annual', label: 'Annual (Jan 1st)' },
-                { value: 'monthly', label: 'Monthly (Any Month)' },
+                { value: 'annual', label: 'Annual' },
+                { value: 'monthly', label: 'Monthly' },
               ]}
               tooltip="Annual uses January starts only; Monthly runs 12x more paths starting in any month"
             />
@@ -1552,7 +1552,7 @@ export function AnalysisTab() {
             />
 
             <SelectInput
-              label="Historical Start Year"
+              label="Period"
               value={sweepStartYear.toString()}
               onChange={v => setSweepStartYear(parseInt(v))}
               options={[
@@ -1863,7 +1863,7 @@ export function AnalysisTab() {
                   </button>
 
                   <SelectInput
-                    label="Rate Simulation Type"
+                    label="Rate Simulation"
                     value={coastRateType}
                     onChange={v => setCoastRateType(v as 'plan' | 'historical')}
                     options={[
@@ -1875,17 +1875,6 @@ export function AnalysisTab() {
 
                   {coastRateType === 'historical' && (
                     <>
-                      <SelectInput
-                        label="Historical Path to Plot"
-                        value={coastPlotMetric}
-                        onChange={v => setCoastPlotMetric(v as 'worst' | 'median')}
-                        options={[
-                          { value: 'worst', label: 'Worst-Case Path (Downside Risk)' },
-                          { value: 'median', label: 'Median Path (50th Percentile)' }
-                        ]}
-                        tooltip="Choose whether the chart plots the worst-case historical sequence (the gating factor for success) or the median (average) outcome."
-                      />
-
                       <SelectInput
                         label="Asset Allocation"
                         value={coastEqAllocation.toString()}
@@ -1901,7 +1890,7 @@ export function AnalysisTab() {
                       />
 
                       <SelectInput
-                        label="Historical Start Year"
+                        label="Period"
                         value={coastStartYear.toString()}
                         onChange={v => setCoastStartYear(parseInt(v))}
                         options={[
@@ -1914,15 +1903,26 @@ export function AnalysisTab() {
                       />
 
                       <SelectInput
-                        label="Min Success Rate Required"
+                        label="Success Rate"
                         value={coastMinSuccessRate.toString()}
                         onChange={v => setCoastMinSuccessRate(parseInt(v))}
                         options={[
-                          { value: '100', label: '100% (No Depletions)' },
-                          { value: '95', label: '95% Success Rate' },
-                          { value: '90', label: '90% Success Rate' },
+                          { value: '100', label: '100%' },
+                          { value: '95', label: '95%' },
+                          { value: '90', label: '90%' },
                         ]}
                         tooltip="The minimum historical success rate required to consider a retirement year successful."
+                      />
+
+                      <SelectInput
+                        label="Plot"
+                        value={coastPlotMetric}
+                        onChange={v => setCoastPlotMetric(v as 'worst' | 'median')}
+                        options={[
+                          { value: 'worst', label: 'Worst-Case Path' },
+                          { value: 'median', label: 'Median Path' }
+                        ]}
+                        tooltip="Choose whether the chart plots the worst-case historical sequence (the gating factor for success) or the median (average) outcome."
                       />
                     </>
                   )}
