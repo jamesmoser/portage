@@ -558,6 +558,7 @@ export function AnalysisTab() {
     yearsArray: number[]
   } | null>(null)
   const [coastRunning, setCoastRunning] = useState(false)
+  const [coastActiveResultType, setCoastActiveResultType] = useState<'plan' | 'historical' | null>(null)
 
   const resetCoastCalculator = () => {
     setCoastRateType('plan')
@@ -567,6 +568,7 @@ export function AnalysisTab() {
     setCoastPlotMetric('worst')
     setCoastPlanResult(null)
     setCoastHistResult(null)
+    setCoastActiveResultType(null)
   }
 
   // Helper to generate modified AppState for stopping contributions in year Y (household)
@@ -707,6 +709,7 @@ export function AnalysisTab() {
         agesArray,
         yearsArray,
       })
+      setCoastActiveResultType('plan')
       setCoastRunning(false)
     }, 20)
   }
@@ -798,6 +801,7 @@ export function AnalysisTab() {
         agesArray: agesArr,
         yearsArray: yearsArr,
       })
+      setCoastActiveResultType('historical')
       setCoastRunning(false)
     }, 20)
   }
@@ -1739,7 +1743,8 @@ export function AnalysisTab() {
             const startAge = intAgeAt(refPerson.birthDate, jan1(currentYear))
             const planningEndAge = refPerson.planningEndAge
 
-            const hasResult = coastRateType === 'plan' ? (coastPlanResult !== null) : (coastHistResult !== null)
+            const activeType = coastActiveResultType ?? coastRateType
+            const hasResult = activeType === 'plan' ? (coastPlanResult !== null) : (coastHistResult !== null)
             const currentAssetsVal = dataPoints[0]?.totalPortfolio ?? 0
 
             const retirementAgeA = intAgeAt(effectiveState.personA.birthDate, effectiveState.personA.retirementDate)
@@ -1749,7 +1754,7 @@ export function AnalysisTab() {
             const hasSpouse = !!effectiveState.personB.name
 
             // Extract the result values if ready
-            const result = coastRateType === 'plan' ? coastPlanResult! : coastHistResult!
+            const result = activeType === 'plan' ? coastPlanResult! : coastHistResult!
             const coastYear = result?.coastYear ?? null
             const coastAge = result?.coastAge ?? null
             const agesArray = result?.agesArray ?? []
@@ -1757,31 +1762,31 @@ export function AnalysisTab() {
 
             const isCoastFireToday = coastYear === currentYear
 
-            const currentPlanPath = coastRateType === 'plan'
+            const currentPlanPath = activeType === 'plan'
               ? coastPlanResult?.currentPlanPathArray ?? []
               : (coastPlotMetric === 'worst' ? coastHistResult?.currentPlanWorstPath ?? [] : coastHistResult?.currentPlanMedianPath ?? [])
 
-            const stopTodayPath = coastRateType === 'plan'
+            const stopTodayPath = activeType === 'plan'
               ? coastPlanResult?.stopTodayPathArray ?? []
               : (coastPlotMetric === 'worst' ? coastHistResult?.stopTodayWorstPath ?? [] : coastHistResult?.stopTodayMedianPath ?? [])
 
-            const stopCoastPath = coastRateType === 'plan'
+            const stopCoastPath = activeType === 'plan'
               ? coastPlanResult?.stopCoastPathArray ?? []
               : (coastPlotMetric === 'worst' ? coastHistResult?.stopCoastWorstPath ?? [] : coastHistResult?.stopCoastMedianPath ?? [])
 
-            const isSucceedingToday = coastRateType === 'plan'
+            const isSucceedingToday = activeType === 'plan'
               ? isCoastFireToday
               : (coastHistResult !== null && coastHistResult.successRateToday >= coastMinSuccessRate / 100)
 
-            const currentPlanName = coastRateType === 'plan'
+            const currentPlanName = activeType === 'plan'
               ? 'Current Plan (With Contributions)'
               : `Current Plan (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.currentPlanSuccessRate ?? 0) * 100).toFixed(0)}%)`
 
-            const stopTodayName = coastRateType === 'plan'
+            const stopTodayName = activeType === 'plan'
               ? (isCoastFireToday ? 'Compounding Only (Stop Saving Today - Succeeds)' : 'Compounding Only (Stop Saving Today - Depletes)')
               : `Compounding Only (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.successRateToday ?? 0) * 100).toFixed(0)}%)`
 
-            const stopCoastName = coastRateType === 'plan'
+            const stopCoastName = activeType === 'plan'
               ? `Stop Saving at Coast Age ${coastAge} (Succeeds)`
               : `Stop Saving at Coast Age ${coastAge} (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.successRateCoast ?? 0) * 100).toFixed(0)}%)`
 
@@ -1856,7 +1861,7 @@ export function AnalysisTab() {
             }
 
             return (
-              <div className="space-y-4">
+              <>
                 {/* Controls */}
                 <div className="flex items-end gap-4 mb-4 flex-wrap">
                   <button
@@ -1958,7 +1963,7 @@ export function AnalysisTab() {
                     {/* Plotly Chart (Left Side) */}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold mb-2 text-slate-700">
-                        {coastRateType === 'plan'
+                        {activeType === 'plan'
                           ? 'Projections based on Configured Plan Rates'
                           : `Projections for Historical Periods Since ${coastStartYear}`}
                       </div>
@@ -1977,7 +1982,7 @@ export function AnalysisTab() {
 
                     {/* Status Alert Box (Right Side) */}
                     <div className="w-full lg:w-96 shrink-0 flex flex-col justify-center">
-                      {coastRateType === 'plan' ? (
+                      {activeType === 'plan' ? (
                         <>
                           {isCoastFireToday ? (
                             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-800 text-sm">
@@ -2062,7 +2067,7 @@ export function AnalysisTab() {
                   </div>
                   </>
                 )}
-              </div>
+              </>
             )
           })()}
         </SectionCard>
