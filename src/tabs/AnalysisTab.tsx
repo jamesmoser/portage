@@ -1617,7 +1617,7 @@ export function AnalysisTab() {
                       <th className="px-3 py-2 text-left font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Start Year</th>
                       <th className="px-3 py-2 text-center font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Status</th>
                       <th className="px-3 py-2 text-center font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Depletion Age</th>
-                      <th className="px-3 py-2 text-right font-medium shadow-[inset_0_-1px_0_0_#e2e8f0]">Final Portfolio Balance</th>
+                      <th className="px-3 py-2 text-right font-medium text-slate-700 bg-amber-50 shadow-[inset_0_-1px_0_0_#e2e8f0]">Final Portfolio Balance</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1638,7 +1638,7 @@ export function AnalysisTab() {
                         <td className="px-3 py-2 text-center text-slate-600">
                           {p.depleted && p.depletionAge ? `${p.depletionAge} yrs` : '—'}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-slate-700">
+                        <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 bg-amber-50">
                           {fmt(p.finalBalance)}
                         </td>
                       </tr>
