@@ -76,6 +76,7 @@ export function AnalysisTab() {
       currentYear,
       Math.max(eA, eB),
       refBirth,
+      effectiveState.personalInflationRatePct,
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatIfs.marketProfile, effectiveState])

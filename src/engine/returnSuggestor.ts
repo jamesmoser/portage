@@ -40,6 +40,7 @@ function buildFlatSchedule(state: AppState, flatRatePct: number): number[] {
     currentYear,
     endYear,
     refBirth,
+    state.personalInflationRatePct,
   )
 }
 

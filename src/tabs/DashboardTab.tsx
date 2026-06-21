@@ -14,7 +14,7 @@ import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../e
 import { DateInput } from '../components/DateInput'
 import type { AppState, HeadlineMetrics, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem, GKPersonConfig } from '../engine/types'
 import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG, DEFAULT_GK_CONFIG } from '../engine/defaults'
-import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
+import { generateRateSchedule, DEFAULT_MARKET_PROFILE, HISTORICAL_ERAS } from '../engine/rateProfiles'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
@@ -129,6 +129,7 @@ const MARKET_PROFILE_OPTIONS: { value: string; label: string }[] = [
   { value: 'cyclicalTrough', label: 'Cyclical Trough' },
   { value: 'marketShock',    label: 'Market Shock' },
   { value: 'noise',          label: 'Noise' },
+  { value: 'historical',     label: 'Historical' },
 ]
 
 // Minimal layout for the market shape preview chart — no axes, no labels.
@@ -756,6 +757,7 @@ export function DashboardTab() {
       currentYear,
       Math.max(eA, eB),
       refBirth,
+      effectiveState.personalInflationRatePct,
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatIfs.marketProfile, effectiveState])
@@ -772,11 +774,13 @@ export function DashboardTab() {
       effectiveState.returnRates,
       { ...DEFAULT_MARKET_PROFILE, profileType: 'step' },
       currentYear, previewEnd, refBirth,
+      effectiveState.personalInflationRatePct,
     ).map(r => r * 100)
     const currentSchedule = generateRateSchedule(
       effectiveState.returnRates,
       mv,
       currentYear, previewEnd, refBirth,
+      effectiveState.personalInflationRatePct,
     ).map(r => r * 100)
     const years = Array.from({ length: 50 }, (_, i) => currentYear + i)
     const high = Math.max(...currentSchedule)
@@ -1847,6 +1851,7 @@ export function DashboardTab() {
                   updateWhatIf('marketProfile', { value: { ...mValue, ...partial } })
                 const isCyclical = mValue.profileType === 'cyclicalCrest' || mValue.profileType === 'cyclicalTrough'
                 const isShock    = mValue.profileType === 'marketShock'
+                const isHistorical = mValue.profileType === 'historical'
                 return (
                   <div>
                     {/* Shape preview chart + stats — always visible */}
@@ -1893,6 +1898,61 @@ export function DashboardTab() {
                     {/* Sub-controls — only when enabled */}
                     {mEnabled && (
                       <div className="border-t border-slate-100">
+                        {/* Historical-specific controls */}
+                        {isHistorical && (
+                          <>
+                            <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-100">
+                              <span className="text-sm text-slate-600 w-24 shrink-0 font-medium">Asset Mix</span>
+                              <div className="flex-1">
+                                <SelectInput
+                                  label=""
+                                  value={String(mValue.historicalEquityAllocationPct ?? 60)}
+                                  onChange={v => setMarketProfile({ historicalEquityAllocationPct: Number(v) })}
+                                  options={[
+                                    { value: '100', label: '100% Equity / 0% Bond' },
+                                    { value: '90',  label: '90% Equity / 10% Bond' },
+                                    { value: '80',  label: '80% Equity / 20% Bond' },
+                                    { value: '70',  label: '70% Equity / 30% Bond' },
+                                    { value: '60',  label: '60% Equity / 40% Bond (Balanced)' },
+                                    { value: '50',  label: '50% Equity / 50% Bond' },
+                                    { value: '40',  label: '40% Equity / 60% Bond' },
+                                    { value: '30',  label: '30% Equity / 70% Bond' },
+                                    { value: '20',  label: '20% Equity / 80% Bond' },
+                                    { value: '10',  label: '10% Equity / 90% Bond' },
+                                    { value: '0',   label: '0% Equity / 100% Bond' },
+                                  ]}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-100">
+                              <span className="text-sm text-slate-600 w-24 shrink-0 font-medium">Historical Era</span>
+                              <div className="flex-1">
+                                <SelectInput
+                                  label=""
+                                  value={String(mValue.historicalStartYear ?? 1929)}
+                                  onChange={v => setMarketProfile({ historicalStartYear: Number(v) })}
+                                  options={HISTORICAL_ERAS.map(era => ({
+                                    value: String(era.year),
+                                    label: era.label
+                                  }))}
+                                />
+                              </div>
+                            </div>
+                            {(() => {
+                              const era = HISTORICAL_ERAS.find(e => e.year === (mValue.historicalStartYear ?? 1929))
+                              return era ? (
+                                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30">
+                                  <InfoPanel>
+                                    <div>
+                                      <span className="font-semibold text-slate-700">Era Profile: </span>
+                                      {era.description}. Remaining years of plan are filled with the era's average return.
+                                    </div>
+                                  </InfoPanel>
+                                </div>
+                              ) : null
+                            })()}
+                          </>
+                        )}
                         {/* Flat rate row — shown for flat and marketShock profiles */}
                         {(mValue.profileType === 'flat' || isShock) && (
                           <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-100">

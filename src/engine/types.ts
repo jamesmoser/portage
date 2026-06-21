@@ -385,6 +385,7 @@ export type MarketProfileType =
   | 'cyclicalTrough' // inverted cosine — starts at trough
   | 'marketShock'    // flat rate with damped-oscillator crash at a specified year
   | 'noise'          // seeded uniform random between peak and low
+  | 'historical'     // real-world historical sequence
 
 export interface MarketProfileConfig {
   profileType:       MarketProfileType
@@ -398,6 +399,8 @@ export interface MarketProfileConfig {
   shockRecovery:     number   // years to settle back to flat rate (marketShock only)
   shockDamping:      number   // 0 = lightly damped (rings), 1 = fully damped (no overshoot)
   noiseSeed:         number   // PRNG seed (noise profile only; re-roll changes this)
+  historicalStartYear?: number // start year of historical profile
+  historicalEquityAllocationPct?: number // equity allocation used to build combined historical returns
 }
 
 // ─── Retirement What-if ───────────────────────────────────────────────────────
