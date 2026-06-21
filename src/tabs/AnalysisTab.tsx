@@ -1973,7 +1973,7 @@ export function AnalysisTab() {
                 type: 'scatter',
                 mode: 'lines',
                 name: currentPlanName,
-                line: { color: '#d97706', width: 2 },
+                line: { color: '#94a3b8', width: 2, dash: 'dash' },
                 hovertemplate: 'Current Plan<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
               })
             }
@@ -1987,7 +1987,7 @@ export function AnalysisTab() {
                 type: 'scatter',
                 mode: 'lines',
                 name: stopTodayName,
-                line: { color: isSucceedingToday ? '#166534' : '#7B1515', width: 2 },
+                line: { color: '#94a3b8', width: 2 },
                 hovertemplate: 'Stop Saving Today<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
               })
             }
@@ -2002,7 +2002,7 @@ export function AnalysisTab() {
                   type: 'scatter',
                   mode: 'lines',
                   name: stopCoastName,
-                  line: { color: '#166534', width: 2.5 },
+                  line: { color: '#7B1515', width: 2.5 },
                   hovertemplate: 'Stop Saving at Coast Age<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
                 })
               }
@@ -2019,7 +2019,7 @@ export function AnalysisTab() {
                 y0: 0,
                 y1: 1,
                 yref: 'paper',
-                line: { color: '#166534', dash: 'dash', width: 2 }
+                line: { color: '#7B1515', dash: 'dash', width: 2 }
               })
               annotations.push({
                 x: coastAge,
@@ -2028,7 +2028,7 @@ export function AnalysisTab() {
                 yref: 'paper',
                 text: `<b>Coast Age: ${coastAge}</b>`,
                 showarrow: false,
-                font: { size: 10, color: '#166534' },
+                font: { size: 10, color: '#7B1515' },
                 xanchor: 'left',
                 yanchor: 'bottom',
                 align: 'left'
@@ -2106,17 +2106,6 @@ export function AnalysisTab() {
                         ]}
                         tooltip="The minimum historical success rate required to consider a retirement year successful."
                       />
-
-                      <SelectInput
-                        label="Plot"
-                        value={coastPlotMetric}
-                        onChange={v => setCoastPlotMetric(v as 'worst' | 'median')}
-                        options={[
-                          { value: 'worst', label: 'Worst-Case Path' },
-                          { value: 'median', label: 'Median Path' }
-                        ]}
-                        tooltip="Choose whether the chart plots the worst-case historical sequence (the gating factor for success) or the median (average) outcome."
-                      />
                     </>
                   )}
                 </div>
@@ -2145,17 +2134,45 @@ export function AnalysisTab() {
                     <div className="flex flex-col lg:flex-row gap-6">
                     {/* Plotly Chart (Left Side) */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold mb-2 text-slate-700">
-                        {activeType === 'plan'
-                          ? 'Projections based on Configured Plan Rates'
-                          : `Projections for Historical Periods Since ${coastStartYear}`}
+                      <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+                        <div className="text-sm font-semibold text-slate-700">
+                          {activeType === 'plan'
+                            ? 'Projections based on Configured Plan Rates'
+                            : `Projections for Historical Periods Since ${coastStartYear}`}
+                        </div>
+                        {activeType === 'historical' && (
+                          <div className="inline-flex rounded-md shadow-sm bg-slate-100 p-0.5" role="group">
+                            <button
+                              type="button"
+                              onClick={() => setCoastPlotMetric('worst')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                                coastPlotMetric === 'worst'
+                                  ? 'bg-white text-slate-800 shadow-sm'
+                                  : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                            >
+                              Worst-Case Path
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCoastPlotMetric('median')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                                coastPlotMetric === 'median'
+                                  ? 'bg-white text-slate-800 shadow-sm'
+                                  : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                            >
+                              Median Path
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <PlotlyChart
                         data={coastChartTraces}
                         layout={{
                           yaxis: { tickformat: ',.0f', title: { text: 'Portfolio Balance ($)', font: { size: 11 } } },
                           xaxis: { title: { text: `${refName}'s Age`, font: { size: 11 } } },
-                          legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                          showlegend: false,
                           shapes,
                           annotations
                         }}
@@ -2164,43 +2181,65 @@ export function AnalysisTab() {
                       />
                     </div>
 
-                    {/* Status Alert Box (Right Side) */}
+                    {/* Status Alert Box & Legend (Right Side) */}
                     <div className="w-full lg:w-96 shrink-0 flex flex-col justify-center">
+                      {/* Legend */}
+                      <div className="mb-4 p-3 bg-slate-50/50 rounded-lg border border-slate-200 text-xs space-y-2.5">
+                        <div className="font-semibold text-slate-400 uppercase tracking-wider" style={{ fontSize: '9px' }}>
+                          Chart Legend
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                          <span className="inline-block w-6 shrink-0" style={{ borderTop: '2.5px dashed #94a3b8' }} />
+                          <span className="text-slate-700 leading-normal">{currentPlanName}</span>
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                          <span className="inline-block w-6 h-0.5 shrink-0 bg-[#94a3b8]" />
+                          <span className="text-slate-700 leading-normal">{stopTodayName}</span>
+                        </div>
+                        {coastYear !== null && coastYear > currentYear && (
+                          <div className="flex items-center gap-2.5">
+                            <span className="inline-block w-6 h-0.5 shrink-0 bg-[#7B1515]" />
+                            <span className="text-slate-700 leading-normal">{stopCoastName}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info Box */}
                       {activeType === 'plan' ? (
                         <>
                           {isCoastFireToday ? (
-                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-800 text-sm">
-                              <div className="flex items-center gap-2 font-bold mb-1">
-                                <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1 text-slate-800">
+                                <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Coast FIRE Achieved!
                               </div>
-                              <p className="text-xs text-emerald-700 leading-relaxed">
+                              <p className="text-xs text-slate-700 leading-relaxed">
                                 Your current plan is already in Coast FIRE. You can stop making future contributions starting <strong>today (Age {startAge} / Year {currentYear})</strong> and your portfolio is projected to successfully cover all retirement spending and lumpy expenses through the end of the plan (Year {endYear}).
                               </p>
                             </div>
                           ) : coastYear !== null ? (
-                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-blue-800 text-sm">
-                              <div className="flex items-center gap-2 font-bold mb-1">
-                                <svg className="w-5 h-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1 text-slate-800">
+                                <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" fill="none" />
                                 </svg>
                                 On Track to Coast at Age {coastAge}
                               </div>
-                              <p className="text-xs text-blue-700 leading-relaxed">
+                              <p className="text-xs text-slate-700 leading-relaxed">
                                 If you stop contributions today, your portfolio is projected to deplete before the end of the plan. However, by continuing your planned contributions for <strong>{coastYear! - currentYear} more years</strong>, you will reach Coast FIRE status at <strong>Age {coastAge} (Year {coastYear!})</strong>. Beyond that point, all future contributions can safely be stopped.
                               </p>
                             </div>
                           ) : (
-                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-sm">
-                              <div className="flex items-center gap-2 font-bold mb-1">
-                                <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1 text-slate-800">
+                                <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                                 Contributions Required
                               </div>
-                              <p className="text-xs text-amber-700 leading-relaxed">
+                              <p className="text-xs text-slate-700 leading-relaxed">
                                 Your current plan is not yet projected to reach Coast FIRE before retirement. Even if you contribute all the way to retirement, the plan is projected to experience a spending shortfall. Consider increasing savings or adjusting your retirement spending.
                               </p>
                             </div>
@@ -2209,38 +2248,38 @@ export function AnalysisTab() {
                       ) : (
                         <>
                           {isCoastFireToday ? (
-                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-800 text-sm">
-                              <div className="flex items-center gap-2 font-bold mb-1">
-                                <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1 text-slate-800">
+                                <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Coast FIRE Achieved!
                               </div>
-                              <p className="text-xs text-emerald-700 leading-relaxed">
+                              <p className="text-xs text-slate-700 leading-relaxed">
                                 Your current plan is already in Coast FIRE. You can stop making future contributions starting <strong>today (Age {startAge} / Year {currentYear})</strong> and your portfolio is projected to successfully cover all retirement spending and lumpy expenses in at least <strong>{coastMinSuccessRate}%</strong> of historical rolling periods.
                               </p>
                             </div>
                           ) : coastYear !== null ? (
-                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-blue-800 text-sm">
-                              <div className="flex items-center gap-2 font-bold mb-1">
-                                <svg className="w-5 h-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1 text-slate-800">
+                                <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" fill="none" />
                                 </svg>
                                 On Track to Coast at Age {coastAge}
                               </div>
-                              <p className="text-xs text-blue-700 leading-relaxed">
+                              <p className="text-xs text-slate-700 leading-relaxed">
                                 If you stop contributions today, your portfolio does not meet the {coastMinSuccessRate}% required success rate. However, by continuing your planned contributions for <strong>{coastYear! - currentYear} more years</strong>, you will reach Coast FIRE status at <strong>Age {coastAge} (Year {coastYear!})</strong> with a <strong>{(coastHistResult!.successRateCoast! * 100).toFixed(0)}%</strong> historical success rate. Beyond that point, all future contributions can safely be stopped.
                               </p>
                             </div>
                           ) : (
-                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-sm">
-                              <div className="flex items-center gap-2 font-bold mb-1">
-                                <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-bold mb-1 text-slate-800">
+                                <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                                 Contributions Required
                               </div>
-                              <p className="text-xs text-amber-700 leading-relaxed">
+                              <p className="text-xs text-slate-700 leading-relaxed">
                                 Your current plan is not projected to reach Coast FIRE. Even with contributions to the end of the plan, the historical success rate is <strong>{(coastHistResult!.currentPlanSuccessRate * 100).toFixed(0)}%</strong> (less than your required {coastMinSuccessRate}%). Consider increasing savings, adjusting retirement spending, or lowering your required success rate.
                               </p>
                             </div>
