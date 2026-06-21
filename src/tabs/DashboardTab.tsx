@@ -1313,7 +1313,7 @@ export function DashboardTab() {
                       onChange={v => {
                         const type = v as DrawdownStrategyType
                         updateWhatIf('drawdownStrategy', {
-                          enabled: type !== 'none',
+                          enabled: true,
                           value: { ...whatIfs.drawdownStrategy.value, strategyType: type },
                         })
                       }}
