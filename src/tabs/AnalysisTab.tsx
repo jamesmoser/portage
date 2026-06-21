@@ -401,28 +401,15 @@ export function AnalysisTab() {
         name: 'Flat Spending Success Rate',
         line: { color: '#7B1515', width: 2 },
         hovertemplate: 'Base Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>'
-      },
-      // Actual simulated points as markers
-      {
-        x: xVals,
-        y: yVals,
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Simulated Levels',
-        marker: { color: '#7B1515', size: 6 },
-        hovertemplate: 'Simulated Base Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>',
-        showlegend: false
       }
     ]
 
-
-
-    // Add open circles for benchmarks (if in sweep range)
+    // Add red dots for benchmarks (if in sweep range)
     const benchmarks = [
-      { name: 'Lean FIRE', amount: 50000, color: '#64748b' },
-      { name: 'Avg. Household', amount: 80000, color: '#166534' },
-      { name: 'Chubby FIRE', amount: 120000, color: '#1e40af' },
-      { name: 'Fat FIRE', amount: 180000, color: '#d97706' },
+      { name: 'Lean FIRE', shortName: 'Lean', amount: 50000 },
+      { name: 'Avg. Household', shortName: 'Avg', amount: 80000 },
+      { name: 'Chubby FIRE', shortName: 'Chubby', amount: 120000 },
+      { name: 'Fat FIRE', shortName: 'Fat', amount: 180000 },
     ]
 
     const benchmarkPoints = benchmarks
@@ -432,7 +419,7 @@ export function AnalysisTab() {
         return {
           x: pt.spending,
           y: pt.successRate * 100,
-          color: b.color,
+          shortName: b.shortName,
           name: b.name
         }
       })
@@ -443,19 +430,18 @@ export function AnalysisTab() {
         x: benchmarkPoints.map(bp => bp.x),
         y: benchmarkPoints.map(bp => bp.y),
         type: 'scatter',
-        mode: 'markers',
+        mode: 'markers+text',
         name: 'Benchmarks',
         marker: {
           symbol: 'circle',
-          size: 14,
-          color: benchmarkPoints.map(() => 'rgba(0,0,0,0)'), // transparent fill
-          line: {
-            color: benchmarkPoints.map(bp => bp.color),
-            width: 2.5
-          }
+          size: 8,
+          color: '#7B1515'
         },
-        hovertemplate: '<b>%{text}</b><br>Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>',
-        text: benchmarkPoints.map(bp => bp.name),
+        text: benchmarkPoints.map(bp => `<b>${bp.shortName}</b>`),
+        textposition: 'top center',
+        textfont: { color: '#7B1515', size: 10, family: 'system-ui, sans-serif' },
+        hovertemplate: '<b>%{customdata}</b><br>Spending: %{x:$,.0f}<br>Success Rate: %{y:.1f}%<extra></extra>',
+        customdata: benchmarkPoints.map(bp => bp.name),
         showlegend: false
       })
     }
@@ -1812,7 +1798,7 @@ export function AnalysisTab() {
                         },
                         legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
                       }}
-                      style={{ height: 420 }}
+                      style={{ height: 336 }}
                     />
                   </div>
 
@@ -1827,11 +1813,10 @@ export function AnalysisTab() {
                         <tbody className="divide-y divide-slate-100">
                           <tr className="hover:bg-slate-50/50">
                             <td className="px-3 py-2 text-slate-600">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#64748b' }} />
+                              <div>
                                 <strong>Lean FIRE:</strong> {fmt(50000)}
                               </div>
-                              <div className="text-[10px] text-slate-400 pl-4">Basic spending, Canadian average</div>
+                              <div className="text-[10px] text-slate-400">Basic spending, Canadian average</div>
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
                               {getClosestSuccessRate(50000)}
@@ -1839,11 +1824,10 @@ export function AnalysisTab() {
                           </tr>
                           <tr className="hover:bg-slate-50/50">
                             <td className="px-3 py-2 text-slate-600">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#166534' }} />
+                              <div>
                                 <strong>Avg. Household:</strong> {fmt(80000)}
                               </div>
-                              <div className="text-[10px] text-slate-400 pl-4">Household spending, Canadian average</div>
+                              <div className="text-[10px] text-slate-400">Household spending, Canadian average</div>
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
                               {getClosestSuccessRate(80000)}
@@ -1851,11 +1835,10 @@ export function AnalysisTab() {
                           </tr>
                           <tr className="hover:bg-slate-50/50">
                             <td className="px-3 py-2 text-slate-600">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#1e40af' }} />
+                              <div>
                                 <strong>Chubby FIRE:</strong> {fmt(120000)}
                               </div>
-                              <div className="text-[10px] text-slate-400 pl-4">Active retirement, frequent travel</div>
+                              <div className="text-[10px] text-slate-400">Active retirement, frequent travel</div>
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
                               {getClosestSuccessRate(120000)}
@@ -1863,11 +1846,10 @@ export function AnalysisTab() {
                           </tr>
                           <tr className="hover:bg-slate-50/50">
                             <td className="px-3 py-2 text-slate-600">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#d97706' }} />
+                              <div>
                                 <strong>Fat FIRE:</strong> {fmt(180000)}
                               </div>
-                              <div className="text-[10px] text-slate-400 pl-4">Premium lifestyle and travel budget</div>
+                              <div className="text-[10px] text-slate-400">Premium lifestyle and travel budget</div>
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-medium text-slate-700">
                               {getClosestSuccessRate(180000)}
