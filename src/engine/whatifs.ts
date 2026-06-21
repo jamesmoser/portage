@@ -77,7 +77,7 @@ export function mergeWhatIfs(base: AppState, wi: WhatIfs): AppState {
     s = { ...s, oasB: { ...s.oasB, startDate: date } }
   }
 
-  if (wi.drawdownStrategy.enabled && wi.drawdownStrategy.value.strategyType !== 'none') {
+  if (wi.drawdownStrategy.enabled) {
     const ds = wi.drawdownStrategy.value
     s = {
       ...s, withdrawalStrategy: {

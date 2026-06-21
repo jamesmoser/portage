@@ -93,7 +93,7 @@ function generateAIContext(): string {
   const effPSPct  = s.withdrawalStrategy.pensionSplitPct
 
   const effDrawdown: DrawdownStrategyConfig =
-    (wi.drawdownStrategy.enabled && wi.drawdownStrategy.value.strategyType !== 'none')
+    wi.drawdownStrategy.enabled
       ? wi.drawdownStrategy.value
       : {
           strategyType:    s.withdrawalStrategy.drawdownStrategy,
