@@ -2620,9 +2620,7 @@ export function AnalysisTab() {
               type: 'scatter' as const,
               mode: 'lines' as const,
               name: 'Total Shortfall',
-              fill: 'tozeroy' as const,
               line: { color: '#7B1515', width: 2.5, shape: 'spline' as const },
-              fillcolor: 'rgba(123, 21, 21, 0.12)',
               hovertemplate: 'Rate: %{x:.2f}%<br>Shortfall: $%{y:,.0f}<extra></extra>',
             }
 
@@ -2664,99 +2662,91 @@ export function AnalysisTab() {
                   </div>
                 </div>
 
-                {/* Sweep chart */}
-                <div className="mb-6">
-                  <div className="text-sm font-semibold mb-2 text-slate-700">Shortfall vs. Return Rate Sweep</div>
-                  <PlotlyChart
-                    data={[sweepTrace]}
-                    layout={{
-                      xaxis: {
-                        title: { text: 'Flat Nominal Return Rate (%)', font: { size: 11 } },
-                        ticksuffix: '%',
-                        dtick: 1,
-                      },
-                      yaxis: {
-                        title: { text: 'Total Cumulative Shortfall', font: { size: 11 } },
-                        tickformat: ',.0f',
-                      },
-                      shapes: [
-                        {
-                          type: 'line',
-                          x0: requiredRate,
-                          x1: requiredRate,
-                          y0: 0,
-                          y1: 1,
-                          yref: 'paper',
-                          line: { color: '#7B1515', dash: 'dot', width: 2 },
+                <div className="flex flex-col lg:flex-row gap-4 items-stretch mb-6">
+                  {/* Sweep chart */}
+                  <div className="flex-1 min-w-0 bg-white rounded-lg border border-slate-200 p-4">
+                    <div className="text-sm font-semibold mb-2 text-slate-700">Shortfall vs. Return Rate Sweep</div>
+                    <PlotlyChart
+                      data={[sweepTrace]}
+                      layout={{
+                        xaxis: {
+                          title: { text: 'Flat Nominal Return Rate (%)', font: { size: 11 } },
+                          ticksuffix: '%',
+                          dtick: 1,
                         },
-                        {
-                          type: 'line',
-                          x0: returnResult.baselineRate,
-                          x1: returnResult.baselineRate,
-                          y0: 0,
-                          y1: 1,
-                          yref: 'paper',
-                          line: { color: '#475569', dash: 'dash', width: 1.5 },
+                        yaxis: {
+                          title: { text: 'Total Cumulative Shortfall', font: { size: 11 } },
+                          tickformat: ',.0f',
                         },
-                      ],
-                      annotations: [
-                        {
-                          x: requiredRate,
-                          y: 0.97,
-                          yref: 'paper',
-                          text: `Break-even ${requiredRate.toFixed(2)}%`,
-                          showarrow: false,
-                          font: { size: 10, color: '#7B1515' },
-                          xanchor: 'left',
-                          bgcolor: 'rgba(255,255,255,0.85)',
-                          align: 'left',
-                        },
-                        {
-                          x: returnResult.baselineRate,
-                          y: 0.85,
-                          yref: 'paper',
-                          text: `Plan avg ${returnResult.baselineRate.toFixed(2)}%`,
-                          showarrow: false,
-                          font: { size: 10, color: '#475569' },
-                          xanchor: returnResult.baselineRate < requiredRate ? 'right' : 'left',
-                          bgcolor: 'rgba(255,255,255,0.85)',
-                          align: 'left',
-                        },
-                      ],
-                      legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
-                    }}
-                    style={{ height: 360 }}
-                  />
-                </div>
+                        shapes: [
+                          {
+                            type: 'line',
+                            x0: returnResult.baselineRate,
+                            x1: returnResult.baselineRate,
+                            y0: 0,
+                            y1: 1,
+                            yref: 'paper',
+                            line: { color: '#f59e0b', dash: 'dash', width: 1.5 },
+                          },
+                        ],
+                        annotations: [
+                          {
+                            x: returnResult.baselineRate,
+                            y: 0.97,
+                            yref: 'paper',
+                            text: `Plan avg ${returnResult.baselineRate.toFixed(2)}%`,
+                            showarrow: false,
+                            font: { size: 10, color: '#d97706' },
+                            xanchor: 'left',
+                            yanchor: 'top',
+                            bgcolor: 'rgba(255,255,255,0.85)',
+                            align: 'left',
+                          },
+                        ],
+                        legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                      }}
+                      style={{ height: 336 }}
+                    />
+                  </div>
 
-                {/* Historical period allocation suggestions */}
-                <div>
-                  <div className="text-sm font-semibold mb-3 text-slate-700">Asset Mix Suggestions by Historical Period</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-                    {returnResult.historicalSuggestions.map(s => (
-                      <div
-                        key={s.startYear}
-                        className="bg-white rounded-lg border shadow-sm p-3 text-center"
-                        style={{ borderColor: s.isInsufficient ? '#fca5a5' : '#e2e8f0' }}
-                      >
-                        <div className="text-xs font-semibold text-slate-500 mb-2" style={{ fontSize: '10px' }}>{s.label}</div>
-                        {s.isInsufficient ? (
-                          <>
-                            <div className="text-base font-bold text-red-700">Insufficient</div>
-                            <div className="text-xs text-slate-500 mt-1">No allocation achieved {requiredRate.toFixed(2)}%</div>
-                            <div className="text-xs text-slate-400 mt-1">Best: 100/0 @ {s.avgReturn.toFixed(1)}% avg</div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                              {s.suggestedEquity}/{s.suggestedBond}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-1">Equity / Bond</div>
-                            <div className="text-xs text-slate-400 mt-1">{s.avgReturn.toFixed(1)}% avg annual return</div>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                  {/* Asset Mix Suggestions table */}
+                  <div className="w-full lg:w-80 shrink-0">
+                    <div className="overflow-x-auto rounded border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th colSpan={2} className="px-3 py-2 text-left font-medium text-slate-700">
+                              Asset Mix Suggestions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {returnResult.historicalSuggestions.map(s => (
+                            <tr key={s.startYear} className="hover:bg-slate-50/50">
+                              <td className="px-3 py-2 text-slate-600">
+                                <div>
+                                  <strong>{s.label}</strong>
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {s.isInsufficient
+                                    ? `Best: 100/0 @ ${s.avgReturn.toFixed(1)}% avg`
+                                    : `${s.avgReturn.toFixed(1)}% avg annual return`}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono font-medium shrink-0 whitespace-nowrap">
+                                {s.isInsufficient ? (
+                                  <span className="text-red-700 font-semibold">Insufficient</span>
+                                ) : (
+                                  <span className="font-bold" style={{ color: '#7B1515' }}>
+                                    {s.suggestedEquity}% / {s.suggestedBond}%
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
