@@ -27,6 +27,8 @@ import { runHistoricalAnalysis, runSpendingSweep, interpolateMonotoneCubic } fro
 import type { HistoricalAnalysisResult, HistoricalPathResult, SpendingSweepPoint } from '../engine/historicalAnalysis'
 import { runInsuranceAnalysis } from '../engine/insuranceAnalyser'
 import type { InsuranceAnalyserResult, InsuranceSweepPoint } from '../engine/insuranceAnalyser'
+import { runRequiredReturnAnalysis } from '../engine/returnSuggestor'
+import type { RequiredReturnResult } from '../engine/returnSuggestor'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
 
@@ -887,6 +889,10 @@ export function AnalysisTab() {
   const [insResult, setInsResult] = useState<InsuranceAnalyserResult | null>(null)
   const [insRunning, setInsRunning] = useState(false)
 
+  // ── Plan Viability Analysis state ─────────────────────────────────────────
+  const [returnResult, setReturnResult] = useState<RequiredReturnResult | null>(null)
+  const [returnRunning, setReturnRunning] = useState(false)
+
   function runInsAnalyser() {
     setInsRunning(true)
     setTimeout(() => {
@@ -905,6 +911,26 @@ export function AnalysisTab() {
     setInsSweepStart('current')
     setInsCurrencyMode('nominal')
     setInsResult(null)
+  }
+
+  function runReturnAnalyser() {
+    setReturnRunning(true)
+    setTimeout(() => {
+      const res = runRequiredReturnAnalysis(effectiveState)
+      setReturnResult(res)
+      setReturnRunning(false)
+    }, 20)
+  }
+
+  function resetReturnAnalyser() {
+    setReturnResult(null)
+  }
+
+  function applyViabilityRate(rate: number) {
+    updateWhatIf('marketProfile', {
+      enabled: true,
+      value: { ...whatIfs.marketProfile.value, profileType: 'flat', flatRate: rate },
+    })
   }
 
   // ── Meltdown chart builder ────────────────────────────────────────────────
@@ -2515,6 +2541,215 @@ export function AnalysisTab() {
                     </InfoPanel>
                   </div>
                 )}
+              </>
+            )
+          })()}
+        </SectionCard>
+
+        {/* ── Plan Viability Analysis ────────────────────────────────────────────── */}
+        <SectionCard
+          title="Plan Viability Analysis"
+          width="full"
+          onReset={resetReturnAnalyser}
+          info={
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Plan Viability Analysis</strong> determines the minimum flat annual nominal return rate your portfolio must earn for the plan to succeed — i.e., fully cover all spending goals with no shortfall in any year.
+              </p>
+              <p>
+                <strong>How it works</strong> — A bisection search runs the full projection engine repeatedly, narrowing in on the exact rate boundary (accurate to ~0.004%). The sweep chart then plots the total cumulative shortfall (in today's dollars) from 0% up to 2 percentage points above the break-even rate, showing the full shape of failure.
+              </p>
+              <p>
+                <strong>Historical Mix Suggestions</strong> — Once the required rate is known, the analyser queries the historical return dataset (Shiller 1871–2025) for each of the five standard historical periods. It finds the minimum equity/bond allocation whose average annual nominal return meets or exceeds the required rate, using nominal compounded monthly data. When no allocation is sufficient, the tile is flagged.
+              </p>
+              <p className="text-xs text-slate-500 italic">
+                All calculations use your current effective plan settings (including any active Dashboard what-if overrides). The flat rate overrides the age-tiered return schedule configured in your plan for the purpose of this analysis only.
+              </p>
+            </div>
+          }
+        >
+          {/* Controls */}
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
+            <button className="btn-primary self-end" onClick={runReturnAnalyser} disabled={returnRunning}>
+              {returnRunning ? 'Running…' : returnResult ? 'Re-Run' : 'Run'}
+            </button>
+          </div>
+
+          {returnRunning && (
+            <div className="flex flex-col items-center justify-center h-80 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                <span>Running viability sweep…</span>
+              </div>
+            </div>
+          )}
+
+          {!returnRunning && !returnResult && (
+            <div className="flex flex-col items-center justify-center h-20 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+              <span>Click "Run" to analyze the minimum return rate needed for plan success.</span>
+            </div>
+          )}
+
+          {returnResult && !returnRunning && (() => {
+            // Build sweep chart traces
+            const requiredRate = returnResult.requiredRate
+
+
+            const allPts = returnResult.sweepPoints
+
+            const sweepTrace = {
+              x: allPts.map(p => p.rate),
+              y: allPts.map(p => p.shortfall),
+              type: 'scatter' as const,
+              mode: 'lines' as const,
+              name: 'Total Shortfall',
+              fill: 'tozeroy' as const,
+              line: { color: '#7B1515', width: 2.5, shape: 'spline' as const },
+              fillcolor: 'rgba(123, 21, 21, 0.12)',
+              hovertemplate: 'Rate: %{x:.2f}%<br>Shortfall: $%{y:,.0f}<extra></extra>',
+            }
+
+
+            return (
+              <>
+                <div className="border-t border-slate-200 my-6" />
+
+                {/* Key metric tiles */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs text-slate-400">Required Return Rate</div>
+                    <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                      {requiredRate >= 30 ? '≥30%' : `${requiredRate.toFixed(2)}%`}
+                    </div>
+                    <div className="text-xs text-slate-400">minimum flat nominal rate for plan success</div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs text-slate-400">Plan Baseline Rate (Avg)</div>
+                    <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>{returnResult.baselineRate.toFixed(2)}%</div>
+                    <div className="text-xs text-slate-400">time-weighted avg of your age-tiered rates</div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                    <div className="text-xs text-slate-400">Rate Gap</div>
+                    {(() => {
+                      const gap = requiredRate - returnResult.baselineRate
+                      const isOk = gap <= 0
+                      return (
+                        <>
+                          <div className="text-2xl font-bold mt-0.5" style={{ color: isOk ? '#15803d' : '#7B1515' }}>
+                            {isOk ? '▲ ' : '▼ '}{Math.abs(gap).toFixed(2)}%
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {isOk ? 'plan rate exceeds required — plan viable' : 'shortfall vs plan rate — action needed'}
+                          </div>
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+
+                {/* Sweep chart */}
+                <div className="mb-6">
+                  <div className="text-sm font-semibold mb-2 text-slate-700">Shortfall vs. Return Rate Sweep</div>
+                  <PlotlyChart
+                    data={[sweepTrace]}
+                    layout={{
+                      xaxis: {
+                        title: { text: 'Flat Nominal Return Rate (%)', font: { size: 11 } },
+                        ticksuffix: '%',
+                        dtick: 1,
+                      },
+                      yaxis: {
+                        title: { text: 'Total Cumulative Shortfall', font: { size: 11 } },
+                        tickformat: ',.0f',
+                      },
+                      shapes: [
+                        {
+                          type: 'line',
+                          x0: requiredRate,
+                          x1: requiredRate,
+                          y0: 0,
+                          y1: 1,
+                          yref: 'paper',
+                          line: { color: '#7B1515', dash: 'dot', width: 2 },
+                        },
+                        {
+                          type: 'line',
+                          x0: returnResult.baselineRate,
+                          x1: returnResult.baselineRate,
+                          y0: 0,
+                          y1: 1,
+                          yref: 'paper',
+                          line: { color: '#475569', dash: 'dash', width: 1.5 },
+                        },
+                      ],
+                      annotations: [
+                        {
+                          x: requiredRate,
+                          y: 0.97,
+                          yref: 'paper',
+                          text: `Break-even ${requiredRate.toFixed(2)}%`,
+                          showarrow: false,
+                          font: { size: 10, color: '#7B1515' },
+                          xanchor: 'left',
+                          bgcolor: 'rgba(255,255,255,0.85)',
+                        },
+                        {
+                          x: returnResult.baselineRate,
+                          y: 0.85,
+                          yref: 'paper',
+                          text: `Plan avg ${returnResult.baselineRate.toFixed(2)}%`,
+                          showarrow: false,
+                          font: { size: 10, color: '#475569' },
+                          xanchor: returnResult.baselineRate < requiredRate ? 'right' : 'left',
+                          bgcolor: 'rgba(255,255,255,0.85)',
+                        },
+                      ],
+                      legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
+                    }}
+                    style={{ height: 360 }}
+                  />
+                </div>
+
+                {/* Historical period allocation suggestions */}
+                <div>
+                  <div className="text-sm font-semibold mb-3 text-slate-700">Asset Mix Suggestions by Historical Period</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+                    {returnResult.historicalSuggestions.map(s => (
+                      <div
+                        key={s.startYear}
+                        className="bg-white rounded-lg border shadow-sm p-3 text-center"
+                        style={{ borderColor: s.isInsufficient ? '#fca5a5' : '#e2e8f0' }}
+                      >
+                        <div className="text-xs font-semibold text-slate-500 mb-2" style={{ fontSize: '10px' }}>{s.label}</div>
+                        {s.isInsufficient ? (
+                          <>
+                            <div className="text-base font-bold text-red-700">Insufficient</div>
+                            <div className="text-xs text-slate-500 mt-1">No allocation achieved {requiredRate.toFixed(2)}%</div>
+                            <div className="text-xs text-slate-400 mt-1">Best: 100/0 @ {s.avgReturn.toFixed(1)}% avg</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                              {s.suggestedEquity}/{s.suggestedBond}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">Equity / Bond</div>
+                            <div className="text-xs text-slate-400 mt-1">{s.avgReturn.toFixed(1)}% avg annual return</div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Apply button */}
+                <div className="mt-5 pt-4 border-t border-slate-200 flex items-center gap-4">
+                  <button className="btn-primary" onClick={() => applyViabilityRate(requiredRate)}>
+                    Apply to Dashboard
+                  </button>
+                  <span className="text-xs text-slate-400">
+                    Enables the Market Profile override on the Dashboard, set to Flat at {requiredRate.toFixed(2)}%.
+                  </span>
+                </div>
               </>
             )
           })()}
