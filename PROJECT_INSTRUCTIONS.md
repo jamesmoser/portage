@@ -321,7 +321,7 @@ Updating `DEFAULT_TAX_SETTINGS` does not auto-update existing users. They must h
 ## Capture Improvement Ideas
 
 When the user shares an idea, improvement, or note to capture for later (e.g., "Idea: ...", "Improvement: ...", "Note for later: ...", "Add to todo: ..."):
-1. Immediately append the idea to [IMPROVEMENTS.md](file:///Users/jamesmoser/Projects/portage/IMPROVEMENTS.md) under the `## Inbox` section.
+1. Immediately append the idea to [IMPROVEMENTS.md](./IMPROVEMENTS.md) under the `## Inbox` section.
 2. Format the entry as: `- [YYYY-MM-DD] <Idea description>`.
 3. Respond with a very brief, single-sentence acknowledgment (e.g., "Added '<Idea description>' to IMPROVEMENTS.md.") and immediately resume the current task. Do not analyze, discuss, or ask clarifying questions about the idea unless explicitly asked.
 

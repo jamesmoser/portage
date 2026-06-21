@@ -2486,19 +2486,19 @@ export function AnalysisTab() {
             const zmax = Math.max(100000, maxZ)
 
             // Find peak points across the entire 2D sweep (not capped at baseline surviving spouse death age)
-            const jamesEarlyPoints = insResult.sweep2D.flatMap(row => row.filter(p => p.beneficiary === 'personB'))
-            const peakPointA = jamesEarlyPoints.reduce((prev, curr) => {
+            const earlyPointsA = insResult.sweep2D.flatMap(row => row.filter(p => p.beneficiary === 'personB'))
+            const peakPointA = earlyPointsA.reduce((prev, curr) => {
               const valPrev = isPd ? prev.lumpSumPd : prev.lumpSumNom
               const valCurr = isPd ? curr.lumpSumPd : curr.lumpSumNom
               return valCurr > valPrev ? curr : prev
-            }, jamesEarlyPoints[0] || insResult.sweep1D_A[0])
+            }, earlyPointsA[0] || insResult.sweep1D_A[0])
 
-            const sandiEarlyPoints = insResult.sweep2D.flatMap(row => row.filter(p => p.beneficiary === 'personA'))
-            const peakPointB = sandiEarlyPoints.reduce((prev, curr) => {
+            const earlyPointsB = insResult.sweep2D.flatMap(row => row.filter(p => p.beneficiary === 'personA'))
+            const peakPointB = earlyPointsB.reduce((prev, curr) => {
               const valPrev = isPd ? prev.lumpSumPd : prev.lumpSumNom
               const valCurr = isPd ? curr.lumpSumPd : curr.lumpSumNom
               return valCurr > valPrev ? curr : prev
-            }, sandiEarlyPoints[0] || insResult.sweep1D_B[0])
+            }, earlyPointsB[0] || insResult.sweep1D_B[0])
 
             // Find configured planning death age points
             const confPointA = insResult.sweep1D_A.find(p => p.ageA === effectiveState.personA.planningEndAge) || insResult.sweep1D_A[insResult.sweep1D_A.length - 1]
@@ -2634,7 +2634,7 @@ export function AnalysisTab() {
                         range: [minAgeA - 0.5, maxAgeA + 0.5]
                       },
                       shapes: [
-                        // Vertical guideline at Sandi (B)'s configured plan death age
+                        // Vertical guideline at Person B's configured plan death age
                         {
                           type: 'line',
                           xref: 'x',
@@ -2649,7 +2649,7 @@ export function AnalysisTab() {
                             dash: 'dash'
                           }
                         },
-                        // Horizontal guideline at James (A)'s configured plan death age
+                        // Horizontal guideline at Person A's configured plan death age
                         {
                           type: 'line',
                           xref: 'x',

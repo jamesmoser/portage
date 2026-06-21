@@ -200,5 +200,5 @@ No data ever leaves your machine. There are no accounts, no analytics, and no ne
 
 ## License
 
-Portage is licensed under the [GNU Affero General Public License v3.0](file:///Users/jamesmoser/Projects/portage/LICENSE) (AGPL-3.0). Under this copyleft license, any modifications or deployments of this software as a network service must make their complete source code available under the same terms.
+Portage is licensed under the [GNU Affero General Public License v3.0](./LICENSE) (AGPL-3.0). Under this copyleft license, any modifications or deployments of this software as a network service must make their complete source code available under the same terms.
 

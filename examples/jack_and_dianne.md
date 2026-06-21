@@ -1,6 +1,6 @@
 # The Story of Jack & Dianne (Ottawa Demonstration Plan)
 
-This document provides the story and configuration details for the Jack and Dianne demonstration plan. The corresponding JSON import file is located at [jack_and_dianne.json](file:///Users/jamesmoser/Projects/portage/examples/jack_and_dianne.json).
+This document provides the story and configuration details for the Jack and Dianne demonstration plan. The corresponding JSON import file is located at [jack_and_dianne.json](./jack_and_dianne.json).
 
 ---
 
