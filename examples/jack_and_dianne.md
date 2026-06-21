@@ -71,7 +71,7 @@ This document provides the story and configuration details for the Jack and Dian
 * **Post-65 Retirement (Jack's Age 65+)**: **`7.0%`** (Shift to more conservative bond mix)
 
 ### 6. Spending Phases (Today's Dollars)
-* **Pre-Retirement (Jack's Age 42 to 60)**: `$0` (Consumption matches available employment after-tax income)
+* **Pre-Retirement (Jack's Age 42 to 60)**: **`$120,422` / year**
 * **Go-Go Years (Jack's Age 60 to 70)**: **`$120,422` / year** (Calculated net cash flow pre-retirement)
 * **Slow-Go Years (Jack's Age 70 to 80)**: **`$96,338` / year** (80% of Go-Go)
 * **No-Go Years (Jack's Age 80 to 85)**: **`$96,338` / year**

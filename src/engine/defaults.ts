@@ -86,7 +86,7 @@ export const DEFAULT_SURPLUS_ITEMS: SpendGapSurplusItem[] = [
 ]
 
 const DEFAULT_SPEND_GAP_PHASE: SpendGapPhaseConfig = {
-  grossIncomeCeiling: 0,
+  grossIncomeCeiling: 100000,
   deficitItems: DEFAULT_DEFICIT_ITEMS,
 }
 

@@ -183,7 +183,7 @@
       "id": "phase-0",
       "label": "Pre-Retirement",
       "startAge": 42,
-      "annualAmount": 0,
+      "annualAmount": 120422,
       "growthRatePct": 0,
       "linkedToFirstDeath": false
     },

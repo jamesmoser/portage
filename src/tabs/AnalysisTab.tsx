@@ -3126,7 +3126,7 @@ export function AnalysisTab() {
           onReset={() => { setMeltSteps(40); setMeltResult(null) }}
           info={
             <div className="space-y-2 text-sm">
-              <p>The meltdown optimizer sweeps the <strong>Gross Income Ceiling</strong> parameter of the Cover Spending Gap strategy to find the ceiling that minimises lifetime income tax paid.</p>
+              <p>The meltdown optimizer sweeps the <strong>Gross Income Ceiling</strong> parameter (which defaults to a reasonable $100,000 to ensure meltdown draws occur; a ceiling of $0 disables meltdown draws) of the Cover Spending Gap strategy to find the ceiling that minimises lifetime income tax paid.</p>
               <p className="text-xs text-slate-500 italic">
                 The optimizer temporarily overrides your plan's configured <strong>Drawdown Strategy</strong> to Cover Spending Gap and sweeps the <strong>Gross Income Ceiling</strong> for each person. All other plan details—such as expected return rates, inflation, income, spending phases, TFSA/Non-Registered contribution rules, and other dashboard overrides—remain exactly as configured in your plan.
               </p>
