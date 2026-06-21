@@ -4,7 +4,6 @@ A place to quickly capture ideas, UI enhancements, tax engine updates, and gener
 
 ## Inbox
 
-- [2026-06-20] Canned JSON files for demonstration and end to end test.
 - [2026-06-20] Project context to more easily update static public information e.g. tax rates and historical return rates
 - [2026-06-20] Add other provinces to the jurisdiction
 
@@ -20,3 +19,9 @@ A place to quickly capture ideas, UI enhancements, tax engine updates, and gener
 
 ### Testing & Quality Assurance
 - *TBD*
+
+---
+
+## Completed
+
+- [2026-06-21] Canned JSON file for Jack and Dianne (Ottawa demo plan) to use for demonstration and video storytelling.
