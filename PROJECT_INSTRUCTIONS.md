@@ -272,9 +272,8 @@ When the user says this, follow these steps:
    - `README.md` — update the `**Version X.Y.Z**` line on line 5
    - `src/App.tsx` — version is auto-imported from `package.json`, no change needed
 
-5. **Build and release** — run the following in order:
+5. **Build and Request Release** — Run `npm run build` to verify the build, but do NOT automatically run git add, git commit, git tag, git push, or gh release commands unless the user has explicitly requested you to commit or push in their prompt. Ask the user for explicit permission to proceed with the following commands:
    ```
-   npm run build
    git add -A
    git commit -m "Bump version to X.Y.Z"
    git tag vX.Y.Z

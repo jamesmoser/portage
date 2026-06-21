@@ -1015,6 +1015,117 @@ export function AnalysisTab() {
 
   // ── JSX ───────────────────────────────────────────────────────────────────
 
+  if (effectiveState.withdrawalStrategy.drawdownStrategy === 'none') {
+    return (
+      <div className="max-w-2xl mx-auto mt-8">
+        <SectionCard title="Analysis Tab Locked" width="full">
+          <div className="space-y-6 py-2">
+            <InfoPanel>
+              <div className="flex items-start gap-3">
+                <span className="text-xl mt-0.5">⚠️</span>
+                <div>
+                  <h4 className="font-semibold text-slate-800">Drawdown Strategy Required</h4>
+                  <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+                    Under a <strong>None</strong> drawdown strategy, no funds are withdrawn from investment accounts 
+                    (RRSP, TFSA, or Non-Registered) to cover retirement spending shortfalls. 
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                    This causes portfolio balances to grow unchecked, producing unrealistic 100% success rates and invalid outputs across all simulation and optimization tools.
+                  </p>
+                </div>
+              </div>
+            </InfoPanel>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-700">Choose a Decumulation Strategy to Unlock</h3>
+              <p className="text-xs text-slate-500">
+                Selecting a strategy below will update your active plan settings and enable the analysis simulations.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                <button
+                  onClick={() => {
+                    if (state.whatIfs.drawdownStrategy?.enabled) {
+                      state.updateWhatIf('drawdownStrategy', {
+                        value: { ...state.whatIfs.drawdownStrategy.value, strategyType: 'spendGap' }
+                      })
+                    } else {
+                      state.updateNested('withdrawalStrategy', 'drawdownStrategy', 'spendGap')
+                    }
+                  }}
+                  className="flex flex-col items-start p-4 text-left border border-slate-200 rounded-lg hover:border-red-600 hover:bg-red-50/20 transition-all group"
+                >
+                  <span className="font-medium text-sm text-slate-800 group-hover:text-red-700">Spend Gap (Recommended)</span>
+                  <span className="text-xs text-slate-500 mt-1">Automatically withdraws to exactly cover retirement spending deficits in tax-efficient order.</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (state.whatIfs.drawdownStrategy?.enabled) {
+                      state.updateWhatIf('drawdownStrategy', {
+                        value: { ...state.whatIfs.drawdownStrategy.value, strategyType: 'bengen' }
+                      })
+                    } else {
+                      state.updateNested('withdrawalStrategy', 'drawdownStrategy', 'bengen')
+                    }
+                  }}
+                  className="flex flex-col items-start p-4 text-left border border-slate-200 rounded-lg hover:border-red-600 hover:bg-red-50/20 transition-all group"
+                >
+                  <span className="font-medium text-sm text-slate-800 group-hover:text-red-700">Bengen (e.g. 4% Rule)</span>
+                  <span className="text-xs text-slate-500 mt-1">Withdraws a fixed initial dollar amount indexed to inflation, using a specified account drawing order.</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (state.whatIfs.drawdownStrategy?.enabled) {
+                      state.updateWhatIf('drawdownStrategy', {
+                        value: { ...state.whatIfs.drawdownStrategy.value, strategyType: 'gk' }
+                      })
+                    } else {
+                      state.updateNested('withdrawalStrategy', 'drawdownStrategy', 'gk')
+                    }
+                  }}
+                  className="flex flex-col items-start p-4 text-left border border-slate-200 rounded-lg hover:border-red-600 hover:bg-red-50/20 transition-all group"
+                >
+                  <span className="font-medium text-sm text-slate-800 group-hover:text-red-700">Guyton-Klinger Guardrails</span>
+                  <span className="text-xs text-slate-500 mt-1">Dynamic rule that adjusts withdrawals upward during good market periods or cuts them to preserve capital.</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (state.whatIfs.drawdownStrategy?.enabled) {
+                      state.updateWhatIf('drawdownStrategy', {
+                        value: { ...state.whatIfs.drawdownStrategy.value, strategyType: 'fixedPct' }
+                      })
+                    } else {
+                      state.updateNested('withdrawalStrategy', 'drawdownStrategy', 'fixedPct')
+                    }
+                  }}
+                  className="flex flex-col items-start p-4 text-left border border-slate-200 rounded-lg hover:border-red-600 hover:bg-red-50/20 transition-all group"
+                >
+                  <span className="font-medium text-sm text-slate-800 group-hover:text-red-700">Fixed Percentage / Fixed Dollar</span>
+                  <span className="text-xs text-slate-500 mt-1">Withdraws custom constant percentages or fixed dollar amounts annually from each account.</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-xs text-slate-400">
+              <span>Or configure this under the <strong>Investments &rarr; Withdrawal Strategy</strong> input tab.</span>
+              {state.whatIfs.drawdownStrategy?.enabled && (
+                <button
+                  onClick={() => state.updateWhatIf('drawdownStrategy', { enabled: false })}
+                  className="text-red-700 hover:underline font-medium"
+                >
+                  Disable What-If Override
+                </button>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* ── Probability Analysis ──────────────────────────────────────────── */}
