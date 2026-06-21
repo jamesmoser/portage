@@ -20,7 +20,13 @@ This document provides the story and configuration details for the Jack and Dian
 >
 > They have a small cash buffer of $10,000 and spend whatever remains of their after-tax income, aiming to maintain this level of lifestyle consumption in their early retirement (Go-Go) years before scaling back to 80% for the rest of their lives.
 >
-> Now, they are beginning to think about decumulation planning as novices, starting their CPP and OAS benefits at age 65."
+> Now, they are beginning to think about decumulation planning as novices, starting their CPP and OAS benefits at age 65.
+>
+> If everything goes according to plan, Jack and Dianne are set up for a very comfortable retirement. With their modest spending requirements, Jack could easily retire at 55. But things don't always go according to plan.
+>
+> With Dianne's defined benefit pension as a buffer, the couple's retirement looks secure under pressure - an unexpected layoff, Jack's untimely death, or a prolonged bear market. But that is only true in isolation; the story quickly erodes when these events occur together - that is, when life happens.
+>
+> Portage is a tool that allows you to evaluate the outcome under any possible scenario."
 
 ---
 
