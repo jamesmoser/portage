@@ -23,6 +23,7 @@ dist/
 
 # Exported plan files (downloaded to ~/Downloads, but ignore if accidentally placed here)
 *.json
+!examples/*.json
 
 # Logs
 npm-debug.log*
