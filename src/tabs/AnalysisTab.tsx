@@ -432,6 +432,7 @@ export function AnalysisTab() {
         type: 'scatter',
         mode: 'markers+text',
         name: 'Benchmarks',
+        cliponaxis: false,
         marker: {
           symbol: 'circle',
           size: 8,
@@ -1790,7 +1791,7 @@ export function AnalysisTab() {
                       layout={{
                         yaxis: { 
                           title: { text: 'Success Rate (%)', font: { size: 11 } },
-                          range: [0, 105] 
+                          range: [0, 110] 
                         },
                         xaxis: { 
                           tickformat: ',.0f', 
