@@ -5,6 +5,15 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.10.1] — 2026-06-21
+
+### Added
+- **E2E Testing & Demo Plan Integration** — Added E2E integration tests based on the Jack & Dianne demonstration plan.
+- **Drawdown Strategies Testing** — Added unit test coverage for Bengen, Guyton-Klinger, and Fixed Percentage drawdown strategies.
+
+### Fixed
+- **Local Data Leaks & Pathing** — Replaced absolute local paths with relative links in documentation and cleaned up variable names in `AnalysisTab.tsx`.
+
 ## [0.10.0] — 2026-06-21
 
 ### Added
