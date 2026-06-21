@@ -302,14 +302,14 @@ export function AnalysisTab() {
     return nextAge
   }
 
-  const baseA = Math.round(decimalAgeAt(effectiveState.personA.birthDate, effectiveState.personA.retirementDate))
-  const baseB = effectiveState.personB.birthDate
-    ? Math.round(decimalAgeAt(effectiveState.personB.birthDate, effectiveState.personB.retirementDate))
-    : 0
-
   const currentAgeA = Math.max(35, getNextBirthdayAge(effectiveState.personA.birthDate, todayStr()))
   const currentAgeB = effectiveState.personB.birthDate
     ? Math.max(35, getNextBirthdayAge(effectiveState.personB.birthDate, todayStr()))
+    : 0
+
+  const baseA = Math.max(currentAgeA, Math.round(decimalAgeAt(effectiveState.personA.birthDate, effectiveState.personA.retirementDate)))
+  const baseB = effectiveState.personB.birthDate
+    ? Math.max(currentAgeB, Math.round(decimalAgeAt(effectiveState.personB.birthDate, effectiveState.personB.retirementDate)))
     : 0
 
   useEffect(() => {

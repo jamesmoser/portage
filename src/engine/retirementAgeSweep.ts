@@ -199,8 +199,11 @@ export function runRetirementAgeSweep(
 ): RetirementAgeSweepResult {
   const points: RetirementAgeSweepPoint[] = []
 
-  const baseA = Math.round(decimalAgeAt(state.personA.birthDate, state.personA.retirementDate))
-  const baseB = Math.round(decimalAgeAt(state.personB.birthDate, state.personB.retirementDate))
+  const currentAgeA = Math.max(35, getNextBirthdayAge(state.personA.birthDate, todayStr()))
+  const currentAgeB = Math.max(35, getNextBirthdayAge(state.personB.birthDate, todayStr()))
+
+  const baseA = Math.max(currentAgeA, Math.round(decimalAgeAt(state.personA.birthDate, state.personA.retirementDate)))
+  const baseB = Math.max(currentAgeB, Math.round(decimalAgeAt(state.personB.birthDate, state.personB.retirementDate)))
 
   // Loop through ages for A and B
   for (let ageA = options.startAgeA; ageA <= options.endAgeA; ageA += options.step) {
@@ -266,8 +269,6 @@ export function runRetirementAgeSweep(
   let minTogetherYear = Infinity
 
   const currentYear = new Date().getFullYear()
-  const currentAgeA = Math.max(35, getNextBirthdayAge(state.personA.birthDate, todayStr()))
-  const currentAgeB = Math.max(35, getNextBirthdayAge(state.personB.birthDate, todayStr()))
 
   for (const p of points) {
     if (p.success) {
