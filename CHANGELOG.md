@@ -5,6 +5,24 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.10.0] — 2026-06-21
+
+### Added
+- **Plan Viability Analyzer** — Added a required return rate sweep chart and side-by-side historical Asset Mix suggestions table.
+
+### Changed
+- **Meltdown Optimizer UI** — Repositioned floor and OAS clawback annotations, and added an optimal minimum dot marker.
+- **Spending Sweep UI** — Restyled benchmarks as red dots with bold labels, hid built-in Plotly legends, added a clean custom HTML legend, and extended the Y-axis to 110% headroom to prevent label clipping.
+- **Spaghetti Plot UI** — Highlighted the Final Portfolio Balance column in the details table in amber-50 to match the Monte Carlo P10 column, and updated the best-case line to solid grey with thickness 3.
+- **Coast FIRE Calculator UI** — Converted the metric selector to a segmented toggle next to the title, standardized status boxes to always use the amber theme, and added a custom HTML legend.
+
+## [0.9.0] — 2026-06-20
+
+### Added
+- **Life Insurance Needs Analyser** — Added a simulator that runs the full Canadian tax and decumulation projection engine under various longevity scenarios to determine life insurance coverage requirements.
+
+---
+
 ## [0.8.0] — 2026-06-20
 
 ### Added
