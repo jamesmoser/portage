@@ -5,6 +5,12 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.11.0] — 2026-06-21
+
+### Added
+- **Historical Return Profile Override** — Added a "Historical" market profile option on the dashboard with 10% asset mix increments, 8 historical eras/starting points, description panels, and era-average overflow fill.
+- **Retirement Age Sweep Analyzer** — Added the retirement age sweep simulator to analyze the success of the plan across a range of retirement ages.
+
 ## [0.10.1] — 2026-06-21
 
 ### Added
