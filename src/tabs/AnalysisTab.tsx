@@ -261,7 +261,7 @@ export function AnalysisTab() {
       type: 'scatter',
       mode: 'lines',
       name: `Best Case (${bestPath.label})`,
-      line: { color: '#166534', width: 3 },
+      line: { color: '#94a3b8', width: 3 },
       hovertemplate: `<b>Best: ${bestPath.label}</b><br>Age: %{x}<br>Portfolio: %{y:$,.0f}<extra></extra>`
     })
 
