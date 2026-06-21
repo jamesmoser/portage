@@ -13,7 +13,7 @@ import { PlotlyChart } from '../components/PlotlyChart'
 import { InfoPanel } from '../components/InfoPanel'
 import { runProjection } from '../engine/projection'
 import { mergeWhatIfs } from '../engine/whatifs'
-import { getYear, dateAtAge, intAgeAt, jan1 } from '../engine/dates'
+import { getYear, dateAtAge, intAgeAt, jan1, dateAtDecimalAge } from '../engine/dates'
 import type { AppState } from '../engine/types'
 import { DEFAULT_WHATIFS } from '../engine/defaults'
 import { generateRateSchedule } from '../engine/rateProfiles'
@@ -61,8 +61,10 @@ export function AnalysisTab() {
   const rateSchedule = useMemo(() => {
     if (!whatIfs.marketProfile?.enabled) return undefined
     const currentYear = new Date().getFullYear()
-    const eA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
-    const eB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+    const eA = getYear(dateAtDecimalAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
+    const eB = effectiveState.personB.birthDate
+      ? getYear(dateAtDecimalAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+      : 0
     const refBirth = effectiveState.ageReferencePerson === 'personB'
       ? effectiveState.personB.birthDate
       : effectiveState.personA.birthDate
@@ -177,8 +179,10 @@ export function AnalysisTab() {
   const refName = effectiveState.ageReferencePerson === 'personB' ? bName : aName
   const startAge = intAgeAt(refPerson.birthDate, jan1(currentYear))
 
-  const eA = getYear(dateAtAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
-  const eB = getYear(dateAtAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+  const eA = getYear(dateAtDecimalAge(effectiveState.personA.birthDate, effectiveState.personA.planningEndAge))
+  const eB = effectiveState.personB.birthDate
+    ? getYear(dateAtDecimalAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
+    : 0
   const endYear = Math.max(eA, eB)
   const maxStartYearLimit = 2025 - (endYear - currentYear)
 
@@ -945,12 +949,30 @@ export function AnalysisTab() {
     const xs = sweep.map(p => p.grossIncomeCeiling)
     const ys = sweep.map(p => p.lifetimeTax)
 
-    const trace: Data = {
-      x: xs, y: ys,
-      type: 'scatter', mode: 'lines',
-      line: { color: '#334155', width: 2 },
-      name: 'Lifetime Tax',
-      hovertemplate: 'Ceiling: %{x:$,.0f}<br>Tax: %{y:$,.0f}<extra></extra>',
+    const traces: Data[] = [
+      {
+        x: xs, y: ys,
+        type: 'scatter', mode: 'lines',
+        line: { color: '#7B1515', width: 2 },
+        name: 'Lifetime Tax',
+        hovertemplate: 'Ceiling: %{x:$,.0f}<br>Tax: %{y:$,.0f}<extra></extra>',
+      }
+    ]
+
+    const optimalPoint = sweep.find(p => p.grossIncomeCeiling === optimalCeiling)
+    if (optimalPoint && optimalCeiling !== null) {
+      traces.push({
+        x: [optimalCeiling],
+        y: [optimalPoint.lifetimeTax],
+        type: 'scatter',
+        mode: 'markers+text',
+        marker: { color: '#7B1515', size: 8 },
+        text: ['<b>Optimal</b>'],
+        textposition: 'top center',
+        textfont: { color: '#7B1515', size: 10, family: 'system-ui, sans-serif' },
+        showlegend: false,
+        hovertemplate: `Optimal Ceiling: $%{x:,.0f}<br>Min Tax: $%{y:,.0f}<extra></extra>`,
+      })
     }
 
     const shapes: object[] = []
@@ -963,9 +985,10 @@ export function AnalysisTab() {
         line: { color: '#94a3b8', dash: 'dot', width: 1.5 },
       })
       annotations.push({
-        x: incomeFloor, xref: 'x', y: 0.97, yref: 'paper',
+        x: incomeFloor, xref: 'x', y: 0.03, yref: 'paper',
         text: 'Floor', showarrow: false,
-        font: { size: 9, color: '#64748b' }, xanchor: 'left', yanchor: 'top',
+        font: { size: 9, color: '#64748b' }, xanchor: 'left', yanchor: 'bottom',
+        align: 'left',
       })
     }
 
@@ -977,9 +1000,10 @@ export function AnalysisTab() {
         line: { color: '#f59e0b', dash: 'dot', width: 1 },
       })
       annotations.push({
-        x: oasClawbackThreshold, xref: 'x', y: 0.80, yref: 'paper',
+        x: oasClawbackThreshold, xref: 'x', y: 0.97, yref: 'paper',
         text: 'Clawback<br>Start', showarrow: false,
         font: { size: 9, color: '#d97706' }, xanchor: 'left', yanchor: 'top',
+        align: 'left',
       })
     }
 
@@ -992,26 +1016,14 @@ export function AnalysisTab() {
         line: { color: '#f59e0b', dash: 'dash', width: 1 },
       })
       annotations.push({
-        x: fullClawbackIncome, xref: 'x', y: 0.65, yref: 'paper',
+        x: fullClawbackIncome, xref: 'x', y: 0.97, yref: 'paper',
         text: 'OAS Fully<br>Clawed Back', showarrow: false,
         font: { size: 9, color: '#d97706' }, xanchor: 'left', yanchor: 'top',
+        align: 'left',
       })
     }
 
-    // Optimal ceiling line
-    if (optimalCeiling !== null) {
-      shapes.push({
-        type: 'line', x0: optimalCeiling, x1: optimalCeiling, y0: 0, y1: 1, yref: 'paper',
-        line: { color: '#7B1515', dash: 'dash', width: 2 },
-      })
-      annotations.push({
-        x: optimalCeiling, xref: 'x', y: 0.90, yref: 'paper',
-        text: `Optimal: ${fmt(optimalCeiling)}`, showarrow: false,
-        font: { size: 9, color: '#7B1515' }, xanchor: 'left', yanchor: 'top',
-      })
-    }
-
-    return { trace, shapes, annotations }
+    return { traces, shapes, annotations }
   }
 
   // ── JSX ───────────────────────────────────────────────────────────────────
@@ -1410,6 +1422,7 @@ export function AnalysisTab() {
                       legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
                     }}
                     style={{ height: 380 }}
+                    forceZeroY={true}
                   />
                 </div>
   
@@ -1600,6 +1613,7 @@ export function AnalysisTab() {
                     legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
                   }}
                   style={{ height: 420 }}
+                  forceZeroY={true}
                 />
               </div>
 
@@ -1957,46 +1971,64 @@ export function AnalysisTab() {
               ? `Stop Saving at Coast Age ${coastAge} (Succeeds)`
               : `Stop Saving at Coast Age ${coastAge} (${coastPlotMetric === 'worst' ? 'Worst Case' : 'Median'} — Success Rate: ${((coastHistResult?.successRateCoast ?? 0) * 100).toFixed(0)}%)`
 
-            const coastChartTraces: Data[] = [
-              {
-                x: agesArray,
-                y: currentPlanPath,
-                customdata: yearsArray,
+            const alignTraceLength = (xArr: number[], yArr: number[]) => {
+              const minLen = Math.min(xArr.length, yArr.length)
+              return {
+                x: xArr.slice(0, minLen),
+                y: yArr.slice(0, minLen)
+              }
+            }
+
+            const coastChartTraces: Data[] = []
+            
+            const safeCurrentPlan = alignTraceLength(agesArray, currentPlanPath)
+            if (safeCurrentPlan.x.length > 0) {
+              coastChartTraces.push({
+                x: safeCurrentPlan.x,
+                y: safeCurrentPlan.y,
+                customdata: yearsArray.slice(0, safeCurrentPlan.x.length),
                 type: 'scatter',
                 mode: 'lines',
                 name: currentPlanName,
                 line: { color: '#d97706', width: 2 },
                 hovertemplate: 'Current Plan<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
-              },
-              {
-                x: agesArray,
-                y: stopTodayPath,
-                customdata: yearsArray,
+              })
+            }
+            
+            const safeStopToday = alignTraceLength(agesArray, stopTodayPath)
+            if (safeStopToday.x.length > 0) {
+              coastChartTraces.push({
+                x: safeStopToday.x,
+                y: safeStopToday.y,
+                customdata: yearsArray.slice(0, safeStopToday.x.length),
                 type: 'scatter',
                 mode: 'lines',
                 name: stopTodayName,
                 line: { color: isSucceedingToday ? '#166534' : '#7B1515', width: 2 },
                 hovertemplate: 'Stop Saving Today<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
-              }
-            ]
+              })
+            }
 
             if (coastYear !== null && coastYear > currentYear) {
-              coastChartTraces.push({
-                x: agesArray,
-                y: stopCoastPath,
-                customdata: yearsArray,
-                type: 'scatter',
-                mode: 'lines',
-                name: stopCoastName,
-                line: { color: '#166534', width: 2.5 },
-                hovertemplate: 'Stop Saving at Coast Age<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
-              })
+              const safeStopCoast = alignTraceLength(agesArray, stopCoastPath)
+              if (safeStopCoast.x.length > 0) {
+                coastChartTraces.push({
+                  x: safeStopCoast.x,
+                  y: safeStopCoast.y,
+                  customdata: yearsArray.slice(0, safeStopCoast.x.length),
+                  type: 'scatter',
+                  mode: 'lines',
+                  name: stopCoastName,
+                  line: { color: '#166534', width: 2.5 },
+                  hovertemplate: 'Stop Saving at Coast Age<br>Age %{x} (%{customdata}): %{y:$,.0f}<extra></extra>'
+                })
+              }
             }
 
             const shapes: any[] = []
             const annotations: any[] = []
 
-            if (hasResult && coastAge !== null) {
+            if (hasResult && coastAge !== null && !isNaN(coastAge)) {
               shapes.push({
                 type: 'line',
                 x0: coastAge,
@@ -2015,7 +2047,8 @@ export function AnalysisTab() {
                 showarrow: false,
                 font: { size: 10, color: '#166534' },
                 xanchor: 'left',
-                yanchor: 'bottom'
+                yanchor: 'bottom',
+                align: 'left'
               })
             }
 
@@ -2144,6 +2177,7 @@ export function AnalysisTab() {
                           annotations
                         }}
                         style={{ height: 380 }}
+                        forceZeroY={true}
                       />
                     </div>
 
@@ -2692,6 +2726,7 @@ export function AnalysisTab() {
                           font: { size: 10, color: '#7B1515' },
                           xanchor: 'left',
                           bgcolor: 'rgba(255,255,255,0.85)',
+                          align: 'left',
                         },
                         {
                           x: returnResult.baselineRate,
@@ -2702,6 +2737,7 @@ export function AnalysisTab() {
                           font: { size: 10, color: '#475569' },
                           xanchor: returnResult.baselineRate < requiredRate ? 'right' : 'left',
                           bgcolor: 'rgba(255,255,255,0.85)',
+                          align: 'left',
                         },
                       ],
                       legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, x: 0 },
@@ -3028,7 +3064,7 @@ export function AnalysisTab() {
   
                   {/* ── Person A sweep ── */}
                   {hasMeltdownA && (() => {
-                    const { trace, shapes, annotations } = buildMeltdownChart(
+                    const { traces, shapes, annotations } = buildMeltdownChart(
                       meltResult.sweepA,
                       meltResult.optimalCeilingA,
                       meltResult.incomeFloorA,
@@ -3043,7 +3079,7 @@ export function AnalysisTab() {
                           {aName} — Meltdown Phase ({firstYear}–{lastYear}, {meltResult.meltdownYearsA.length} year{meltResult.meltdownYearsA.length !== 1 ? 's' : ''})
                         </div>
                         <PlotlyChart
-                          data={[trace]}
+                          data={traces}
                           layout={{
                             shapes,
                             annotations,
@@ -3074,7 +3110,7 @@ export function AnalysisTab() {
   
                   {/* ── Person B sweep ── */}
                   {hasMeltdownB && (() => {
-                    const { trace, shapes, annotations } = buildMeltdownChart(
+                    const { traces, shapes, annotations } = buildMeltdownChart(
                       meltResult.sweepB,
                       meltResult.optimalCeilingB,
                       meltResult.incomeFloorB,
@@ -3089,7 +3125,7 @@ export function AnalysisTab() {
                           {bName} — Meltdown Phase ({firstYear}–{lastYear}, {meltResult.meltdownYearsB.length} year{meltResult.meltdownYearsB.length !== 1 ? 's' : ''})
                         </div>
                         <PlotlyChart
-                          data={[trace]}
+                          data={traces}
                           layout={{
                             shapes,
                             annotations,

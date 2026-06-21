@@ -36,6 +36,7 @@ interface Props {
   config?: Partial<PlotlyConfig>
   className?: string
   style?: React.CSSProperties
+  forceZeroY?: boolean
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +49,7 @@ function getPlotly(): Promise<any> {
   return plotlyPromise
 }
 
-export function PlotlyChart({ data, layout, config, className, style }: Props) {
+export function PlotlyChart({ data, layout, config, className, style, forceZeroY = false }: Props) {
   const divRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -58,18 +59,54 @@ export function PlotlyChart({ data, layout, config, className, style }: Props) {
 
     getPlotly().then((Plotly) => {
       if (cancelled || !el) return
+
+      let hasNegativeY = false
+      if (Array.isArray(data)) {
+        for (const trace of data) {
+          if (Array.isArray(trace?.y)) {
+            for (const val of trace.y) {
+              if (typeof val === 'number' && val < -0.01) {
+                hasNegativeY = true
+                break
+              }
+            }
+          }
+          if (hasNegativeY) break
+        }
+      }
+
+      const showXAxisLine = layout?.xaxis?.visible !== false
+      const mergedLayout = {
+        margin: { t: 20, r: 10, b: 36, l: 70 },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: '#f8fafc',
+        font: { family: 'system-ui, sans-serif', size: 11, color: '#475569' },
+        showlegend: false,
+        ...layout,
+        xaxis: {
+          ...(showXAxisLine ? {
+            showline: true,
+            linecolor: '#cbd5e1',
+            linewidth: 1.2,
+          } : {}),
+          zeroline: false,
+          ...layout?.xaxis,
+        },
+        yaxis: {
+          ...(!hasNegativeY && forceZeroY ? { range: [0, null] } : {}),
+          ...(!hasNegativeY ? { rangemode: 'nonnegative' as const } : {}),
+          zeroline: true,
+          zerolinecolor: '#cbd5e1',
+          zerolinewidth: 1.2,
+          ...layout?.yaxis,
+        },
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(Plotly as any).react(
         el,
         data,
-        {
-          margin: { t: 20, r: 10, b: 36, l: 70 },
-          paper_bgcolor: 'transparent',
-          plot_bgcolor: '#f8fafc',
-          font: { family: 'system-ui, sans-serif', size: 11, color: '#475569' },
-          showlegend: false,
-          ...layout,
-        },
+        mergedLayout,
         {
           responsive: true,
           displayModeBar: false,
