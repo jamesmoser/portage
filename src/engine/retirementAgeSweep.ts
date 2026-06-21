@@ -2,6 +2,7 @@ import type { AppState } from './types'
 import { runProjection } from './projection'
 
 import { dateAtAge, dateAtDecimalAge, exactAgeAt, parseDate, formatDate, todayStr, getYear } from './dates'
+import { HISTORICAL_MONTHLY_RETURNS } from './historicalData'
 
 export interface RetirementAgeSweepPoint {
   ageA: number
@@ -37,6 +38,9 @@ export interface RetirementAgeSweepOptions {
   cascadeRrsp: boolean
   cascadeTfsa: boolean
   cascadeNonReg: boolean
+  rateType?: 'plan' | 'historical'
+  equityAllocationPct?: number
+  historicalStartYear?: number
 }
 
 // Helper to determine the next birthday age, avoiding timezone or leap-year drift.
@@ -205,32 +209,136 @@ export function runRetirementAgeSweep(
   const baseA = Math.max(currentAgeA, Math.round(decimalAgeAt(state.personA.birthDate, state.personA.retirementDate)))
   const baseB = Math.max(currentAgeB, Math.round(decimalAgeAt(state.personB.birthDate, state.personB.retirementDate)))
 
+  // Generate historical rate schedules once if historical simulation is requested
+  const schedules: number[][] = []
+  if (options.rateType === 'historical') {
+    const deathDateA = dateAtDecimalAge(state.personA.birthDate, state.personA.planningEndAge)
+    const deathDateB = dateAtDecimalAge(state.personB.birthDate, state.personB.planningEndAge)
+    const endYearA   = getYear(deathDateA)
+    const endYearB   = getYear(deathDateB)
+    const endYear    = Math.max(endYearA, endYearB)
+    const currentYear = new Date().getFullYear()
+    const n           = endYear - currentYear + 1
+
+    const eqWeight = (options.equityAllocationPct ?? 60) / 100
+    const bondWeight = 1.0 - eqWeight
+
+    const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => r.year >= (options.historicalStartYear ?? 1871))
+    const monthsNeeded = n * 12
+
+    for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
+      const startItem = filteredReturns[startIdx]
+      // Use annual resolution (start in Jan only) for optimal speed
+      if (startItem.month !== 1) {
+        continue
+      }
+
+      const schedule: number[] = []
+      const userInflation = state.personalInflationRatePct / 100
+      for (let y = 0; y < n; y++) {
+        let compoundedReal = 1.0
+        for (let m = 0; m < 12; m++) {
+          const item = filteredReturns[startIdx + y * 12 + m]
+          const masterIdx = HISTORICAL_MONTHLY_RETURNS.findIndex(r => r.year === item.year && r.month === item.month)
+          const prevItem = masterIdx > 0 ? HISTORICAL_MONTHLY_RETURNS[masterIdx - 1] : item
+          const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
+          const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
+          compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+        }
+        schedule.push(compoundedReal * (1.0 + userInflation) - 1.0)
+      }
+      schedules.push(schedule)
+    }
+  }
+
   // Loop through ages for A and B
   for (let ageA = options.startAgeA; ageA <= options.endAgeA; ageA += options.step) {
     for (let ageB = options.startAgeB; ageB <= options.endAgeB; ageB += options.step) {
       const testState = applyRetirementAges(state, ageA, ageB, options)
 
-      const { warnings, dataPoints } = runProjection(testState, rateSchedule)
-      const shortfallYears = warnings.filter(w => w.includes('spending shortfall')).length
-      const success = shortfallYears === 0
-      const successRate = success ? 100 : 0
-      const finalBalance = dataPoints[dataPoints.length - 1]?.totalPortfolio ?? 0
-
+      let successRate = 0
+      let success = false
+      let shortfallYears = 0
+      let finalBalance = 0
       let firstShortfallYear: number | null = null
-      const firstWarning = warnings.find(w => w.includes('spending shortfall'))
-      if (firstWarning) {
-        const match = firstWarning.match(/Year (\d+):/)
-        if (match) firstShortfallYear = parseInt(match[1], 10)
-      }
-
       let shortfallTotal = 0
-      for (const w of warnings) {
-        if (w.includes('spending shortfall')) {
-          const idx = w.indexOf('$')
-          if (idx !== -1) {
-            const digits = w.substring(idx + 1).replace(/\D/g, '')
-            if (digits) {
-              shortfallTotal += parseInt(digits, 10)
+
+      if (options.rateType === 'historical' && schedules.length > 0) {
+        let successCount = 0
+        let totalShortfallYears = 0
+        let totalShortfallTotal = 0
+        const finalBalances: number[] = []
+
+        for (const schedule of schedules) {
+          const { warnings, dataPoints } = runProjection(testState, schedule)
+          const pathShortfallYears = warnings.filter(w => w.includes('spending shortfall')).length
+          const pathSuccess = pathShortfallYears === 0
+          if (pathSuccess) {
+            successCount++
+          } else {
+            totalShortfallYears += pathShortfallYears
+            
+            let pathFirstShortfallYear: number | null = null
+            const firstWarning = warnings.find(w => w.includes('spending shortfall'))
+            if (firstWarning) {
+              const match = firstWarning.match(/Year (\d+):/)
+              if (match) pathFirstShortfallYear = parseInt(match[1], 10)
+            }
+            if (pathFirstShortfallYear !== null) {
+              if (firstShortfallYear === null || pathFirstShortfallYear < firstShortfallYear) {
+                firstShortfallYear = pathFirstShortfallYear
+              }
+            }
+
+            for (const w of warnings) {
+              if (w.includes('spending shortfall')) {
+                const idx = w.indexOf('$')
+                if (idx !== -1) {
+                  const digits = w.substring(idx + 1).replace(/\D/g, '')
+                  if (digits) {
+                    totalShortfallTotal += parseInt(digits, 10)
+                  }
+                }
+              }
+            }
+          }
+          finalBalances.push(dataPoints[dataPoints.length - 1]?.totalPortfolio ?? 0)
+        }
+
+        successRate = (successCount / schedules.length) * 100
+        success = successCount === schedules.length // 100% success rate is the safe boundary
+        shortfallYears = Math.round(totalShortfallYears / schedules.length)
+        shortfallTotal = Math.round(totalShortfallTotal / schedules.length)
+
+        if (finalBalances.length > 0) {
+          finalBalances.sort((a, b) => a - b)
+          const mid = Math.floor(finalBalances.length / 2)
+          finalBalance = finalBalances.length % 2 !== 0
+            ? finalBalances[mid]
+            : (finalBalances[mid - 1] + finalBalances[mid]) / 2
+        }
+      } else {
+        const { warnings, dataPoints } = runProjection(testState, rateSchedule)
+        const pathShortfallYears = warnings.filter(w => w.includes('spending shortfall')).length
+        success = pathShortfallYears === 0
+        successRate = success ? 100 : 0
+        shortfallYears = pathShortfallYears
+        finalBalance = dataPoints[dataPoints.length - 1]?.totalPortfolio ?? 0
+
+        const firstWarning = warnings.find(w => w.includes('spending shortfall'))
+        if (firstWarning) {
+          const match = firstWarning.match(/Year (\d+):/)
+          if (match) firstShortfallYear = parseInt(match[1], 10)
+        }
+
+        for (const w of warnings) {
+          if (w.includes('spending shortfall')) {
+            const idx = w.indexOf('$')
+            if (idx !== -1) {
+              const digits = w.substring(idx + 1).replace(/\D/g, '')
+              if (digits) {
+                shortfallTotal += parseInt(digits, 10)
+              }
             }
           }
         }

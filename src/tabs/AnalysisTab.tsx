@@ -284,6 +284,17 @@ export function AnalysisTab() {
   const [retResult, setRetResult] = useState<RetirementAgeSweepResult | null>(null)
   const [retRunning, setRetRunning] = useState(false)
   const [retApplyTarget, setRetApplyTarget] = useState<'personA' | 'personB' | 'joint' | 'balanced'>('personA')
+  const [retRateType, setRetRateType] = useState<'plan' | 'historical'>('plan')
+  const [retEqAllocation, setRetEqAllocation] = useState(60)
+  const [retStartYear, setRetStartYear] = useState(1871)
+
+  useEffect(() => {
+    if (retStartYear > maxStartYearLimit) {
+      const options = [2000, 1980, 1950, 1871]
+      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
+      setRetStartYear(best)
+    }
+  }, [maxStartYearLimit, retStartYear])
 
   const lastBirthA = useRef('')
   const lastBirthB = useRef('')
@@ -344,6 +355,9 @@ export function AnalysisTab() {
   const resetRetirementAgeSweep = () => {
     setRetResult(null)
     setRetApplyTarget('personA')
+    setRetRateType('plan')
+    setRetEqAllocation(60)
+    setRetStartYear(1871)
 
     const defaultStartA = currentAgeA
     const defaultEndA = Math.max(defaultStartA, Math.min(effectiveState.personA.planningEndAge, baseA + 10))
@@ -370,7 +384,10 @@ export function AnalysisTab() {
         cascadePension: true,
         cascadeRrsp: true,
         cascadeTfsa: true,
-        cascadeNonReg: true
+        cascadeNonReg: true,
+        rateType: retRateType,
+        equityAllocationPct: retEqAllocation,
+        historicalStartYear: retStartYear
       })
       setRetResult(res)
       setRetRunning(false)
@@ -483,7 +500,12 @@ export function AnalysisTab() {
         const yearA = getYear(dateA)
         const yearB = getYear(dateB)
         
-        const outcome = point.success ? 'Success' : `Failure (${point.shortfallYears} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
+        const outcome = point.success
+          ? (point.successRate === 100 ? 'Success' : `Success (${point.successRate.toFixed(0)}%)`)
+          : (point.successRate === 0
+              ? `Failure (${point.shortfallYears} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
+              : `Failure (${point.successRate.toFixed(0)}% success, Avg Shortfall: ${point.shortfallYears} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
+            )
         const firstYr = point.firstShortfallYear ? `<br>First Shortfall: Year ${point.firstShortfallYear}` : ''
         return `${aName} retires: Age ${yVal} (${yearA})<br>${bName} retires: Age ${xVal} (${yearB})<br>Outcome: <b>${outcome}</b>${firstYr}<br>Final Balance: ${fmt(point.finalBalance)}`
       })
@@ -2187,10 +2209,52 @@ export function AnalysisTab() {
             return (
               <>
                 {/* Controls */}
-                <div className="flex items-center gap-4 mb-4 flex-wrap">
+                <div className="flex items-end gap-4 mb-4 flex-wrap">
                   <button className="btn-primary" onClick={runRetirementSweep} disabled={retRunning}>
                     {retRunning ? 'Running…' : retResult ? 'Re-Run' : 'Run'}
                   </button>
+
+                  <SelectInput
+                    label="Rate Simulation"
+                    value={retRateType}
+                    onChange={v => setRetRateType(v as 'plan' | 'historical')}
+                    options={[
+                      { value: 'plan', label: 'Plan Rates' },
+                      { value: 'historical', label: 'Historical Rates' }
+                    ]}
+                    tooltip="Choose whether to evaluate sweep combinations using the flat rates defined in your plan, or stress-test against actual historical market data."
+                  />
+
+                  {retRateType === 'historical' && (
+                    <>
+                      <SelectInput
+                        label="Asset Allocation"
+                        value={retEqAllocation.toString()}
+                        onChange={v => setRetEqAllocation(parseInt(v))}
+                        options={[
+                          { value: '100', label: '100% Equity / 0% Bond' },
+                          { value: '80', label: '80% Equity / 20% Bond' },
+                          { value: '60', label: '60% Equity / 40% Bond' },
+                          { value: '40', label: '40% Equity / 60% Bond' },
+                          { value: '20', label: '20% Equity / 80% Bond' },
+                        ]}
+                        tooltip="Target mix compiled dynamically from historical monthly returns"
+                      />
+
+                      <SelectInput
+                        label="Period"
+                        value={retStartYear.toString()}
+                        onChange={v => setRetStartYear(parseInt(v))}
+                        options={[
+                          { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
+                          { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
+                          { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
+                          { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
+                        ]}
+                        tooltip="The starting year boundary for the simulation series"
+                      />
+                    </>
+                  )}
                 </div>
 
                 {retRunning && (
