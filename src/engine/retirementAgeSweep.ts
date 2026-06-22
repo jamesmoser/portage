@@ -223,7 +223,13 @@ export function runRetirementAgeSweep(
     const eqWeight = (options.equityAllocationPct ?? 60) / 100
     const bondWeight = 1.0 - eqWeight
 
-    const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => r.year >= (options.historicalStartYear ?? 1871))
+    const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => {
+      const startYear = options.historicalStartYear ?? 1871
+      if (r.year < startYear) return false
+      if (r.year > 2023) return false
+      if (r.year === 2023 && r.month > 9) return false
+      return true
+    })
     const monthsNeeded = n * 12
 
     for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {

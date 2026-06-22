@@ -51,8 +51,13 @@ export function runHistoricalAnalysis(
   const eqWeight = options.equityAllocationPct / 100
   const bondWeight = 1.0 - eqWeight
 
-  // Filter monthly returns by historicalStartYear
-  const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => r.year >= options.historicalStartYear)
+  // Filter monthly returns by historicalStartYear and cap at Sept 2023 due to post-Sept 2023 incomplete/zeroed data
+  const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => {
+    if (r.year < options.historicalStartYear) return false
+    if (r.year > 2023) return false
+    if (r.year === 2023 && r.month > 9) return false
+    return true
+  })
 
   // We need exactly n * 12 months for a full plan sequence
   const monthsNeeded = n * 12
@@ -210,7 +215,12 @@ export function runSpendingSweep(
   const bondWeight = 1.0 - eqWeight
 
   const resolution = options.resolution ?? 'annual'
-  const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => r.year >= options.historicalStartYear)
+  const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => {
+    if (r.year < options.historicalStartYear) return false
+    if (r.year > 2023) return false
+    if (r.year === 2023 && r.month > 9) return false
+    return true
+  })
   const monthsNeeded = n * 12
 
   // Compile return schedules once to avoid repeating work

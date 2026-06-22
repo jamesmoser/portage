@@ -78,6 +78,12 @@ export function getHistoricalAnnualReturns(equityWeight: number, startYear?: num
   
   for (const r of HISTORICAL_MONTHLY_RETURNS) {
     if (r.year >= limitYear) {
+      // Exclude data after September 2023 because bond/CPI values are zeroed out.
+      // This automatically means 2023 (only 9 months of valid data) will be skipped
+      // below in the `monthlyReturns.length === 12` check, ending active years at 2022.
+      if (r.year > 2023 || (r.year === 2023 && r.month > 9)) {
+        continue
+      }
       if (!returnsByYear[r.year]) {
         returnsByYear[r.year] = []
       }

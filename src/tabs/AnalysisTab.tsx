@@ -187,7 +187,7 @@ export function AnalysisTab() {
     ? getYear(dateAtDecimalAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
     : 0
   const endYear = Math.max(eA, eB)
-  const maxStartYearLimit = 2025 - (endYear - currentYear)
+  const maxStartYearLimit = 2023 - (endYear - currentYear)
 
   // ── Historical Sequence Stress Test state ──────────────────────────────────
   const [histEqAllocation, setHistEqAllocation] = useState(60)
@@ -1565,18 +1565,18 @@ export function AnalysisTab() {
                   <li><em>Traditional</em> — Uses the baseline rate profile as the mean expected return.</li>
                   <li><em>Reduced CMA</em> — Lowers the baseline expected return rates across the entire plan by a fixed reduction percentage to build in a conservative margin of safety.</li>
                   <li><em>Dynamic Reduced CMA</em> — Lowers baseline expected return rates in the early years of the plan. The reduction starts at a maximum and decays linearly to 0% over a configured decay period (e.g. 10 years). This models short-term market headwinds (like high starting valuations) returning to historical norms.</li>
-                  <li><em>Simple Bootstrap</em> — Non-parametric sampling. Draws random calendar-year returns directly from actual history (Shiller monthly dataset: 1871–2025) for a selected asset allocation and historical period.</li>
+                  <li><em>Simple Bootstrap</em> — Non-parametric sampling. Draws random calendar-year returns directly from actual history (Shiller monthly dataset: 1871–2022) for a selected asset allocation and historical period.</li>
                   <li><em>Block Bootstrap</em> — Draws random *consecutive blocks* of historical returns (e.g. 5-year blocks) to preserve business cycles, multi-year recessions, and momentum in market sequences.</li>
                   <li><em>Regime Switching</em> — Simulates economic expansions (long, high return, low volatility) and contractions (short, negative return, high volatility), with Markov transitions between the two regimes.</li>
                 </ul>
               </p>
               <p><strong>Historical Period</strong> — Filters the dataset for bootstrapping to specific economic epochs:
                 <ul className="list-disc pl-4 mt-1 space-y-1">
-                  <li><em>1871–2025</em> — Full history (155 years), capturing early industrial cycles, depressions, and wars.</li>
-                  <li><em>1950–2025</em> — Post-WWII modern era (76 years).</li>
-                  <li><em>1980–2025</em> — Post-Stagflation declining interest rate era (46 years).</li>
-                  <li><em>2000–2025</em> — 21st Century tech-bubble and recovery era (26 years).</li>
-                  <li><em>2015–2025</em> — Recent high-growth and high-volatility decade (11 years).</li>
+                  <li><em>1871–2022</em> — Full history (152 years), capturing early industrial cycles, depressions, and wars.</li>
+                  <li><em>1950–2022</em> — Post-WWII modern era (73 years).</li>
+                  <li><em>1980–2022</em> — Post-Stagflation declining interest rate era (43 years).</li>
+                  <li><em>2000–2022</em> — 21st Century tech-bubble and recovery era (23 years).</li>
+                  <li><em>2015–2022</em> — Recent high-growth and high-volatility decade (8 years).</li>
                 </ul>
               </p>
               <p><strong>Noise Distribution</strong> — Sets the shape of the random market perturbations:
@@ -1591,6 +1591,9 @@ export function AnalysisTab() {
               <p><strong>Probability of Success</strong> — Percentage of simulations where the portfolio remains above zero at the final year of the plan. 90%+ is generally considered robust; below 70% warrants strategy changes.</p>
               <p><strong>Median Depletion Age</strong> — In simulations that do deplete, the median age of the reference person when the portfolio first reaches zero. Only shown when at least 5% of simulations deplete.</p>
               <p>The fan chart shows the distribution of portfolio outcomes over time. The red line is the deterministic result of the configured rate profile. Grey bands show the 10th–90th and 25th–75th percentile ranges. Black dotted lines are the best and worst case outcomes across all simulations.</p>
+              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
+                <strong>Historical Data Limitations:</strong> Simple and Block Bootstrap methods draw from raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI). These projections do not account for USD/CAD exchange rate volatility, Canadian inflation differences, or Canadian tax/withholding differences on foreign-sourced investment income.
+              </p>
             </div>
           }>
   
@@ -1653,11 +1656,11 @@ export function AnalysisTab() {
                   value={mcHistoricalStartYear.toString()}
                   onChange={v => setMcHistoricalStartYear(parseInt(v))}
                   options={[
-                    { value: '1871', label: '1871–2025 (Full History)' },
-                    { value: '1950', label: '1950–2025 (Modern Era)' },
-                    { value: '1980', label: '1980–2025 (Post-Stagflation)' },
-                    { value: '2000', label: '2000–2025 (21st Century)' },
-                    { value: '2015', label: '2015–2025 (Recent Decade)' },
+                    { value: '1871', label: '1871–2022 (Full History)' },
+                    { value: '1950', label: '1950–2022 (Modern Era)' },
+                    { value: '1980', label: '1980–2022 (Post-Stagflation)' },
+                    { value: '2000', label: '2000–2022 (21st Century)' },
+                    { value: '2015', label: '2015–2022 (Recent Decade)' },
                   ]}
                   tooltip="Filters the historical dataset to only draw from this period"
                 />
@@ -1986,6 +1989,9 @@ export function AnalysisTab() {
                 </ul>
               </p>
               <p><strong>Worst and Best Paths:</strong> The chart highlights the worst historical period in solid red, the best historical period in solid green, and all other historical paths in light gray.</p>
+              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
+                <strong>Historical Data Limitations:</strong> Rolling period simulations utilize raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. They do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
+              </p>
             </div>
           }
         >
@@ -2182,6 +2188,9 @@ export function AnalysisTab() {
                   <li>Pensions, RRSP, TFSA, and Non-Registered contribution end dates are shifted dynamically (cascade automatically) to match the simulated retirement age.</li>
                   <li>The start age of the first retirement spending phase (typically <em>Go-Go Years</em>) is shifted to the age when both spouses are retired. Subsequent phases (Slow-Go, No-Go) remain at their configured biological ages, representing declines tied to health.</li>
                 </ul>
+              </p>
+              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
+                <strong>Historical Data Limitations:</strong> When using Historical Rates, simulations run on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. Projections do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
               </p>
             </div>
           }
@@ -2425,6 +2434,9 @@ export function AnalysisTab() {
               <p>
                 The <strong>Configured Plan Success Rate</strong> stats card displays the success rate of your plan exactly as configured (including all custom spending phases and additional/lumpy expenses). The curve plots the success rate of a simplified baseline plan with a flat spending level and no additional/lumpy expenses.
               </p>
+              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
+                <strong>Historical Data Limitations:</strong> When using Historical Rates, simulations run on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. Projections do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
+              </p>
             </div>
           }
         >
@@ -2644,6 +2656,9 @@ export function AnalysisTab() {
               </p>
               <p>
                 <em>This account-based analysis automatically includes all pensions, government benefits (CPP/OAS), lumpy expenses (such as home sales), inflation, and tax brackets.</em>
+              </p>
+              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
+                <strong>Historical Data Limitations:</strong> When using Historical Rates, simulations run on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. Projections do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
               </p>
             </div>
           }
@@ -3363,10 +3378,13 @@ export function AnalysisTab() {
                 <strong>How it works</strong> — A bisection search runs the full projection engine repeatedly, narrowing in on the exact rate boundary (accurate to ~0.004%). The sweep chart then plots the total cumulative shortfall (in today's dollars) from 0% up to 2 percentage points above the break-even rate, showing the full shape of failure.
               </p>
               <p>
-                <strong>Historical Mix Suggestions</strong> — Once the required rate is known, the analyser queries the historical return dataset (Shiller 1871–2025) for each of the five standard historical periods. It finds the minimum equity/bond allocation whose average annual nominal return meets or exceeds the required rate, using nominal compounded monthly data. When no allocation is sufficient, the tile is flagged.
+                <strong>Historical Mix Suggestions</strong> — Once the required rate is known, the analyser queries the historical return dataset (Shiller 1871–2022) for each of the five standard historical periods. It finds the minimum equity/bond allocation whose average annual nominal return meets or exceeds the required rate, using nominal compounded monthly data. When no allocation is sufficient, the tile is flagged.
               </p>
               <p className="text-xs text-slate-500 italic">
                 All calculations use your current effective plan settings (including any active Dashboard what-if overrides). The flat rate overrides the age-tiered return schedule configured in your plan for the purpose of this analysis only.
+              </p>
+              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
+                <strong>Historical Data Limitations:</strong> Mix suggestions are derived from raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI). They do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
               </p>
             </div>
           }

@@ -1943,9 +1943,14 @@ export function DashboardTab() {
                               return era ? (
                                 <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30">
                                   <InfoPanel>
-                                    <div>
-                                      <span className="font-semibold text-slate-700">Era Profile: </span>
-                                      {era.description}. Remaining years of plan are filled with the era's average return.
+                                    <div className="space-y-1">
+                                      <div>
+                                        <span className="font-semibold text-slate-700">Era Profile: </span>
+                                        {era.description}. Remaining years of plan are filled with the era's average return.
+                                      </div>
+                                      <div className="text-[11px] text-slate-500 italic border-t border-slate-200/60 pt-1 mt-1">
+                                        <strong>U.S. Data Limitations:</strong> Runs on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to Sept 2023. Does not account for USD/CAD exchange fluctuations, Canadian inflation, or Canadian taxes on foreign dividends/interest.
+                                      </div>
                                     </div>
                                   </InfoPanel>
                                 </div>
