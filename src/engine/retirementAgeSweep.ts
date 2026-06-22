@@ -1,8 +1,8 @@
-import type { AppState } from './types'
+import type { AppState, MonthlyDataPoint, AnnualDataPoint } from './types'
 import { runProjection } from './projection'
 
 import { dateAtAge, dateAtDecimalAge, exactAgeAt, parseDate, formatDate, todayStr, getYear } from './dates'
-import { HISTORICAL_MONTHLY_RETURNS } from './historicalData'
+import { getDatasetById } from './datasets'
 
 export interface RetirementAgeSweepPoint {
   ageA: number
@@ -223,37 +223,54 @@ export function runRetirementAgeSweep(
     const eqWeight = (options.equityAllocationPct ?? 60) / 100
     const bondWeight = 1.0 - eqWeight
 
-    const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => {
-      const startYear = options.historicalStartYear ?? 1871
-      if (r.year < startYear) return false
-      if (r.year > 2023) return false
-      if (r.year === 2023 && r.month > 9) return false
-      return true
-    })
-    const monthsNeeded = n * 12
+    const dataset = getDatasetById(state.activeDatasetId || 'us_shiller')
+    const userInflation = state.personalInflationRatePct / 100
+    const histStartYear = options.historicalStartYear ?? dataset.startYear
 
-    for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
-      const startItem = filteredReturns[startIdx]
-      // Use annual resolution (start in Jan only) for optimal speed
-      if (startItem.month !== 1) {
-        continue
-      }
+    if (dataset.resolution === 'monthly') {
+      const data = dataset.data as MonthlyDataPoint[]
+      const filteredReturns = data.filter(r => r.year >= histStartYear)
+      const monthsNeeded = n * 12
 
-      const schedule: number[] = []
-      const userInflation = state.personalInflationRatePct / 100
-      for (let y = 0; y < n; y++) {
-        let compoundedReal = 1.0
-        for (let m = 0; m < 12; m++) {
-          const item = filteredReturns[startIdx + y * 12 + m]
-          const masterIdx = HISTORICAL_MONTHLY_RETURNS.findIndex(r => r.year === item.year && r.month === item.month)
-          const prevItem = masterIdx > 0 ? HISTORICAL_MONTHLY_RETURNS[masterIdx - 1] : item
-          const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
-          const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
-          compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+      for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
+        const startItem = filteredReturns[startIdx]
+        // Use annual resolution (start in Jan only) for optimal speed in the sweep
+        if (startItem.month !== 1) {
+          continue
         }
-        schedule.push(compoundedReal * (1.0 + userInflation) - 1.0)
+
+        const schedule: number[] = []
+        for (let y = 0; y < n; y++) {
+          let compoundedReal = 1.0
+          for (let m = 0; m < 12; m++) {
+            const item = filteredReturns[startIdx + y * 12 + m]
+            const masterIdx = data.findIndex(r => r.year === item.year && r.month === item.month)
+            const prevItem = masterIdx > 0 ? data[masterIdx - 1] : item
+            const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
+            const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
+            compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+          }
+          schedule.push(compoundedReal * (1.0 + userInflation) - 1.0)
+        }
+        schedules.push(schedule)
       }
-      schedules.push(schedule)
+    } else {
+      // Annual resolution
+      const data = dataset.data as AnnualDataPoint[]
+      const filteredReturns = data.filter(r => r.year >= histStartYear)
+      const yearsNeeded = n
+
+      for (let startIdx = 0; startIdx <= filteredReturns.length - yearsNeeded; startIdx++) {
+        const schedule: number[] = []
+        for (let y = 0; y < n; y++) {
+          const item = filteredReturns[startIdx + y]
+          const annualNomRet = eqWeight * item.equity + bondWeight * item.bond
+          const annualInfl = item.cpiChange
+          const yearReal = (1.0 + annualNomRet) / (1.0 + annualInfl)
+          schedule.push(yearReal * (1.0 + userInflation) - 1.0)
+        }
+        schedules.push(schedule)
+      }
     }
   }
 
@@ -313,7 +330,7 @@ export function runRetirementAgeSweep(
 
         successRate = (successCount / schedules.length) * 100
         success = successCount === schedules.length // 100% success rate is the safe boundary
-        shortfallYears = Math.round(totalShortfallYears / schedules.length)
+        shortfallYears = Math.round((totalShortfallYears / schedules.length) * 100) / 100
         shortfallTotal = Math.round(totalShortfallTotal / schedules.length)
 
         if (finalBalances.length > 0) {

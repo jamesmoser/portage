@@ -1,7 +1,7 @@
 import { runProjection } from './projection'
 import { getYear, dateAtAge } from './dates'
-import type { AppState } from './types'
-import { HISTORICAL_MONTHLY_RETURNS } from './historicalData'
+import type { AppState, MonthlyDataPoint, AnnualDataPoint } from './types'
+import { getDatasetById } from './datasets'
 import { generateRateSchedule } from './rateProfiles'
 
 export interface HistoricalSuggestion {
@@ -41,6 +41,7 @@ function buildFlatSchedule(state: AppState, flatRatePct: number): number[] {
     endYear,
     refBirth,
     state.personalInflationRatePct,
+    state.activeDatasetId,
   )
 }
 
@@ -67,55 +68,75 @@ export function getShortfallForRate(state: AppState, flatRatePct: number): { has
 /**
  * Calculates the average annual compounded return for a given equity/bond weight over a period.
  */
-export function getHistoricalAverageReturn(startYear: number, endYear: number, equityPct: number): number {
+export function getHistoricalAverageReturn(startYear: number, endYear: number, equityPct: number, activeDatasetId?: string): number {
   const eqWeight = equityPct / 100
   const bondWeight = 1.0 - eqWeight
 
-  const yearsData: Record<number, number[]> = {}
-  for (const item of HISTORICAL_MONTHLY_RETURNS) {
-    if (item.year >= startYear && item.year <= endYear) {
-      if (!yearsData[item.year]) {
-        yearsData[item.year] = []
-      }
-      const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
-      yearsData[item.year].push(monthlyNomRet)
-    }
-  }
+  const dsId = activeDatasetId || 'us_shiller'
+  const dataset = getDatasetById(dsId)
 
-  const annualReturns: number[] = []
-  for (const yrStr in yearsData) {
-    const monthlyReturns = yearsData[yrStr]
-    // Compounded annual return
-    if (monthlyReturns.length >= 11) {
-      let compounded = 1.0
-      for (const r of monthlyReturns) {
-        compounded *= (1.0 + r)
+  if (dataset.resolution === 'monthly') {
+    const VALID_RETURNS = dataset.data as MonthlyDataPoint[]
+    const yearsData: Record<number, number[]> = {}
+    for (const item of VALID_RETURNS) {
+      if (item.year >= startYear && item.year <= endYear) {
+        if (!yearsData[item.year]) {
+          yearsData[item.year] = []
+        }
+        const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
+        yearsData[item.year].push(monthlyNomRet)
       }
-      annualReturns.push(compounded - 1.0)
     }
-  }
 
-  if (annualReturns.length === 0) return 0
-  const sum = annualReturns.reduce((a, b) => a + b, 0)
-  return sum / annualReturns.length
+    const annualReturns: number[] = []
+    for (const yrStr in yearsData) {
+      const monthlyReturns = yearsData[yrStr]
+      // Compounded annual return
+      if (monthlyReturns.length >= 11) {
+        let compounded = 1.0
+        for (const r of monthlyReturns) {
+          compounded *= (1.0 + r)
+        }
+        annualReturns.push(compounded - 1.0)
+      }
+    }
+
+    if (annualReturns.length === 0) return 0
+    const sum = annualReturns.reduce((a, b) => a + b, 0)
+    return sum / annualReturns.length
+  } else {
+    // Annual JST dataset
+    const VALID_RETURNS = dataset.data as AnnualDataPoint[]
+    const annualReturns: number[] = []
+    for (const item of VALID_RETURNS) {
+      if (item.year >= startYear && item.year <= endYear) {
+        const annNomRet = eqWeight * item.equity + bondWeight * item.bond
+        annualReturns.push(annNomRet)
+      }
+    }
+
+    if (annualReturns.length === 0) return 0
+    const sum = annualReturns.reduce((a, b) => a + b, 0)
+    return sum / annualReturns.length
+  }
 }
 
 /**
  * Finds the asset mix (equity/bond) that achieves at least the target return rate.
  */
-export function suggestAssetAllocation(targetRatePct: number, startYear: number, endYear: number): { equity: number; bond: number; avgReturn: number; isInsufficient: boolean } {
+export function suggestAssetAllocation(targetRatePct: number, startYear: number, endYear: number, activeDatasetId?: string): { equity: number; bond: number; avgReturn: number; isInsufficient: boolean } {
   const targetRate = targetRatePct / 100
 
   // We test from 0% to 100% equity in steps of 10%
   for (let eq = 0; eq <= 100; eq += 10) {
-    const avgReturn = getHistoricalAverageReturn(startYear, endYear, eq)
+    const avgReturn = getHistoricalAverageReturn(startYear, endYear, eq, activeDatasetId)
     if (avgReturn >= targetRate) {
       return { equity: eq, bond: 100 - eq, avgReturn, isInsufficient: false }
     }
   }
 
   // If no mix is sufficient, return 100% Equity / 0% Bond and mark as insufficient
-  const bestAvgReturn = getHistoricalAverageReturn(startYear, endYear, 100)
+  const bestAvgReturn = getHistoricalAverageReturn(startYear, endYear, 100, activeDatasetId)
   return { equity: 100, bond: 0, avgReturn: bestAvgReturn, isInsufficient: true }
 }
 
@@ -182,16 +203,16 @@ export function runRequiredReturnAnalysis(state: AppState): RequiredReturnResult
   }
 
   // 4. Get suggestions for typical historical periods
-  const periods = [
-    { startYear: 1871, label: '1871–2025 (Full History)' },
-    { startYear: 1950, label: '1950–2025 (Modern Era)' },
-    { startYear: 1980, label: '1980–2025 (Post-Stagflation)' },
-    { startYear: 2000, label: '2000–2025 (21st Century)' },
-    { startYear: 2015, label: '2015–2025 (Recent Decade)' },
-  ]
+  const dsId = state.activeDatasetId || 'us_shiller'
+  const dataset = getDatasetById(dsId)
+  
+  const periods = dataset.epochs.map(e => ({
+    startYear: e.year,
+    label: e.label
+  }))
 
   const historicalSuggestions: HistoricalSuggestion[] = periods.map(p => {
-    const alloc = suggestAssetAllocation(requiredRate, p.startYear, 2025)
+    const alloc = suggestAssetAllocation(requiredRate, p.startYear, dataset.endYear, state.activeDatasetId)
     return {
       startYear: p.startYear,
       label: p.label,
@@ -209,3 +230,4 @@ export function runRequiredReturnAnalysis(state: AppState): RequiredReturnResult
     baselineRate,
   }
 }
+

@@ -14,7 +14,8 @@ import { exactAgeAt, getYear, dateAtAge, dateAtDecimalAge, todayStr } from '../e
 import { DateInput } from '../components/DateInput'
 import type { AppState, HeadlineMetrics, DrawdownStrategyType, DataPoint, MarketProfileType, RetirementWhatIfConfig, SpendGapAccountType, SpendGapPhaseConfig, SpendGapDeficitItem, SpendGapSurplusAccountType, SpendGapSurplusItem, BengenPersonConfig, BengenAccountItem, GKPersonConfig } from '../engine/types'
 import { DEFAULT_SPEND_GAP_CONFIG, DEFAULT_DEFICIT_ITEMS, DEFAULT_SURPLUS_ITEMS, DEFAULT_WHATIFS, DEFAULT_BENGEN_ACCOUNT_ORDER, DEFAULT_BENGEN_CONFIG, DEFAULT_GK_CONFIG } from '../engine/defaults'
-import { generateRateSchedule, DEFAULT_MARKET_PROFILE, HISTORICAL_ERAS } from '../engine/rateProfiles'
+import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../engine/rateProfiles'
+import { getDatasetById } from '../engine/datasets'
 import { CHART_COLORS } from './PaletteTab'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = any
@@ -758,6 +759,7 @@ export function DashboardTab() {
       Math.max(eA, eB),
       refBirth,
       effectiveState.personalInflationRatePct,
+      effectiveState.activeDatasetId,
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatIfs.marketProfile, effectiveState])
@@ -775,12 +777,14 @@ export function DashboardTab() {
       { ...DEFAULT_MARKET_PROFILE, profileType: 'step' },
       currentYear, previewEnd, refBirth,
       effectiveState.personalInflationRatePct,
+      effectiveState.activeDatasetId,
     ).map(r => r * 100)
     const currentSchedule = generateRateSchedule(
       effectiveState.returnRates,
       mv,
       currentYear, previewEnd, refBirth,
       effectiveState.personalInflationRatePct,
+      effectiveState.activeDatasetId,
     ).map(r => r * 100)
     const years = Array.from({ length: 50 }, (_, i) => currentYear + i)
     const high = Math.max(...currentSchedule)
@@ -1927,110 +1931,150 @@ export function DashboardTab() {
                             <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-100">
                               <span className="text-sm text-slate-600 w-24 shrink-0 font-medium">Historical Era</span>
                               <div className="flex-1">
-                                <SelectInput
-                                  label=""
-                                  value={mValue.historicalStartIsCustom ? 'custom' : String(mValue.historicalStartYear ?? 1929)}
-                                  onChange={v => {
-                                    if (v === 'custom') {
-                                      setMarketProfile({
-                                        historicalStartIsCustom: true,
-                                        historicalStartYear: 1980,
-                                        historicalStartMonth: 1
-                                      })
-                                    } else {
-                                      setMarketProfile({
-                                        historicalStartIsCustom: false,
-                                        historicalStartYear: Number(v),
-                                        historicalStartMonth: 1
-                                      })
-                                    }
-                                  }}
-                                  options={[
-                                    ...HISTORICAL_ERAS.map(era => ({
-                                      value: String(era.year),
-                                      label: era.label
-                                    })),
-                                    { value: 'custom', label: 'Custom Start...' }
-                                  ]}
-                                />
+                                {(() => {
+                                  const activeDatasetId = state.activeDatasetId || 'us_shiller'
+                                  const dataset = getDatasetById(activeDatasetId)
+                                  const isCust = mValue.historicalStartIsCustom || !dataset.eras.some(e => e.year === mValue.historicalStartYear)
+                                  
+                                  return (
+                                    <SelectInput
+                                      label=""
+                                      value={isCust ? 'custom' : String(mValue.historicalStartYear ?? dataset.startYear)}
+                                      onChange={v => {
+                                        if (v === 'custom') {
+                                          setMarketProfile({
+                                            historicalStartIsCustom: true,
+                                            historicalStartYear: dataset.epochs[0]?.year ?? dataset.startYear,
+                                            historicalStartMonth: 1
+                                          })
+                                        } else {
+                                          const selectedEra = dataset.eras.find(e => String(e.year) === v)
+                                          setMarketProfile({
+                                            historicalStartIsCustom: false,
+                                            historicalStartYear: Number(v),
+                                            historicalStartMonth: selectedEra ? selectedEra.month : 1
+                                          })
+                                        }
+                                      }}
+                                      options={[
+                                        ...dataset.eras.map(era => ({
+                                          value: String(era.year),
+                                          label: era.label
+                                        })),
+                                        { value: 'custom', label: 'Custom Start...' }
+                                      ]}
+                                    />
+                                  )
+                                })()}
                               </div>
                             </div>
 
-                            {mValue.historicalStartIsCustom && (
-                              <div className="flex gap-4 px-3 py-2.5 border-b border-slate-100 bg-slate-50/20 flex-wrap">
-                                <div className="flex-1 min-w-[140px]">
-                                  <SelectInput
-                                    label="Start Year"
-                                    value={String(mValue.historicalStartYear ?? 1980)}
-                                    onChange={yrStr => {
-                                      const yr = Number(yrStr)
-                                      let m = mValue.historicalStartMonth ?? 1
-                                      if (yr === 1871 && m < 2) m = 2
-                                      if (yr === 2023 && m > 9) m = 9
-                                      setMarketProfile({ historicalStartYear: yr, historicalStartMonth: m })
-                                    }}
-                                    options={Array.from({ length: 2023 - 1871 + 1 }, (_, i) => {
-                                      const y = 1871 + i
-                                      return { value: String(y), label: String(y) }
-                                    }).reverse()}
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-[140px]">
-                                  <SelectInput
-                                    label="Start Month"
-                                    value={String(mValue.historicalStartMonth ?? 1)}
-                                    onChange={mStr => setMarketProfile({ historicalStartMonth: Number(mStr) })}
-                                    options={(() => {
-                                      const yr = mValue.historicalStartYear ?? 1980
-                                      const monthNames = [
-                                        "January", "February", "March", "April", "May", "June",
-                                        "July", "August", "September", "October", "November", "December"
-                                      ]
-                                      return monthNames.map((name, i) => {
-                                        const mVal = i + 1
-                                        const isDisabled = (yr === 1871 && mVal < 2) || (yr === 2023 && mVal > 9)
-                                        return {
-                                          value: String(mVal),
-                                          label: name,
-                                          disabled: isDisabled
-                                        }
-                                      })
-                                    })()}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
                             {(() => {
-                              const isCust = mValue.historicalStartIsCustom
-                              const era = !isCust ? HISTORICAL_ERAS.find(e => e.year === (mValue.historicalStartYear ?? 1929)) : null
-                              
-                              const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-                              const mName = monthNames[(mValue.historicalStartMonth ?? 1) - 1]
-                              
-                              if (isCust || era) {
-                                return (
-                                  <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30">
-                                    <InfoPanel>
-                                      <div className="space-y-1">
-                                        <div>
-                                          <span className="font-semibold text-slate-700">
-                                            {isCust ? "Custom Start: " : "Era Profile: "}
-                                          </span>
-                                          {isCust 
-                                            ? `Sequence will run chronologically starting in ${mName} ${mValue.historicalStartYear ?? 1980}. Remaining years of the plan are filled with the sequence's average return.`
-                                            : `${era?.description}. Remaining years of plan are filled with the era's average return.`
-                                          }
-                                        </div>
-                                        <div className="text-[11px] text-slate-500 italic border-t border-slate-200/60 pt-1 mt-1">
-                                          <strong>U.S. Data Limitations:</strong> Runs on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to Sept 2023. Does not account for USD/CAD exchange fluctuations, Canadian inflation, or Canadian taxes on foreign dividends/interest.
-                                        </div>
+                              const activeDatasetId = state.activeDatasetId || 'us_shiller'
+                              const dataset = getDatasetById(activeDatasetId)
+                              const isCust = mValue.historicalStartIsCustom || !dataset.eras.some(e => e.year === mValue.historicalStartYear)
+                              const startYearVal = mValue.historicalStartYear ?? dataset.startYear
+                              const startYearClamped = Math.max(dataset.startYear, Math.min(dataset.endYear, startYearVal))
+
+                              return (
+                                <>
+                                  {isCust && (
+                                    <div className="flex gap-4 px-3 py-2.5 border-b border-slate-100 bg-slate-50/20 flex-wrap">
+                                      <div className="flex-1 min-w-[140px]">
+                                        <SelectInput
+                                          label="Start Year"
+                                          value={String(startYearClamped)}
+                                          onChange={yrStr => {
+                                            const yr = Number(yrStr)
+                                            let m = mValue.historicalStartMonth ?? 1
+                                            if (dataset.resolution === 'monthly') {
+                                              if (yr === dataset.startYear && m < 2 && dataset.id === 'us_shiller') m = 2
+                                              if (yr === dataset.endYear && m > 9 && dataset.id === 'us_shiller') m = 9
+                                            } else {
+                                              m = 1
+                                            }
+                                            setMarketProfile({ historicalStartYear: yr, historicalStartMonth: m })
+                                          }}
+                                          options={Array.from({ length: dataset.endYear - dataset.startYear + 1 }, (_, i) => {
+                                            const y = dataset.startYear + i
+                                            return { value: String(y), label: String(y) }
+                                          }).reverse()}
+                                        />
                                       </div>
-                                    </InfoPanel>
-                                  </div>
-                                )
-                              }
-                              return null
+                                      {dataset.resolution === 'monthly' && (
+                                        <div className="flex-1 min-w-[140px]">
+                                          <SelectInput
+                                            label="Start Month"
+                                            value={String(mValue.historicalStartMonth ?? 1)}
+                                            onChange={mStr => setMarketProfile({ historicalStartMonth: Number(mStr) })}
+                                            options={(() => {
+                                              const yr = startYearClamped
+                                              const monthNames = [
+                                                "January", "February", "March", "April", "May", "June",
+                                                "July", "August", "September", "October", "November", "December"
+                                              ]
+                                              return monthNames.map((name, i) => {
+                                                const mVal = i + 1
+                                                let isDisabled = false
+                                                if (dataset.id === 'us_shiller') {
+                                                  isDisabled = (yr === 1871 && mVal < 2) || (yr === 2023 && mVal > 9)
+                                                } else if (dataset.resolution === 'monthly') {
+                                                  isDisabled = (yr === 2023 && mVal > 9) // cap Canada/UK/Japan at Sept 2023
+                                                }
+                                                return {
+                                                  value: String(mVal),
+                                                  label: name,
+                                                  disabled: isDisabled
+                                                }
+                                              })
+                                            })()}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {(() => {
+                                    const era = !isCust ? dataset.eras.find(e => e.year === startYearClamped) : null
+                                    
+                                    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                                    const mName = monthNames[(mValue.historicalStartMonth ?? 1) - 1]
+                                    
+                                    const formattedStart = dataset.resolution === 'monthly'
+                                      ? `${mName} ${startYearClamped}`
+                                      : `${startYearClamped}`
+
+                                    if (isCust || era) {
+                                      return (
+                                        <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30">
+                                          <InfoPanel>
+                                            <div className="space-y-1">
+                                              <div>
+                                                <span className="font-semibold text-slate-700">
+                                                  {isCust ? "Custom Start: " : "Era Profile: "}
+                                                </span>
+                                                {isCust 
+                                                  ? `Sequence will run chronologically starting in ${formattedStart}. Remaining years of the plan are filled with the sequence's average return.`
+                                                  : (() => {
+                                                      const desc = era?.description ?? ''
+                                                      const hasPeriod = desc.endsWith('.')
+                                                      return `${desc}${hasPeriod ? '' : '.'} Remaining years of plan are filled with the era's average return.`
+                                                    })()
+                                                }
+                                              </div>
+                                              <div className="border-t border-slate-200/60 pt-1.5 mt-1.5">
+                                                <span className="font-semibold text-slate-700">{dataset.name} Description and Limitations: </span>
+                                                {dataset.description} {dataset.limitations.join(' ')}
+                                              </div>
+                                            </div>
+                                          </InfoPanel>
+                                        </div>
+                                      )
+                                    }
+                                    return null
+                                  })()}
+                                </>
+                              )
                             })()}
                           </>
                         )}

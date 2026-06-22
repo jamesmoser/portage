@@ -1,7 +1,7 @@
-import type { AppState } from './types'
+import type { AppState, MonthlyDataPoint, AnnualDataPoint } from './types'
 import { runProjection } from './projection'
-import { dateAtDecimalAge, getYear, exactAgeAt, intAgeAt, jan1 } from './dates'
-import { HISTORICAL_MONTHLY_RETURNS } from './historicalData'
+import { dateAtDecimalAge, getYear, exactAgeAt, intAgeAt } from './dates'
+import { getDatasetById } from './datasets'
 
 export interface HistoricalAnalysisOptions {
   equityAllocationPct: number
@@ -51,87 +51,139 @@ export function runHistoricalAnalysis(
   const eqWeight = options.equityAllocationPct / 100
   const bondWeight = 1.0 - eqWeight
 
-  // Filter monthly returns by historicalStartYear and cap at Sept 2023 due to post-Sept 2023 incomplete/zeroed data
-  const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => {
-    if (r.year < options.historicalStartYear) return false
-    if (r.year > 2023) return false
-    if (r.year === 2023 && r.month > 9) return false
-    return true
-  })
+  const dataset = getDatasetById(state.activeDatasetId || 'us_shiller')
+  const userInflation = state.personalInflationRatePct / 100
 
-  // We need exactly n * 12 months for a full plan sequence
-  const monthsNeeded = n * 12
   const paths: HistoricalPathResult[] = []
-
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-  for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
-    const startItem = filteredReturns[startIdx]
-    
-    // If annual resolution, only start in January (month === 1)
-    if (options.resolution === 'annual' && startItem.month !== 1) {
-      continue
-    }
+  if (dataset.resolution === 'monthly') {
+    const data = dataset.data as MonthlyDataPoint[]
+    const filteredReturns = data.filter(r => r.year >= options.historicalStartYear)
 
-    // Construct nominal rate schedule of length n, adjusted for historical CPI inflation
-    // to map real returns correctly into the projection engine's constant personal inflation rate.
-    const schedule: number[] = []
-    const userInflation = state.personalInflationRatePct / 100
+    // We need exactly n * 12 months for a full plan sequence
+    const monthsNeeded = n * 12
 
-    for (let y = 0; y < n; y++) {
-      let compoundedReal = 1.0
-      for (let m = 0; m < 12; m++) {
-        const item = filteredReturns[startIdx + y * 12 + m]
-        
-        // Find index in master list to get previous month's CPI for inflation calculation
-        const masterIdx = HISTORICAL_MONTHLY_RETURNS.findIndex(r => r.year === item.year && r.month === item.month)
-        const prevItem = masterIdx > 0 ? HISTORICAL_MONTHLY_RETURNS[masterIdx - 1] : item
-        
-        const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
-        const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
-        
-        // Compounded real return of this month: (1 + nominal) / (1 + inflation)
-        compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
-      }
+    for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
+      const startItem = filteredReturns[startIdx]
       
-      // Re-inflate by the user's constant personal inflation rate so that the real return remains unchanged
-      const adjustedAnnualReturn = compoundedReal * (1.0 + userInflation) - 1.0
-      schedule.push(adjustedAnnualReturn)
-    }
-
-    const { dataPoints } = runProjection(state, schedule)
-
-    const balances = dataPoints.map(dp => dp.totalPortfolio)
-    const years = dataPoints.map(dp => dp.year)
-
-    let depleted = false
-    let depletionAge: number | null = null
-
-    for (const dp of dataPoints) {
-      if (dp.totalPortfolio < 1000) {
-        depleted = true
-        // Calculate exact age at this point
-        const exactAge = Math.floor(exactAgeAt(refBirthDate, dp.date))
-        depletionAge = exactAge
-        break
+      // If annual resolution, only start in January (month === 1)
+      if (options.resolution === 'annual' && startItem.month !== 1) {
+        continue
       }
+
+      // Construct nominal rate schedule of length n, adjusted for historical CPI inflation
+      // to map real returns correctly into the projection engine's constant personal inflation rate.
+      const schedule: number[] = []
+
+      for (let y = 0; y < n; y++) {
+        let compoundedReal = 1.0
+        for (let m = 0; m < 12; m++) {
+          const item = filteredReturns[startIdx + y * 12 + m]
+          
+          // Find index in master list to get previous month's CPI for inflation calculation
+          const masterIdx = data.findIndex(r => r.year === item.year && r.month === item.month)
+          const prevItem = masterIdx > 0 ? data[masterIdx - 1] : item
+          
+          const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
+          const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
+          
+          // Compounded real return of this month: (1 + nominal) / (1 + inflation)
+          compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+        }
+        
+        // Re-inflate by the user's constant personal inflation rate so that the real return remains unchanged
+        const adjustedAnnualReturn = compoundedReal * (1.0 + userInflation) - 1.0
+        schedule.push(adjustedAnnualReturn)
+      }
+
+      const { dataPoints } = runProjection(state, schedule)
+
+      const balances = dataPoints.map(dp => dp.totalPortfolio)
+      const years = dataPoints.map(dp => dp.year)
+
+      let depleted = false
+      let depletionAge: number | null = null
+
+      for (const dp of dataPoints) {
+        if (dp.totalPortfolio < 1000) {
+          depleted = true
+          // Calculate exact age at this point
+          const exactAge = Math.floor(exactAgeAt(refBirthDate, dp.date))
+          depletionAge = exactAge
+          break
+        }
+      }
+
+      const finalBalance = balances[balances.length - 1] ?? 0
+      const label = options.resolution === 'annual' 
+        ? `${startItem.year}` 
+        : `${monthNames[startItem.month - 1]} ${startItem.year}`
+
+      paths.push({
+        startYear: startItem.year,
+        startMonth: startItem.month,
+        label,
+        years,
+        portfolioBalances: balances,
+        depleted,
+        depletionAge,
+        finalBalance,
+      })
     }
+  } else {
+    // Annual resolution (like global_jst)
+    const data = dataset.data as AnnualDataPoint[]
+    const filteredReturns = data.filter(r => r.year >= options.historicalStartYear)
 
-    const finalBalance = balances[balances.length - 1] ?? 0
-    const label = options.resolution === 'annual' 
-      ? `${startItem.year}` 
-      : `${monthNames[startItem.month - 1]} ${startItem.year}`
+    // We need exactly n years for a full plan sequence
+    const yearsNeeded = n
 
-    paths.push({
-      startYear: startItem.year,
-      startMonth: startItem.month,
-      label,
-      years,
-      portfolioBalances: balances,
-      depleted,
-      depletionAge,
-      finalBalance,
-    })
+    for (let startIdx = 0; startIdx <= filteredReturns.length - yearsNeeded; startIdx++) {
+      const startItem = filteredReturns[startIdx]
+      const schedule: number[] = []
+
+      for (let y = 0; y < n; y++) {
+        const item = filteredReturns[startIdx + y]
+        const annualNomRet = eqWeight * item.equity + bondWeight * item.bond
+        const annualInfl = item.cpiChange
+        
+        const yearReal = (1.0 + annualNomRet) / (1.0 + annualInfl)
+        const adjustedAnnualReturn = yearReal * (1.0 + userInflation) - 1.0
+        schedule.push(adjustedAnnualReturn)
+      }
+
+      const { dataPoints } = runProjection(state, schedule)
+
+      const balances = dataPoints.map(dp => dp.totalPortfolio)
+      const years = dataPoints.map(dp => dp.year)
+
+      let depleted = false
+      let depletionAge: number | null = null
+
+      for (const dp of dataPoints) {
+        if (dp.totalPortfolio < 1000) {
+          depleted = true
+          const exactAge = Math.floor(exactAgeAt(refBirthDate, dp.date))
+          depletionAge = exactAge
+          break
+        }
+      }
+
+      const finalBalance = balances[balances.length - 1] ?? 0
+      const label = `${startItem.year}`
+
+      paths.push({
+        startYear: startItem.year,
+        startMonth: 1,
+        label,
+        years,
+        portfolioBalances: balances,
+        depleted,
+        depletionAge,
+        finalBalance,
+      })
+    }
   }
 
   if (paths.length === 0) {
@@ -214,38 +266,55 @@ export function runSpendingSweep(
   const eqWeight = options.equityAllocationPct / 100
   const bondWeight = 1.0 - eqWeight
 
-  const resolution = options.resolution ?? 'annual'
-  const filteredReturns = HISTORICAL_MONTHLY_RETURNS.filter(r => {
-    if (r.year < options.historicalStartYear) return false
-    if (r.year > 2023) return false
-    if (r.year === 2023 && r.month > 9) return false
-    return true
-  })
-  const monthsNeeded = n * 12
+  const dataset = getDatasetById(state.activeDatasetId || 'us_shiller')
+  const userInflation = state.personalInflationRatePct / 100
 
-  // Compile return schedules once to avoid repeating work
   const schedules: number[][] = []
-  for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
-    const startItem = filteredReturns[startIdx]
-    if (resolution === 'annual' && startItem.month !== 1) {
-      continue
-    }
 
-    const schedule: number[] = []
-    const userInflation = state.personalInflationRatePct / 100
-    for (let y = 0; y < n; y++) {
-      let compoundedReal = 1.0
-      for (let m = 0; m < 12; m++) {
-        const item = filteredReturns[startIdx + y * 12 + m]
-        const masterIdx = HISTORICAL_MONTHLY_RETURNS.findIndex(r => r.year === item.year && r.month === item.month)
-        const prevItem = masterIdx > 0 ? HISTORICAL_MONTHLY_RETURNS[masterIdx - 1] : item
-        const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
-        const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
-        compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+  if (dataset.resolution === 'monthly') {
+    const data = dataset.data as MonthlyDataPoint[]
+    const filteredReturns = data.filter(r => r.year >= options.historicalStartYear)
+    const monthsNeeded = n * 12
+    const resolution = options.resolution ?? 'annual'
+
+    for (let startIdx = 0; startIdx <= filteredReturns.length - monthsNeeded; startIdx++) {
+      const startItem = filteredReturns[startIdx]
+      if (resolution === 'annual' && startItem.month !== 1) {
+        continue
       }
-      schedule.push(compoundedReal * (1.0 + userInflation) - 1.0)
+
+      const schedule: number[] = []
+      for (let y = 0; y < n; y++) {
+        let compoundedReal = 1.0
+        for (let m = 0; m < 12; m++) {
+          const item = filteredReturns[startIdx + y * 12 + m]
+          const masterIdx = data.findIndex(r => r.year === item.year && r.month === item.month)
+          const prevItem = masterIdx > 0 ? data[masterIdx - 1] : item
+          const monthlyNomRet = eqWeight * item.equity + bondWeight * item.bond
+          const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
+          compoundedReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+        }
+        schedule.push(compoundedReal * (1.0 + userInflation) - 1.0)
+      }
+      schedules.push(schedule)
     }
-    schedules.push(schedule)
+  } else {
+    // Annual resolution
+    const data = dataset.data as AnnualDataPoint[]
+    const filteredReturns = data.filter(r => r.year >= options.historicalStartYear)
+    const yearsNeeded = n
+
+    for (let startIdx = 0; startIdx <= filteredReturns.length - yearsNeeded; startIdx++) {
+      const schedule: number[] = []
+      for (let y = 0; y < n; y++) {
+        const item = filteredReturns[startIdx + y]
+        const annualNomRet = eqWeight * item.equity + bondWeight * item.bond
+        const annualInfl = item.cpiChange
+        const yearReal = (1.0 + annualNomRet) / (1.0 + annualInfl)
+        schedule.push(yearReal * (1.0 + userInflation) - 1.0)
+      }
+      schedules.push(schedule)
+    }
   }
 
   // Pre-calculate retirement age and base state overrides

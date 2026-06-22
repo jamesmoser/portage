@@ -535,6 +535,7 @@ export interface AppState {
   withdrawalStrategy: WithdrawalStrategy
 
   scenarios: Scenario[]
+  activeDatasetId: string
 
   // Transient — populated by mergeWhatIfs when homeSale what-if is active; never persisted.
   homeSaleEvent?: { date: string; amount: number; account: 'hisa' | 'nonRegA' | 'nonRegB' }
@@ -620,3 +621,51 @@ export interface ProjectionResult {
   dataPoints: DataPoint[]
   warnings: string[]
 }
+
+// ─── Multi-Dataset Architecture ──────────────────────────────────────────────
+
+export type DatasetResolution = 'monthly' | 'annual';
+
+export interface HistoricalEra {
+  year: number
+  month: number // 1-12
+  label: string
+  description: string
+}
+
+export interface HistoricalEpoch {
+  year: number
+  label: string // e.g. "1950–2022 (Modern Era)"
+}
+
+export interface MonthlyDataPoint {
+  year: number
+  month: number
+  equity: number // nominal decimal monthly return
+  bond: number   // nominal decimal monthly return
+  cpi: number    // CPI index level
+}
+
+export interface AnnualDataPoint {
+  year: number
+  equity: number // nominal decimal annual return
+  bond: number   // nominal decimal annual return
+  cpiChange: number // annual inflation rate as decimal
+}
+
+export interface HistoricalDataset {
+  id: string
+  name: string
+  shortName: string
+  geographicFocus: string
+  flag: string // Emoji flag (e.g. "🇺🇸")
+  startYear: number
+  endYear: number
+  resolution: DatasetResolution
+  description: string
+  limitations: string[]
+  eras: HistoricalEra[]
+  epochs: HistoricalEpoch[]
+  data: MonthlyDataPoint[] | AnnualDataPoint[]
+}
+
