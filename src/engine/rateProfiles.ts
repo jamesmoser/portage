@@ -62,7 +62,8 @@ export function generateRateSchedule(
       return true
     })
 
-    const startIdx = VALID_RETURNS.findIndex(r => r.year === histStartYear && r.month === 1)
+    const histStartMonth = config.historicalStartMonth ?? 1
+    const startIdx = VALID_RETURNS.findIndex(r => r.year === histStartYear && r.month === histStartMonth)
     if (startIdx === -1) {
       return Array.from({ length: n }, () => 0.06)
     }
@@ -196,5 +197,7 @@ export const DEFAULT_MARKET_PROFILE: MarketProfileConfig = {
   shockDamping:     0.7,
   noiseSeed:        42,
   historicalStartYear: 1929,
+  historicalStartMonth: 1,
+  historicalStartIsCustom: false,
   historicalEquityAllocationPct: 60,
 }

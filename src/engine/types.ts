@@ -400,6 +400,8 @@ export interface MarketProfileConfig {
   shockDamping:      number   // 0 = lightly damped (rings), 1 = fully damped (no overshoot)
   noiseSeed:         number   // PRNG seed (noise profile only; re-roll changes this)
   historicalStartYear?: number // start year of historical profile
+  historicalStartMonth?: number // start month of historical profile (1-12)
+  historicalStartIsCustom?: boolean // true if custom starting year/month is active
   historicalEquityAllocationPct?: number // equity allocation used to build combined historical returns
 }
 

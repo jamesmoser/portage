@@ -1929,32 +1929,108 @@ export function DashboardTab() {
                               <div className="flex-1">
                                 <SelectInput
                                   label=""
-                                  value={String(mValue.historicalStartYear ?? 1929)}
-                                  onChange={v => setMarketProfile({ historicalStartYear: Number(v) })}
-                                  options={HISTORICAL_ERAS.map(era => ({
-                                    value: String(era.year),
-                                    label: era.label
-                                  }))}
+                                  value={mValue.historicalStartIsCustom ? 'custom' : String(mValue.historicalStartYear ?? 1929)}
+                                  onChange={v => {
+                                    if (v === 'custom') {
+                                      setMarketProfile({
+                                        historicalStartIsCustom: true,
+                                        historicalStartYear: 1980,
+                                        historicalStartMonth: 1
+                                      })
+                                    } else {
+                                      setMarketProfile({
+                                        historicalStartIsCustom: false,
+                                        historicalStartYear: Number(v),
+                                        historicalStartMonth: 1
+                                      })
+                                    }
+                                  }}
+                                  options={[
+                                    ...HISTORICAL_ERAS.map(era => ({
+                                      value: String(era.year),
+                                      label: era.label
+                                    })),
+                                    { value: 'custom', label: 'Custom Start...' }
+                                  ]}
                                 />
                               </div>
                             </div>
-                            {(() => {
-                              const era = HISTORICAL_ERAS.find(e => e.year === (mValue.historicalStartYear ?? 1929))
-                              return era ? (
-                                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30">
-                                  <InfoPanel>
-                                    <div className="space-y-1">
-                                      <div>
-                                        <span className="font-semibold text-slate-700">Era Profile: </span>
-                                        {era.description}. Remaining years of plan are filled with the era's average return.
-                                      </div>
-                                      <div className="text-[11px] text-slate-500 italic border-t border-slate-200/60 pt-1 mt-1">
-                                        <strong>U.S. Data Limitations:</strong> Runs on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to Sept 2023. Does not account for USD/CAD exchange fluctuations, Canadian inflation, or Canadian taxes on foreign dividends/interest.
-                                      </div>
-                                    </div>
-                                  </InfoPanel>
+
+                            {mValue.historicalStartIsCustom && (
+                              <div className="flex gap-4 px-3 py-2.5 border-b border-slate-100 bg-slate-50/20 flex-wrap">
+                                <div className="flex-1 min-w-[140px]">
+                                  <SelectInput
+                                    label="Start Year"
+                                    value={String(mValue.historicalStartYear ?? 1980)}
+                                    onChange={yrStr => {
+                                      const yr = Number(yrStr)
+                                      let m = mValue.historicalStartMonth ?? 1
+                                      if (yr === 1871 && m < 2) m = 2
+                                      if (yr === 2023 && m > 9) m = 9
+                                      setMarketProfile({ historicalStartYear: yr, historicalStartMonth: m })
+                                    }}
+                                    options={Array.from({ length: 2023 - 1871 + 1 }, (_, i) => {
+                                      const y = 1871 + i
+                                      return { value: String(y), label: String(y) }
+                                    }).reverse()}
+                                  />
                                 </div>
-                              ) : null
+                                <div className="flex-1 min-w-[140px]">
+                                  <SelectInput
+                                    label="Start Month"
+                                    value={String(mValue.historicalStartMonth ?? 1)}
+                                    onChange={mStr => setMarketProfile({ historicalStartMonth: Number(mStr) })}
+                                    options={(() => {
+                                      const yr = mValue.historicalStartYear ?? 1980
+                                      const monthNames = [
+                                        "January", "February", "March", "April", "May", "June",
+                                        "July", "August", "September", "October", "November", "December"
+                                      ]
+                                      return monthNames.map((name, i) => {
+                                        const mVal = i + 1
+                                        const isDisabled = (yr === 1871 && mVal < 2) || (yr === 2023 && mVal > 9)
+                                        return {
+                                          value: String(mVal),
+                                          label: name,
+                                          disabled: isDisabled
+                                        }
+                                      })
+                                    })()}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {(() => {
+                              const isCust = mValue.historicalStartIsCustom
+                              const era = !isCust ? HISTORICAL_ERAS.find(e => e.year === (mValue.historicalStartYear ?? 1929)) : null
+                              
+                              const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                              const mName = monthNames[(mValue.historicalStartMonth ?? 1) - 1]
+                              
+                              if (isCust || era) {
+                                return (
+                                  <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30">
+                                    <InfoPanel>
+                                      <div className="space-y-1">
+                                        <div>
+                                          <span className="font-semibold text-slate-700">
+                                            {isCust ? "Custom Start: " : "Era Profile: "}
+                                          </span>
+                                          {isCust 
+                                            ? `Sequence will run chronologically starting in ${mName} ${mValue.historicalStartYear ?? 1980}. Remaining years of the plan are filled with the sequence's average return.`
+                                            : `${era?.description}. Remaining years of plan are filled with the era's average return.`
+                                          }
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 italic border-t border-slate-200/60 pt-1 mt-1">
+                                          <strong>U.S. Data Limitations:</strong> Runs on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to Sept 2023. Does not account for USD/CAD exchange fluctuations, Canadian inflation, or Canadian taxes on foreign dividends/interest.
+                                        </div>
+                                      </div>
+                                    </InfoPanel>
+                                  </div>
+                                )
+                              }
+                              return null
                             })()}
                           </>
                         )}
