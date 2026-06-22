@@ -5,6 +5,11 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.11.1] — 2026-06-21
+
+### Added
+- **GitHub Pages Deployment Workflow** — Added a GitHub Actions workflow to automatically build and deploy the retirement planner to GitHub Pages on new release publication.
+
 ## [0.11.0] — 2026-06-21
 
 ### Added
