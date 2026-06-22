@@ -1,13 +1,7 @@
-// Monte Carlo simulation — runs the projection engine N times with normally
-// distributed random perturbations applied to each year's return rate.
-// The active rate profile (if any) provides the mean return for each year;
-// only market sequence varies. All other plan inputs (income, tax, spending,
-// drawdown strategy) are held fixed.
-
-import type { AppState } from './types'
+import type { AppState, MonthlyDataPoint, AnnualDataPoint } from './types'
 import { runProjection, nominalReturnForAge } from './projection'
 import { dateAtDecimalAge, exactAgeAt, getYear, intAgeAt, jan1 } from './dates'
-import { HISTORICAL_MONTHLY_RETURNS } from './historicalData'
+import { getDatasetById } from './datasets'
 
 // Box-Muller transform: standard normal random variable.
 function randn(): number {
@@ -71,41 +65,52 @@ function getNoise(
 }
 
 // Group and compound monthly equity/bond returns into calendar year annual returns for a given allocation mix.
-export function getHistoricalAnnualReturns(equityWeight: number, startYear?: number): number[] {
+export function getHistoricalAnnualReturns(equityWeight: number, startYear?: number, activeDatasetId?: string): number[] {
   const bondWeight = 1.0 - equityWeight
-  const returnsByYear: { [year: number]: number[] } = {}
-  const limitYear = startYear ?? 1871
+  const dsId = activeDatasetId || 'us_shiller'
+  const dataset = getDatasetById(dsId)
+  const limitYear = startYear ?? dataset.startYear
   
-  for (const r of HISTORICAL_MONTHLY_RETURNS) {
-    if (r.year >= limitYear) {
-      // Exclude data after September 2023 because bond/CPI values are zeroed out.
-      // This automatically means 2023 (only 9 months of valid data) will be skipped
-      // below in the `monthlyReturns.length === 12` check, ending active years at 2022.
-      if (r.year > 2023 || (r.year === 2023 && r.month > 9)) {
-        continue
-      }
-      if (!returnsByYear[r.year]) {
-        returnsByYear[r.year] = []
-      }
-      returnsByYear[r.year].push(equityWeight * r.equity + bondWeight * r.bond)
-    }
-  }
-  
-  const annualReturns: number[] = []
-  for (const yearStr in returnsByYear) {
-    const year = parseInt(yearStr)
-    const monthlyReturns = returnsByYear[year]
+  if (dataset.resolution === 'monthly') {
+    const VALID_RETURNS = dataset.data as MonthlyDataPoint[]
+    const returnsByYear: { [year: number]: number[] } = {}
     
-    // Only include complete calendar years (12 months)
-    if (monthlyReturns.length === 12) {
-      let compounded = 1.0
-      for (const mRet of monthlyReturns) {
-        compounded *= (1.0 + mRet)
+    for (const r of VALID_RETURNS) {
+      if (r.year >= limitYear) {
+        if (!returnsByYear[r.year]) {
+          returnsByYear[r.year] = []
+        }
+        returnsByYear[r.year].push(equityWeight * r.equity + bondWeight * r.bond)
       }
-      annualReturns.push(compounded - 1.0)
     }
+    
+    const annualReturns: number[] = []
+    for (const yearStr in returnsByYear) {
+      const year = parseInt(yearStr)
+      const monthlyReturns = returnsByYear[year]
+      
+      // Only include complete calendar years (12 months)
+      if (monthlyReturns.length === 12) {
+        let compounded = 1.0
+        for (const r of monthlyReturns) {
+          compounded *= (1.0 + r)
+        }
+        annualReturns.push(compounded - 1.0)
+      }
+    }
+    return annualReturns
+  } else {
+    // Annual JST dataset
+    const VALID_RETURNS = dataset.data as AnnualDataPoint[]
+    const annualReturns: number[] = []
+    for (const r of VALID_RETURNS) {
+      if (r.year >= limitYear) {
+        const annNomRet = equityWeight * r.equity + bondWeight * r.bond
+        annualReturns.push(annNomRet)
+      }
+    }
+    return annualReturns
   }
-  return annualReturns
 }
 
 // Interpolating percentile on a pre-sorted array.
@@ -237,7 +242,7 @@ export function runMonteCarlo(
   // Pre-calculate annual returns if bootstrapping
   const isBootstrap = options.method === 'simple_bootstrap' || options.method === 'block_bootstrap'
   const eqWeight = (options.equityAllocationPct ?? 60) / 100
-  const histAnnualReturns = isBootstrap ? getHistoricalAnnualReturns(eqWeight, options.historicalStartYear) : []
+  const histAnnualReturns = isBootstrap ? getHistoricalAnnualReturns(eqWeight, options.historicalStartYear, state.activeDatasetId) : []
 
   for (let sim = 0; sim < options.simulations; sim++) {
     // Generate rate schedule: either by drawing from historical returns or perturbing baseRates

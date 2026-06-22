@@ -343,4 +343,5 @@ export const DEFAULT_STATE: AppState = {
   },
 
   scenarios: [],
+  activeDatasetId: 'us_shiller',
 }

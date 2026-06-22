@@ -107,6 +107,7 @@ interface StoreActions {
   activeOutputTab: string
   setActiveInputTab: (tab: string) => void
   setActiveOutputTab: (tab: string) => void
+  setActiveDatasetId: (id: string) => void
   lastSaved: Date | null
 }
 
@@ -352,5 +353,8 @@ export const useStore = create<Store>()(
 
     setActiveInputTab:  (tab) => set(s => ({ ...s, activeInputTab:  tab })),
     setActiveOutputTab: (tab) => set(s => ({ ...s, activeOutputTab: tab })),
+    setActiveDatasetId: (id) => {
+      get().update('activeDatasetId', id)
+    },
   })),
 )

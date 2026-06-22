@@ -8,6 +8,7 @@ import { AnalysisTab }    from './tabs/AnalysisTab'
 import { AssumptionsTab } from './tabs/AssumptionsTab'
 import { IncomeTab }      from './tabs/IncomeTab'
 import { InvestmentsTab } from './tabs/InvestmentsTab'
+import { DatasetSelectorPopover } from './components/DatasetSelectorPopover'
 
 import { version as APP_VERSION } from '../package.json'
 
@@ -793,8 +794,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* Burger menu */}
-        <div className="relative" ref={menuRef}>
+        <div className="flex items-center gap-3">
+          {/* Dataset Selector Popover */}
+          <DatasetSelectorPopover />
+
+          {/* Burger menu */}
+          <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
             aria-label="Menu"
@@ -895,7 +900,8 @@ export default function App() {
             </div>
           )}
         </div>
-      </header>
+      </div>
+    </header>
 
       {/* ── Tab strip ── */}
       <nav className="px-5 shrink-0" style={{ backgroundColor: '#6B1010' }}>

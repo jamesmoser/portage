@@ -27,6 +27,7 @@ import { runHistoricalAnalysis, runSpendingSweep, interpolateMonotoneCubic } fro
 import type { HistoricalAnalysisResult, HistoricalPathResult, SpendingSweepPoint } from '../engine/historicalAnalysis'
 import { runInsuranceAnalysis } from '../engine/insuranceAnalyser'
 import type { InsuranceAnalyserResult, InsuranceSweepPoint } from '../engine/insuranceAnalyser'
+import { getDatasetById } from '../engine/datasets'
 import { runRequiredReturnAnalysis } from '../engine/returnSuggestor'
 import type { RequiredReturnResult } from '../engine/returnSuggestor'
 import { runRetirementAgeSweep, decimalAgeAt } from '../engine/retirementAgeSweep'
@@ -77,6 +78,7 @@ export function AnalysisTab() {
       Math.max(eA, eB),
       refBirth,
       effectiveState.personalInflationRatePct,
+      effectiveState.activeDatasetId,
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatIfs.marketProfile, effectiveState])
@@ -187,7 +189,39 @@ export function AnalysisTab() {
     ? getYear(dateAtDecimalAge(effectiveState.personB.birthDate, effectiveState.personB.planningEndAge))
     : 0
   const endYear = Math.max(eA, eB)
-  const maxStartYearLimit = 2023 - (endYear - currentYear)
+  const dataset = getDatasetById(state.activeDatasetId || 'us_shiller')
+  const maxStartYearLimit = dataset.endYear - (endYear - currentYear)
+
+  // Synchronize historical start years with the active dataset when it changes
+  useEffect(() => {
+    const activeDataset = getDatasetById(state.activeDatasetId || 'us_shiller')
+    const options = activeDataset.epochs.map(e => e.year)
+    
+    const getValidYear = (currentVal: number, applyLimit: boolean) => {
+      const limit = applyLimit ? maxStartYearLimit : activeDataset.endYear
+      if (currentVal >= activeDataset.startYear && currentVal <= limit && options.includes(currentVal)) {
+        return currentVal
+      }
+      return options.find(yr => yr <= limit) ?? activeDataset.startYear
+    }
+
+    setMcHistoricalStartYear(prev => getValidYear(prev, false))
+    setHistStartYear(prev => getValidYear(prev, true))
+    setRetStartYear(prev => getValidYear(prev, true))
+    setSweepStartYear(prev => getValidYear(prev, true))
+    setCoastStartYear(prev => getValidYear(prev, true))
+
+    if (activeDataset.resolution === 'annual') {
+      setHistResolution('annual')
+    }
+  }, [state.activeDatasetId, maxStartYearLimit])
+
+  const renderDatasetInfo = () => (
+    <div className="border-t border-slate-100 pt-2 mt-1.5 text-slate-700">
+      <span className="font-semibold text-slate-700">{dataset.name} Description and Limitations: </span>
+      {dataset.description} {dataset.limitations.join(' ')}
+    </div>
+  )
 
   // ── Historical Sequence Stress Test state ──────────────────────────────────
   const [histEqAllocation, setHistEqAllocation] = useState(60)
@@ -195,14 +229,6 @@ export function AnalysisTab() {
   const [histResolution, setHistResolution] = useState<'annual' | 'monthly'>('monthly')
   const [histResult, setHistResult] = useState<HistoricalAnalysisResult | null>(null)
   const [histRunning, setHistRunning] = useState(false)
-
-  useEffect(() => {
-    if (histStartYear > maxStartYearLimit) {
-      const options = [2000, 1980, 1950, 1871]
-      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
-      setHistStartYear(best)
-    }
-  }, [maxStartYearLimit, histStartYear])
 
   function runHistAnalysis() {
     setHistRunning(true)
@@ -288,14 +314,6 @@ export function AnalysisTab() {
   const [retRateType, setRetRateType] = useState<'plan' | 'historical'>('plan')
   const [retEqAllocation, setRetEqAllocation] = useState(60)
   const [retStartYear, setRetStartYear] = useState(1871)
-
-  useEffect(() => {
-    if (retStartYear > maxStartYearLimit) {
-      const options = [2000, 1980, 1950, 1871]
-      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
-      setRetStartYear(best)
-    }
-  }, [maxStartYearLimit, retStartYear])
 
   const lastBirthA = useRef('')
   const lastBirthB = useRef('')
@@ -492,6 +510,13 @@ export function AnalysisTab() {
       })
     })
 
+    const formatShortfallYears = (val: number) => {
+      if (val === 0) return '0'
+      if (val % 1 === 0) return val.toString()
+      if (val < 0.1) return val.toFixed(2)
+      return val.toFixed(1)
+    }
+
     const hoverText = ys.map((yVal) => {
       return xs.map((xVal) => {
         const point = retResult.points.find(p => p.ageA === yVal && p.ageB === xVal)
@@ -501,11 +526,12 @@ export function AnalysisTab() {
         const yearA = getYear(dateA)
         const yearB = getYear(dateB)
         
+        const sfYrsStr = formatShortfallYears(point.shortfallYears)
         const outcome = point.success
           ? (point.successRate === 100 ? 'Success' : `Success (${point.successRate.toFixed(0)}%)`)
           : (point.successRate === 0
-              ? `Failure (${point.shortfallYears} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
-              : `Failure (${point.successRate.toFixed(0)}% success, Avg Shortfall: ${point.shortfallYears} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
+              ? `Failure (${sfYrsStr} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
+              : `Failure (${point.successRate.toFixed(0)}% success, Avg Shortfall: ${sfYrsStr} yrs, Total Shortfall: ${fmt(point.shortfallTotal)})`
             )
         const firstYr = point.firstShortfallYear ? `<br>First Shortfall: Year ${point.firstShortfallYear}` : ''
         return `${aName} retires: Age ${yVal} (${yearA})<br>${bName} retires: Age ${xVal} (${yearB})<br>Outcome: <b>${outcome}</b>${firstYr}<br>Final Balance: ${fmt(point.finalBalance)}`
@@ -679,14 +705,6 @@ export function AnalysisTab() {
   const sweepResolution = 'annual'
   const [sweepResult, setSweepResult] = useState<{ points: SpendingSweepPoint[], currentSpending: number, currentSuccessRate: number } | null>(null)
   const [sweepRunning, setSweepRunning] = useState(false)
-
-  useEffect(() => {
-    if (sweepStartYear > maxStartYearLimit) {
-      const options = [2000, 1980, 1950, 1871]
-      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
-      setSweepStartYear(best)
-    }
-  }, [maxStartYearLimit, sweepStartYear])
 
   const runSpendingSweepPlan = (
     state: AppState,
@@ -1089,14 +1107,6 @@ export function AnalysisTab() {
     }
     return worst.portfolioBalances
   }
-
-  useEffect(() => {
-    if (coastStartYear > maxStartYearLimit) {
-      const options = [2000, 1980, 1950, 1871]
-      const best = options.find(yr => yr <= maxStartYearLimit) ?? 1871
-      setCoastStartYear(best)
-    }
-  }, [maxStartYearLimit, coastStartYear])
 
   // ── Coast FIRE Calculator — Plan Rates Simulation ─────────────────────────
   const runCoastPlanCalculation = () => {
@@ -1591,9 +1601,7 @@ export function AnalysisTab() {
               <p><strong>Probability of Success</strong> — Percentage of simulations where the portfolio remains above zero at the final year of the plan. 90%+ is generally considered robust; below 70% warrants strategy changes.</p>
               <p><strong>Median Depletion Age</strong> — In simulations that do deplete, the median age of the reference person when the portfolio first reaches zero. Only shown when at least 5% of simulations deplete.</p>
               <p>The fan chart shows the distribution of portfolio outcomes over time. The red line is the deterministic result of the configured rate profile. Grey bands show the 10th–90th and 25th–75th percentile ranges. Black dotted lines are the best and worst case outcomes across all simulations.</p>
-              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
-                <strong>Historical Data Limitations:</strong> Simple and Block Bootstrap methods draw from raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI). These projections do not account for USD/CAD exchange rate volatility, Canadian inflation differences, or Canadian tax/withholding differences on foreign-sourced investment income.
-              </p>
+              {renderDatasetInfo()}
             </div>
           }>
   
@@ -1655,13 +1663,10 @@ export function AnalysisTab() {
                   label="Historical Period"
                   value={mcHistoricalStartYear.toString()}
                   onChange={v => setMcHistoricalStartYear(parseInt(v))}
-                  options={[
-                    { value: '1871', label: '1871–2022 (Full History)' },
-                    { value: '1950', label: '1950–2022 (Modern Era)' },
-                    { value: '1980', label: '1980–2022 (Post-Stagflation)' },
-                    { value: '2000', label: '2000–2022 (21st Century)' },
-                    { value: '2015', label: '2015–2022 (Recent Decade)' },
-                  ]}
+                  options={dataset.epochs.map(e => ({
+                    value: String(e.year),
+                    label: e.label
+                  }))}
                   tooltip="Filters the historical dataset to only draw from this period"
                 />
 
@@ -1969,8 +1974,8 @@ export function AnalysisTab() {
           width="full"
           onReset={() => {
             setHistEqAllocation(60)
-            setHistStartYear(1871)
-            setHistResolution('monthly')
+            setHistStartYear(dataset.startYear)
+            setHistResolution(dataset.resolution === 'monthly' ? 'monthly' : 'annual')
             setHistResult(null)
           }}
           info={
@@ -1989,9 +1994,7 @@ export function AnalysisTab() {
                 </ul>
               </p>
               <p><strong>Worst and Best Paths:</strong> The chart highlights the worst historical period in solid red, the best historical period in solid green, and all other historical paths in light gray.</p>
-              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
-                <strong>Historical Data Limitations:</strong> Rolling period simulations utilize raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. They do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
-              </p>
+              {renderDatasetInfo()}
             </div>
           }
         >
@@ -2015,29 +2018,30 @@ export function AnalysisTab() {
               tooltip="Target mix compiled dynamically from historical monthly returns"
             />
 
-            <SelectInput
+             <SelectInput
               label="Period"
               value={histStartYear.toString()}
               onChange={v => setHistStartYear(parseInt(v))}
-              options={[
-                { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
-                { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
-                { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
-                { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
-              ]}
+              options={dataset.epochs.map(e => ({
+                value: String(e.year),
+                label: e.label,
+                disabled: e.year > maxStartYearLimit
+              }))}
               tooltip="The starting year boundary for the simulation series"
             />
 
-            <SelectInput
-              label="Resolution"
-              value={histResolution}
-              onChange={v => setHistResolution(v as 'annual' | 'monthly')}
-              options={[
-                { value: 'annual', label: 'Annual' },
-                { value: 'monthly', label: 'Monthly' },
-              ]}
-              tooltip="Annual uses January starts only; Monthly runs 12x more paths starting in any month"
-            />
+            {dataset.resolution === 'monthly' && (
+              <SelectInput
+                label="Resolution"
+                value={histResolution}
+                onChange={v => setHistResolution(v as 'annual' | 'monthly')}
+                options={[
+                  { value: 'annual', label: 'Annual' },
+                  { value: 'monthly', label: 'Monthly' },
+                ]}
+                tooltip="Annual uses January starts only; Monthly runs 12x more paths starting in any month"
+              />
+            )}
 
 
           </div>
@@ -2189,9 +2193,7 @@ export function AnalysisTab() {
                   <li>The start age of the first retirement spending phase (typically <em>Go-Go Years</em>) is shifted to the age when both spouses are retired. Subsequent phases (Slow-Go, No-Go) remain at their configured biological ages, representing declines tied to health.</li>
                 </ul>
               </p>
-              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
-                <strong>Historical Data Limitations:</strong> When using Historical Rates, simulations run on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. Projections do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
-              </p>
+              {renderDatasetInfo()}
             </div>
           }
         >
@@ -2255,12 +2257,11 @@ export function AnalysisTab() {
                         label="Period"
                         value={retStartYear.toString()}
                         onChange={v => setRetStartYear(parseInt(v))}
-                        options={[
-                          { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
-                          { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
-                          { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
-                          { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
-                        ]}
+                        options={dataset.epochs.map(e => ({
+                          value: String(e.year),
+                          label: e.label,
+                          disabled: e.year > maxStartYearLimit
+                        }))}
                         tooltip="The starting year boundary for the simulation series"
                       />
                     </>
@@ -2434,9 +2435,7 @@ export function AnalysisTab() {
               <p>
                 The <strong>Configured Plan Success Rate</strong> stats card displays the success rate of your plan exactly as configured (including all custom spending phases and additional/lumpy expenses). The curve plots the success rate of a simplified baseline plan with a flat spending level and no additional/lumpy expenses.
               </p>
-              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
-                <strong>Historical Data Limitations:</strong> When using Historical Rates, simulations run on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. Projections do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
-              </p>
+              {renderDatasetInfo()}
             </div>
           }
         >
@@ -2477,12 +2476,11 @@ export function AnalysisTab() {
                   label="Period"
                   value={sweepStartYear.toString()}
                   onChange={v => setSweepStartYear(parseInt(v))}
-                  options={[
-                    { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
-                    { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
-                    { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
-                    { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
-                  ]}
+                  options={dataset.epochs.map(e => ({
+                    value: String(e.year),
+                    label: e.label,
+                    disabled: e.year > maxStartYearLimit
+                  }))}
                   tooltip="The starting year boundary for the simulation series"
                 />
               </>
@@ -2657,9 +2655,7 @@ export function AnalysisTab() {
               <p>
                 <em>This account-based analysis automatically includes all pensions, government benefits (CPP/OAS), lumpy expenses (such as home sales), inflation, and tax brackets.</em>
               </p>
-              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
-                <strong>Historical Data Limitations:</strong> When using Historical Rates, simulations run on raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI) up to September 2023. Projections do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
-              </p>
+              {renderDatasetInfo()}
             </div>
           }
         >
@@ -2848,12 +2844,11 @@ export function AnalysisTab() {
                         label="Period"
                         value={coastStartYear.toString()}
                         onChange={v => setCoastStartYear(parseInt(v))}
-                        options={[
-                          { value: '1871', label: '1871 (Full History)', disabled: 1871 > maxStartYearLimit },
-                          { value: '1950', label: '1950 (Modern Era)', disabled: 1950 > maxStartYearLimit },
-                          { value: '1980', label: '1980 (Post-Stagflation)', disabled: 1980 > maxStartYearLimit },
-                          { value: '2000', label: '2000 (21st Century)', disabled: 2000 > maxStartYearLimit },
-                        ]}
+                        options={dataset.epochs.map(e => ({
+                          value: String(e.year),
+                          label: e.label,
+                          disabled: e.year > maxStartYearLimit
+                        }))}
                         tooltip="The starting year boundary for the simulation series"
                       />
 
@@ -3378,14 +3373,12 @@ export function AnalysisTab() {
                 <strong>How it works</strong> — A bisection search runs the full projection engine repeatedly, narrowing in on the exact rate boundary (accurate to ~0.004%). The sweep chart then plots the total cumulative shortfall (in today's dollars) from 0% up to 2 percentage points above the break-even rate, showing the full shape of failure.
               </p>
               <p>
-                <strong>Historical Mix Suggestions</strong> — Once the required rate is known, the analyser queries the historical return dataset (Shiller 1871–2022) for each of the five standard historical periods. It finds the minimum equity/bond allocation whose average annual nominal return meets or exceeds the required rate, using nominal compounded monthly data. When no allocation is sufficient, the tile is flagged.
+                <strong>Historical Mix Suggestions</strong> — Once the required rate is known, the analyser queries the active historical return dataset for each of the standard historical periods. It finds the minimum equity/bond allocation whose average annual nominal return meets or exceeds the required rate. When no allocation is sufficient, the tile is flagged.
               </p>
               <p className="text-xs text-slate-500 italic">
                 All calculations use your current effective plan settings (including any active Dashboard what-if overrides). The flat rate overrides the age-tiered return schedule configured in your plan for the purpose of this analysis only.
               </p>
-              <p className="text-xs text-slate-500 border-t border-slate-100 pt-2 mt-1.5 italic">
-                <strong>Historical Data Limitations:</strong> Mix suggestions are derived from raw, pre-tax U.S. index history (S&P 500, U.S. 10-Yr bonds, U.S. CPI). They do not account for currency exchange risk (USD/CAD fluctuations), Canadian inflation differences, or Canadian tax/withholding drag on foreign investment income.
-              </p>
+              {renderDatasetInfo()}
             </div>
           }
         >

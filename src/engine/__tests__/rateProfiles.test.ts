@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { generateRateSchedule, DEFAULT_MARKET_PROFILE } from '../rateProfiles'
-import type { ReturnRates, MarketProfileConfig } from '../types'
+import type { ReturnRates, MarketProfileConfig, MonthlyDataPoint } from '../types'
+import { getDatasetById } from '../datasets'
 
 const dummyRates: ReturnRates = {
   upTo55: 7.0,

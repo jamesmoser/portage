@@ -1,6 +1,6 @@
-import type { ReturnRates, MarketProfileConfig } from './types'
+import type { ReturnRates, MarketProfileConfig, MonthlyDataPoint, AnnualDataPoint } from './types'
 import { intAgeAt, jan1 } from './dates'
-import { HISTORICAL_MONTHLY_RETURNS } from './historicalData'
+import { getDatasetById } from './datasets'
 
 export interface HistoricalEra {
   year: number
@@ -39,6 +39,7 @@ export function generateRateSchedule(
   endYear: number,
   refBirthDate: string,
   personalInflationRatePct?: number,
+  activeDatasetId?: string,
 ): number[] {
   const { profileType, outlookOffset, beta, cyclePeriodYears, dutyCycle,
           shockOffset, shockMagnitude, shockRecovery, shockDamping, noiseSeed,
@@ -55,55 +56,84 @@ export function generateRateSchedule(
     const eqAllocation = historicalEquityAllocationPct ?? 60
     const userInflation = (personalInflationRatePct ?? 3.0) / 100
 
-    // Filter valid historical returns (up to Sep 2023)
-    const VALID_RETURNS = HISTORICAL_MONTHLY_RETURNS.filter(r => {
-      if (r.year > 2023) return false
-      if (r.year === 2023 && r.month > 9) return false
-      return true
-    })
+    const dsId = activeDatasetId || 'us_shiller'
+    const dataset = getDatasetById(dsId)
 
-    const histStartMonth = config.historicalStartMonth ?? 1
-    const startIdx = VALID_RETURNS.findIndex(r => r.year === histStartYear && r.month === histStartMonth)
-    if (startIdx === -1) {
-      return Array.from({ length: n }, () => 0.06)
-    }
-
-    const totalMonthsAvailable = VALID_RETURNS.length - startIdx
-    const totalYearsAvailable = Math.floor(totalMonthsAvailable / 12)
-
-    // Precalculate all annual real returns of the era to compute the CAGR
-    let cumReal = 1.0
-    const eraAnnualRealReturns: number[] = []
-
-    for (let yAv = 0; yAv < totalYearsAvailable; yAv++) {
-      let yrReal = 1.0
-      for (let m = 0; m < 12; m++) {
-        const idx = startIdx + yAv * 12 + m
-        const item = VALID_RETURNS[idx]
-        const prevItem = VALID_RETURNS[idx - 1] || item
-        const monthlyNomRet = (eqAllocation / 100) * item.equity + (1 - eqAllocation / 100) * item.bond
-        const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
-        yrReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+    if (dataset.resolution === 'monthly') {
+      const VALID_RETURNS = dataset.data as MonthlyDataPoint[]
+      const histStartMonth = config.historicalStartMonth ?? 1
+      const startIdx = VALID_RETURNS.findIndex(r => r.year === histStartYear && r.month === histStartMonth)
+      if (startIdx === -1) {
+        return Array.from({ length: n }, () => 0.06)
       }
-      cumReal *= yrReal
-      eraAnnualRealReturns.push(yrReal - 1.0)
-    }
+      const totalMonthsAvailable = VALID_RETURNS.length - startIdx
+      const totalYearsAvailable = Math.floor(totalMonthsAvailable / 12)
 
-    const eraRealCAGR = totalYearsAvailable > 0 ? Math.pow(cumReal, 1 / totalYearsAvailable) - 1 : 0.04
+      let cumReal = 1.0
+      const eraAnnualRealReturns: number[] = []
 
-    return Array.from({ length: n }, (_, i) => {
-      let realRet: number
-      if (i < totalYearsAvailable) {
-        realRet = eraAnnualRealReturns[i]
-      } else {
-        // Overflow: fill with average return from the era
-        realRet = eraRealCAGR
+      for (let yAv = 0; yAv < totalYearsAvailable; yAv++) {
+        let yrReal = 1.0
+        for (let m = 0; m < 12; m++) {
+          const idx = startIdx + yAv * 12 + m
+          const item = VALID_RETURNS[idx]
+          const prevItem = VALID_RETURNS[idx - 1] || item
+          const monthlyNomRet = (eqAllocation / 100) * item.equity + (1 - eqAllocation / 100) * item.bond
+          const monthlyInfl = prevItem.cpi > 0 ? (item.cpi - prevItem.cpi) / prevItem.cpi : 0
+          yrReal *= (1.0 + monthlyNomRet) / (1.0 + monthlyInfl)
+        }
+        cumReal *= yrReal
+        eraAnnualRealReturns.push(yrReal - 1.0)
       }
-      // Apply beta (amplitude scaling around the average) and outlookOffset
-      const realRetScaled = eraRealCAGR + (realRet - eraRealCAGR) * beta
-      const reInflated = (1.0 + realRetScaled) * (1.0 + userInflation) - 1.0
-      return reInflated + outlookOffset / 100
-    })
+
+      const eraRealCAGR = totalYearsAvailable > 0 ? Math.pow(cumReal, 1 / totalYearsAvailable) - 1 : 0.04
+
+      return Array.from({ length: n }, (_, i) => {
+        let realRet: number
+        if (i < totalYearsAvailable) {
+          realRet = eraAnnualRealReturns[i]
+        } else {
+          realRet = eraRealCAGR
+        }
+        const realRetScaled = eraRealCAGR + (realRet - eraRealCAGR) * beta
+        const reInflated = (1.0 + realRetScaled) * (1.0 + userInflation) - 1.0
+        return reInflated + outlookOffset / 100
+      })
+    } else {
+      // Annual JST dataset
+      const VALID_RETURNS = dataset.data as AnnualDataPoint[]
+      const startIdx = VALID_RETURNS.findIndex(r => r.year === histStartYear)
+      if (startIdx === -1) {
+        return Array.from({ length: n }, () => 0.06)
+      }
+      const totalYearsAvailable = VALID_RETURNS.length - startIdx
+
+      let cumReal = 1.0
+      const eraAnnualRealReturns: number[] = []
+
+      for (let yAv = 0; yAv < totalYearsAvailable; yAv++) {
+        const item = VALID_RETURNS[startIdx + yAv]
+        const annNomRet = (eqAllocation / 100) * item.equity + (1 - eqAllocation / 100) * item.bond
+        const annInfl = item.cpiChange
+        const yrReal = (1.0 + annNomRet) / (1.0 + annInfl)
+        cumReal *= yrReal
+        eraAnnualRealReturns.push(yrReal - 1.0)
+      }
+
+      const eraRealCAGR = totalYearsAvailable > 0 ? Math.pow(cumReal, 1 / totalYearsAvailable) - 1 : 0.04
+
+      return Array.from({ length: n }, (_, i) => {
+        let realRet: number
+        if (i < totalYearsAvailable) {
+          realRet = eraAnnualRealReturns[i]
+        } else {
+          realRet = eraRealCAGR
+        }
+        const realRetScaled = eraRealCAGR + (realRet - eraRealCAGR) * beta
+        const reInflated = (1.0 + realRetScaled) * (1.0 + userInflation) - 1.0
+        return reInflated + outlookOffset / 100
+      })
+    }
   }
 
   // Compute mid as the time-weighted average of the base step schedule so that
