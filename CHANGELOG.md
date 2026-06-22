@@ -5,6 +5,11 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.11.2] — 2026-06-21
+
+### Fixed
+- **Gitignore & Configuration Files** — Exempted `package-lock.json` and `tsconfig.json` from `.gitignore` and added them to source control to ensure the GitHub Actions build runner can compile successfully.
+
 ## [0.11.1] — 2026-06-21
 
 ### Added
