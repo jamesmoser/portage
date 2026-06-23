@@ -6,6 +6,7 @@ A place to quickly capture ideas, UI enhancements, tax engine updates, and gener
 
 - [2026-06-20] Project context to more easily update static public information e.g. tax rates and historical return rates
 - [2026-06-20] Add other provinces to the jurisdiction
+- [2026-06-23] One-shot annuity purchase event — deduct premium from a specified account at a given date, add a guaranteed income stream (with indexation and survivor fraction) for the remainder of the plan.
 
 ---
 
