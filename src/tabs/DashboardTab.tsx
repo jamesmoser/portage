@@ -2551,6 +2551,7 @@ export function DashboardTab() {
             <p><strong>Freeze</strong> — Captures the current values as a comparison baseline. Once frozen, each tile shows the current value alongside the frozen value with a coloured arrow (green = better, red = worse). Freeze a scenario, then adjust or load another — deltas update live on every tile.</p>
             <p><strong>Portfolio</strong> — Total invested assets (RRSP/RRIF + TFSA + Non-Reg + HISA) at key milestones: today, each person's retirement, the peak balance, and each person's death. A high peak followed by rapid decline can signal sequence-of-returns risk.</p>
             <p><strong>Spending</strong> — Two shortfall tiles count years where cash flow is negative (spending exceeds all income and draws) and show the average and peak shortfall. Three net income tiles show average, minimum, and maximum household net income across all full plan years (first and last years excluded as partial). Zero shortfall years is the primary plan goal.</p>
+            <p><strong>Effective Withdrawal Rate</strong> — The average annual gross draw from investment accounts (RRSP/RRIF, TFSA, Non-Reg, HISA) during retirement, expressed as a percentage of the total portfolio at the anchor person's retirement date. Two cards are shown — one anchored at each person's retirement year — to show the cost of the earlier retirement start. Because CPP, OAS, DB pension, and employment income reduce what must be drawn from the portfolio, this rate is net of those sources. It is comparable to the Bengen "safe withdrawal rate" framework: research suggests ~3.3% has survived all historical return sequences; rates above 4–4.5% show meaningful failure probability in stress scenarios. Run the Historical Analyzer on the Analysis tab to see how your plan holds up across past market sequences.</p>
             <p><strong>Tax</strong> — Total lifetime tax paid (federal + Ontario + OAS clawback), the average effective rate (total tax ÷ gross income across the plan), and the single peak tax year. Use these to evaluate drawdown strategy tradeoffs — earlier RRSP draws typically raise near-term taxes while reducing OAS clawback and estate tax later.</p>
             <p><strong>Government Benefits</strong> — Total CPP and OAS collected (gross, before clawback) and years with OAS clawback. The vs-Age-65 tiles show the net lifetime difference between your chosen CPP/OAS start ages and collecting at exactly 65, accounting for the full projection horizon and survivor benefits.</p>
           </div>
@@ -2859,6 +2860,64 @@ export function DashboardTab() {
                   highlightRow: d => d.year === metrics.maxNetIncomeYear,
                   summary: [
                     { label: 'Max Net Income', value: fmt(metrics.maxNetIncome) + ` (${metrics.maxNetIncomeYear})` },
+                  ],
+                })} />
+              <MetricCard label="Effective Withdrawal Rate"
+                betterWhenHigher={false}
+                value={fmtPct(metrics.effectiveWithdrawalRateA)}
+                sub={`at ${aName}'s retirement in ${retirementYearA}`}
+                frozen={frozenFor(metrics.effectiveWithdrawalRateA, frozenMetrics?.effectiveWithdrawalRateA, fmtPct, false)}
+                onClick={() => setModalDef({
+                  title: `Effective Withdrawal Rate — ${aName}'s Retirement`,
+                  note: `Today's dollars. Rows from ${aName}'s retirement year onward. Total Draw = gross investment account draws (RRSP/RRIF, TFSA, Non-Reg, HISA). Ann. Rate = Total Draw ÷ that year's end-of-year portfolio. The headline EWR is the average Total Draw ÷ portfolio at ${retirementYearA}. Highlighted row = anchor year.`,
+                  columns: [
+                    { header: 'Year',            render: d => d.year },
+                    { header: `Age — ${aName}`,  right: true, render: d => d.personAAge.toFixed(1) },
+                    { header: 'RRSP/RRIF',        right: true, render: d => fmt(d.rrifA + d.rrifB) },
+                    { header: 'TFSA',             right: true, render: d => fmt(d.tfsaWithdrawalA + d.tfsaWithdrawalB) },
+                    { header: 'Non-Reg',          right: true, render: d => fmt(d.nonRegWithdrawalA + d.nonRegWithdrawalB) },
+                    { header: 'HISA',             right: true, render: d => fmt(d.hisaWithdrawal) },
+                    { header: 'Total Draw',       right: true, bold: true, render: d => fmt(d.rrifA + d.rrifB + d.tfsaWithdrawalA + d.tfsaWithdrawalB + d.nonRegWithdrawalA + d.nonRegWithdrawalB + d.hisaWithdrawal) },
+                    { header: 'Portfolio',        right: true, render: d => fmt(d.totalPortfolio) },
+                    { header: 'Ann. Rate',        right: true, render: d => {
+                      const draw = d.rrifA + d.rrifB + d.tfsaWithdrawalA + d.tfsaWithdrawalB + d.nonRegWithdrawalA + d.nonRegWithdrawalB + d.hisaWithdrawal
+                      return d.totalPortfolio > 0 ? fmtPct(draw / d.totalPortfolio) : '—'
+                    }},
+                  ],
+                  rows: dataPoints.filter(d => d.year >= retirementYearA),
+                  highlightRow: d => d.year === retirementYearA,
+                  summary: [
+                    { label: `Portfolio at ${aName}'s Retirement (${retirementYearA})`, value: fmt(metrics.portfolioAtRetirementA) },
+                    { label: 'Effective Withdrawal Rate', value: fmtPct(metrics.effectiveWithdrawalRateA) },
+                  ],
+                })} />
+              <MetricCard label="Effective Withdrawal Rate"
+                betterWhenHigher={false}
+                value={fmtPct(metrics.effectiveWithdrawalRateB)}
+                sub={`at ${bName}'s retirement in ${retirementYearB}`}
+                frozen={frozenFor(metrics.effectiveWithdrawalRateB, frozenMetrics?.effectiveWithdrawalRateB, fmtPct, false)}
+                onClick={() => setModalDef({
+                  title: `Effective Withdrawal Rate — ${bName}'s Retirement`,
+                  note: `Today's dollars. Rows from ${bName}'s retirement year onward. Total Draw = gross investment account draws (RRSP/RRIF, TFSA, Non-Reg, HISA). Ann. Rate = Total Draw ÷ that year's end-of-year portfolio. The headline EWR is the average Total Draw ÷ portfolio at ${retirementYearB}. Highlighted row = anchor year.`,
+                  columns: [
+                    { header: 'Year',            render: d => d.year },
+                    { header: `Age — ${bName}`,  right: true, render: d => d.personBAge.toFixed(1) },
+                    { header: 'RRSP/RRIF',        right: true, render: d => fmt(d.rrifA + d.rrifB) },
+                    { header: 'TFSA',             right: true, render: d => fmt(d.tfsaWithdrawalA + d.tfsaWithdrawalB) },
+                    { header: 'Non-Reg',          right: true, render: d => fmt(d.nonRegWithdrawalA + d.nonRegWithdrawalB) },
+                    { header: 'HISA',             right: true, render: d => fmt(d.hisaWithdrawal) },
+                    { header: 'Total Draw',       right: true, bold: true, render: d => fmt(d.rrifA + d.rrifB + d.tfsaWithdrawalA + d.tfsaWithdrawalB + d.nonRegWithdrawalA + d.nonRegWithdrawalB + d.hisaWithdrawal) },
+                    { header: 'Portfolio',        right: true, render: d => fmt(d.totalPortfolio) },
+                    { header: 'Ann. Rate',        right: true, render: d => {
+                      const draw = d.rrifA + d.rrifB + d.tfsaWithdrawalA + d.tfsaWithdrawalB + d.nonRegWithdrawalA + d.nonRegWithdrawalB + d.hisaWithdrawal
+                      return d.totalPortfolio > 0 ? fmtPct(draw / d.totalPortfolio) : '—'
+                    }},
+                  ],
+                  rows: dataPoints.filter(d => d.year >= retirementYearB),
+                  highlightRow: d => d.year === retirementYearB,
+                  summary: [
+                    { label: `Portfolio at ${bName}'s Retirement (${retirementYearB})`, value: fmt(metrics.portfolioAtRetirementB) },
+                    { label: 'Effective Withdrawal Rate', value: fmtPct(metrics.effectiveWithdrawalRateB) },
                   ],
                 })} />
             </div>

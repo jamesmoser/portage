@@ -485,6 +485,11 @@ export interface HeadlineMetrics {
   oasClawbackPct:      number   // 0–1, clawback years / OAS-active years
   cppVs65:             number   // actual collected minus what collecting at 65 would have yielded; positive = timing benefited you
   oasVs65:             number   // same for OAS (gross vs gross; clawback shown separately)
+
+  // Effective Withdrawal Rate — avg annual investment draw / portfolio at each person's retirement
+  // Anchored independently: A's card uses A's retirement year as year 1; B's card uses B's.
+  effectiveWithdrawalRateA: number  // 0–1
+  effectiveWithdrawalRateB: number  // 0–1
 }
 
 // ─── Scenarios ────────────────────────────────────────────────────────────────

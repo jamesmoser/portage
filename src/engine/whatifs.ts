@@ -275,6 +275,7 @@ export function computeHeadlineMetrics(
     lifetimeTaxPaid: 0, avgEffectiveTaxRate: 0, peakTaxYear: 0, peakTaxAmount: 0,
     totalCPPCollected: 0, totalOASCollected: 0, totalOASClawback: 0,
     oasClawbackYears: 0, oasClawbackPct: 0, cppVs65: 0, oasVs65: 0,
+    effectiveWithdrawalRateA: 0, effectiveWithdrawalRateB: 0,
   }
   if (dataPoints.length === 0) return zero
 
@@ -392,6 +393,23 @@ export function computeHeadlineMetrics(
   const cppVs65 = totalCPPCollected - baseCPP65
   const oasVs65 = totalOASCollected - baseOAS65
 
+  // Effective Withdrawal Rate — avg annual gross draw from investment accounts during retirement,
+  // divided by the total portfolio at the anchor person's retirement year.
+  // Uses gross draws (pre-tax) to match the Bengen framework; CPP/OAS/pension reduce draws naturally.
+  function computeEWR(anchorYear: number, anchorPortfolio: number): number {
+    if (anchorPortfolio <= 0) return 0
+    const pts = dataPoints.filter(d => d.year >= anchorYear)
+    if (pts.length === 0) return 0
+    const avgDraw = pts.reduce((sum, d) =>
+      sum + d.rrifA + d.rrifB
+          + d.tfsaWithdrawalA + d.tfsaWithdrawalB
+          + d.nonRegWithdrawalA + d.nonRegWithdrawalB
+          + d.hisaWithdrawal, 0) / pts.length
+    return avgDraw / anchorPortfolio
+  }
+  const effectiveWithdrawalRateA = computeEWR(retirementYearA, pointAtRetirementA.totalPortfolio)
+  const effectiveWithdrawalRateB = computeEWR(retirementYearB, pointAtRetirementB.totalPortfolio)
+
   return {
     portfolioAtStart:       dataPoints[0].totalPortfolio,
     peakPortfolio:          peakPoint.totalPortfolio,
@@ -426,5 +444,7 @@ export function computeHeadlineMetrics(
     oasClawbackPct:      oasActiveYears > 0 ? oasClawbackYears / oasActiveYears : 0,
     cppVs65,
     oasVs65,
+    effectiveWithdrawalRateA,
+    effectiveWithdrawalRateB,
   }
 }
