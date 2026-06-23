@@ -5,6 +5,14 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.12.1] — 2026-06-23
+
+### Added
+- **Effective Withdrawal Rate** — Two new metric cards in the Key Outcomes → Spending section, one anchored at each person's retirement year. Shows the average annual gross investment draw (RRSP/RRIF, TFSA, Non-Reg, HISA) as a percentage of the total portfolio at that retirement date — a Bengen-comparable rate that accounts for CPP, OAS, and pension income reducing the portfolio draw. Detail modal shows year-by-year draws by account type with annual rate column.
+
+### Fixed
+- **SpendGap surplus defaults** — TFSA surplus limit defaulted to $0, silently routing all surplus to the RRSP. Default is now $7,000 (2024–2025 annual contribution room) with non-registered set to unlimited. DATA_SOURCES.md updated with a static values review table to flag the TFSA limit for annual refresh.
+
 ## [0.11.2] — 2026-06-21
 
 ### Fixed
