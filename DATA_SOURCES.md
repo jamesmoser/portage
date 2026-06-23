@@ -111,3 +111,13 @@ npm run test
 npm run build
 ```
 The application will bundle the new datasets into the single HTML output.
+
+---
+
+## 4. Static Values to Review on Update
+
+The following values are hardcoded in the application and should be reviewed whenever refreshing data or cutting a new release:
+
+| Value | Location | Current | Notes |
+| :--- | :--- | :--- | :--- |
+| TFSA annual contribution limit | `src/engine/defaults.ts` — `DEFAULT_SURPLUS_ITEMS` | $7,000 | Set by the CRA each year. Confirm the current limit at [canada.ca](https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/tax-free-savings-account/contribution-room.html) and update the `limit` for the `tfsa` surplus item. |

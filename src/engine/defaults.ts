@@ -77,11 +77,11 @@ export const DEFAULT_DEFICIT_ITEMS: SpendGapDeficitItem[] = [
   { account: 'hisa',   unlimited: true, cap: 0 },
 ]
 
-// Default surplus routing: all accounts with unlimited=false and limit=0 → no reinvestment by default.
-// Users can enable unlimited on any account to route surplus there, or set a positive limit to cap it.
+// Default surplus routing: TFSA capped at current annual contribution limit, nonReg unlimited.
+// TFSA limit (7000) reflects the 2024–2025 annual contribution room — update when refreshing static data.
 export const DEFAULT_SURPLUS_ITEMS: SpendGapSurplusItem[] = [
-  { account: 'tfsa',   unlimited: false, limit: 0 },
-  { account: 'nonReg', unlimited: false, limit: 0 },
+  { account: 'tfsa',   unlimited: false, limit: 7000 },
+  { account: 'nonReg', unlimited: true,  limit: 0 },
   { account: 'hisa',   unlimited: false, limit: 0 },
 ]
 
