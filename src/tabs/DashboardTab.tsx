@@ -43,6 +43,7 @@ type ModalDef = {
 const _fmtObj = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
 const fmt      = (v: number) => _fmtObj.format(v)
 const fmtPct   = (v: number) => `${(v * 100).toFixed(1)}%`
+const fmtPct2  = (v: number) => `${(v * 100).toFixed(2)}%`
 const fmtT     = (v: number) => Math.abs(v) < 0.5 ? '—' : fmt(v)   // dash for zero in table cells
 // Values between -1 and +1 are treated as exactly $0 to avoid rounding noise.
 const NEAR_ZERO = 1
@@ -2864,9 +2865,9 @@ export function DashboardTab() {
                 })} />
               <MetricCard label="Effective Withdrawal Rate"
                 betterWhenHigher={false}
-                value={fmtPct(metrics.effectiveWithdrawalRateA)}
+                value={fmtPct2(metrics.effectiveWithdrawalRateA)}
                 sub={`at ${aName}'s retirement in ${retirementYearA}`}
-                frozen={frozenFor(metrics.effectiveWithdrawalRateA, frozenMetrics?.effectiveWithdrawalRateA, fmtPct, false)}
+                frozen={frozenFor(metrics.effectiveWithdrawalRateA, frozenMetrics?.effectiveWithdrawalRateA, fmtPct2, false)}
                 onClick={() => setModalDef({
                   title: `Effective Withdrawal Rate — ${aName}'s Retirement`,
                   note: `Today's dollars. Rows from ${aName}'s retirement year onward. Total Draw = gross investment account draws (RRSP/RRIF, TFSA, Non-Reg, HISA). Ann. Rate = Total Draw ÷ that year's end-of-year portfolio. The headline EWR is the average Total Draw ÷ portfolio at ${retirementYearA}. Highlighted row = anchor year.`,
@@ -2881,21 +2882,21 @@ export function DashboardTab() {
                     { header: 'Portfolio',        right: true, render: d => fmt(d.totalPortfolio) },
                     { header: 'Ann. Rate',        right: true, render: d => {
                       const draw = d.rrifA + d.rrifB + d.tfsaWithdrawalA + d.tfsaWithdrawalB + d.nonRegWithdrawalA + d.nonRegWithdrawalB + d.hisaWithdrawal
-                      return d.totalPortfolio > 0 ? fmtPct(draw / d.totalPortfolio) : '—'
+                      return d.totalPortfolio > 0 ? fmtPct2(draw / d.totalPortfolio) : '—'
                     }},
                   ],
                   rows: dataPoints.filter(d => d.year >= retirementYearA),
                   highlightRow: d => d.year === retirementYearA,
                   summary: [
                     { label: `Portfolio at ${aName}'s Retirement (${retirementYearA})`, value: fmt(metrics.portfolioAtRetirementA) },
-                    { label: 'Effective Withdrawal Rate', value: fmtPct(metrics.effectiveWithdrawalRateA) },
+                    { label: 'Effective Withdrawal Rate', value: fmtPct2(metrics.effectiveWithdrawalRateA) },
                   ],
                 })} />
               <MetricCard label="Effective Withdrawal Rate"
                 betterWhenHigher={false}
-                value={fmtPct(metrics.effectiveWithdrawalRateB)}
+                value={fmtPct2(metrics.effectiveWithdrawalRateB)}
                 sub={`at ${bName}'s retirement in ${retirementYearB}`}
-                frozen={frozenFor(metrics.effectiveWithdrawalRateB, frozenMetrics?.effectiveWithdrawalRateB, fmtPct, false)}
+                frozen={frozenFor(metrics.effectiveWithdrawalRateB, frozenMetrics?.effectiveWithdrawalRateB, fmtPct2, false)}
                 onClick={() => setModalDef({
                   title: `Effective Withdrawal Rate — ${bName}'s Retirement`,
                   note: `Today's dollars. Rows from ${bName}'s retirement year onward. Total Draw = gross investment account draws (RRSP/RRIF, TFSA, Non-Reg, HISA). Ann. Rate = Total Draw ÷ that year's end-of-year portfolio. The headline EWR is the average Total Draw ÷ portfolio at ${retirementYearB}. Highlighted row = anchor year.`,
@@ -2910,14 +2911,14 @@ export function DashboardTab() {
                     { header: 'Portfolio',        right: true, render: d => fmt(d.totalPortfolio) },
                     { header: 'Ann. Rate',        right: true, render: d => {
                       const draw = d.rrifA + d.rrifB + d.tfsaWithdrawalA + d.tfsaWithdrawalB + d.nonRegWithdrawalA + d.nonRegWithdrawalB + d.hisaWithdrawal
-                      return d.totalPortfolio > 0 ? fmtPct(draw / d.totalPortfolio) : '—'
+                      return d.totalPortfolio > 0 ? fmtPct2(draw / d.totalPortfolio) : '—'
                     }},
                   ],
                   rows: dataPoints.filter(d => d.year >= retirementYearB),
                   highlightRow: d => d.year === retirementYearB,
                   summary: [
                     { label: `Portfolio at ${bName}'s Retirement (${retirementYearB})`, value: fmt(metrics.portfolioAtRetirementB) },
-                    { label: 'Effective Withdrawal Rate', value: fmtPct(metrics.effectiveWithdrawalRateB) },
+                    { label: 'Effective Withdrawal Rate', value: fmtPct2(metrics.effectiveWithdrawalRateB) },
                   ],
                 })} />
             </div>
