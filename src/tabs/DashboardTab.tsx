@@ -389,11 +389,12 @@ function MetricCard({ label, value, sub, frozen, betterWhenHigher = true, onClic
   label: string
   value: string
   sub?: string
-  frozen?: { value: string; sub?: string; numericDelta: number } | null
+  frozen?: { value: string; sub?: string; numericDelta: number; nearZero?: number } | null
   betterWhenHigher?: boolean
   onClick?: () => void
 }) {
-  const sig      = frozen != null && Math.abs(frozen.numericDelta) >= NEAR_ZERO
+  const threshold = frozen?.nearZero ?? NEAR_ZERO
+  const sig      = frozen != null && Math.abs(frozen.numericDelta) >= threshold
   const isBetter = sig && (betterWhenHigher ? frozen!.numericDelta > 0 : frozen!.numericDelta < 0)
   const isWorse  = sig && (betterWhenHigher ? frozen!.numericDelta < 0 : frozen!.numericDelta > 0)
   const arrow    = sig ? (frozen!.numericDelta > 0 ? '▲' : '▼') : null
@@ -1021,12 +1022,16 @@ export function DashboardTab() {
     formatter: (v: number) => string,
     betterWhenHigh = true,
     frozenSub?: string,
+    nearZero?: number,
   ) {
-    if (frozenMetrics == null || frozenVal == null) return undefined
+    if (frozenMetrics == null) return undefined
+    // frozenVal may be undefined for fields added after the snapshot was captured
+    const resolved = frozenVal ?? current
     return {
-      value:        formatter(frozenVal),
+      value:        formatter(resolved),
       sub:          frozenSub,
-      numericDelta: current - frozenVal,   // always raw delta; MetricCard owns the semantics
+      numericDelta: current - resolved,
+      nearZero,
     }
   }
 
@@ -2867,7 +2872,7 @@ export function DashboardTab() {
                 betterWhenHigher={false}
                 value={fmtPct2(metrics.effectiveWithdrawalRateA)}
                 sub={`at ${aName}'s retirement in ${retirementYearA}`}
-                frozen={frozenFor(metrics.effectiveWithdrawalRateA, frozenMetrics?.effectiveWithdrawalRateA, fmtPct2, false)}
+                frozen={frozenFor(metrics.effectiveWithdrawalRateA, frozenMetrics?.effectiveWithdrawalRateA, fmtPct2, false, undefined, 0.0001)}
                 onClick={() => setModalDef({
                   title: `Effective Withdrawal Rate — ${aName}'s Retirement`,
                   note: `Today's dollars. Rows from ${aName}'s retirement year onward. Total Draw = gross investment account draws (RRSP/RRIF, TFSA, Non-Reg, HISA). Ann. Rate = Total Draw ÷ that year's end-of-year portfolio. The headline EWR is the average Total Draw ÷ portfolio at ${retirementYearA}. Highlighted row = anchor year.`,
@@ -2896,7 +2901,7 @@ export function DashboardTab() {
                 betterWhenHigher={false}
                 value={fmtPct2(metrics.effectiveWithdrawalRateB)}
                 sub={`at ${bName}'s retirement in ${retirementYearB}`}
-                frozen={frozenFor(metrics.effectiveWithdrawalRateB, frozenMetrics?.effectiveWithdrawalRateB, fmtPct2, false)}
+                frozen={frozenFor(metrics.effectiveWithdrawalRateB, frozenMetrics?.effectiveWithdrawalRateB, fmtPct2, false, undefined, 0.0001)}
                 onClick={() => setModalDef({
                   title: `Effective Withdrawal Rate — ${bName}'s Retirement`,
                   note: `Today's dollars. Rows from ${bName}'s retirement year onward. Total Draw = gross investment account draws (RRSP/RRIF, TFSA, Non-Reg, HISA). Ann. Rate = Total Draw ÷ that year's end-of-year portfolio. The headline EWR is the average Total Draw ÷ portfolio at ${retirementYearB}. Highlighted row = anchor year.`,
@@ -2959,7 +2964,7 @@ export function DashboardTab() {
               <MetricCard label="Avg Effective Rate"
                 betterWhenHigher={false}
                 value={fmtPct(metrics.avgEffectiveTaxRate)}
-                frozen={frozenFor(metrics.avgEffectiveTaxRate, frozenMetrics?.avgEffectiveTaxRate, fmtPct, false)}
+                frozen={frozenFor(metrics.avgEffectiveTaxRate, frozenMetrics?.avgEffectiveTaxRate, fmtPct, false, undefined, 0.0001)}
                 onClick={() => setModalDef({
                   title: 'Tax — Effective Rates by Year',
                   note: "Today's dollars. Effective rate = total tax ÷ gross income.",
