@@ -41,6 +41,7 @@ export interface RetirementAgeSweepOptions {
   rateType?: 'plan' | 'historical'
   equityAllocationPct?: number
   historicalStartYear?: number
+  allowableShortfall?: number // average annual shortfall (PD$) below which a path still counts as success
 }
 
 // Helper to determine the next birthday age, avoiding timezone or leap-year drift.
@@ -286,6 +287,8 @@ export function runRetirementAgeSweep(
       let firstShortfallYear: number | null = null
       let shortfallTotal = 0
 
+      const allowable = options.allowableShortfall ?? 0
+
       if (options.rateType === 'historical' && schedules.length > 0) {
         let successCount = 0
         let totalShortfallYears = 0
@@ -295,41 +298,42 @@ export function runRetirementAgeSweep(
         for (const schedule of schedules) {
           const { warnings, dataPoints } = runProjection(testState, schedule)
           const pathShortfallYears = warnings.filter(w => w.includes('spending shortfall')).length
-          const pathSuccess = pathShortfallYears === 0
-          if (pathSuccess) {
-            successCount++
-          } else {
-            totalShortfallYears += pathShortfallYears
-            
-            let pathFirstShortfallYear: number | null = null
-            const firstWarning = warnings.find(w => w.includes('spending shortfall'))
-            if (firstWarning) {
-              const match = firstWarning.match(/Year (\d+):/)
-              if (match) pathFirstShortfallYear = parseInt(match[1], 10)
-            }
-            if (pathFirstShortfallYear !== null) {
-              if (firstShortfallYear === null || pathFirstShortfallYear < firstShortfallYear) {
-                firstShortfallYear = pathFirstShortfallYear
-              }
-            }
 
-            for (const w of warnings) {
-              if (w.includes('spending shortfall')) {
-                const idx = w.indexOf('$')
-                if (idx !== -1) {
-                  const digits = w.substring(idx + 1).replace(/\D/g, '')
-                  if (digits) {
-                    totalShortfallTotal += parseInt(digits, 10)
-                  }
-                }
+          let pathShortfallTotal = 0
+          let pathFirstShortfallYear: number | null = null
+          for (const w of warnings) {
+            if (w.includes('spending shortfall')) {
+              if (pathFirstShortfallYear === null) {
+                const match = w.match(/Year (\d+):/)
+                if (match) pathFirstShortfallYear = parseInt(match[1], 10)
+              }
+              const idx = w.indexOf('$')
+              if (idx !== -1) {
+                const digits = w.substring(idx + 1).replace(/\D/g, '')
+                if (digits) pathShortfallTotal += parseInt(digits, 10)
               }
             }
           }
+
+          if (pathFirstShortfallYear !== null) {
+            if (firstShortfallYear === null || pathFirstShortfallYear < firstShortfallYear) {
+              firstShortfallYear = pathFirstShortfallYear
+            }
+          }
+
+          const pathAvgShortfallYear = pathShortfallYears > 0 ? pathShortfallTotal / pathShortfallYears : 0
+          if (pathAvgShortfallYear <= allowable) {
+            successCount++
+          }
+
+          // Accumulate raw shortfall for heatmap coloring (independent of tolerance)
+          totalShortfallYears += pathShortfallYears
+          totalShortfallTotal += pathShortfallTotal
           finalBalances.push(dataPoints[dataPoints.length - 1]?.totalPortfolio ?? 0)
         }
 
         successRate = (successCount / schedules.length) * 100
-        success = successCount === schedules.length // 100% success rate is the safe boundary
+        success = successCount === schedules.length
         shortfallYears = Math.round((totalShortfallYears / schedules.length) * 100) / 100
         shortfallTotal = Math.round(totalShortfallTotal / schedules.length)
 
@@ -343,8 +347,6 @@ export function runRetirementAgeSweep(
       } else {
         const { warnings, dataPoints } = runProjection(testState, rateSchedule)
         const pathShortfallYears = warnings.filter(w => w.includes('spending shortfall')).length
-        success = pathShortfallYears === 0
-        successRate = success ? 100 : 0
         shortfallYears = pathShortfallYears
         finalBalance = dataPoints[dataPoints.length - 1]?.totalPortfolio ?? 0
 
@@ -359,12 +361,14 @@ export function runRetirementAgeSweep(
             const idx = w.indexOf('$')
             if (idx !== -1) {
               const digits = w.substring(idx + 1).replace(/\D/g, '')
-              if (digits) {
-                shortfallTotal += parseInt(digits, 10)
-              }
+              if (digits) shortfallTotal += parseInt(digits, 10)
             }
           }
         }
+
+        const avgShortfallYear = shortfallYears > 0 ? shortfallTotal / shortfallYears : 0
+        success = avgShortfallYear <= allowable
+        successRate = success ? 100 : 0
       }
 
       points.push({

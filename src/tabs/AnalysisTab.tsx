@@ -314,6 +314,7 @@ export function AnalysisTab() {
   const [retRateType, setRetRateType] = useState<'plan' | 'historical'>('plan')
   const [retEqAllocation, setRetEqAllocation] = useState(60)
   const [retStartYear, setRetStartYear] = useState(1871)
+  const [retAllowableShortfall, setRetAllowableShortfall] = useState(0)
 
   const lastBirthA = useRef('')
   const lastBirthB = useRef('')
@@ -377,6 +378,7 @@ export function AnalysisTab() {
     setRetRateType('plan')
     setRetEqAllocation(60)
     setRetStartYear(1871)
+    setRetAllowableShortfall(0)
 
     const defaultStartA = currentAgeA
     const defaultEndA = Math.max(defaultStartA, Math.min(effectiveState.personA.planningEndAge, baseA + 10))
@@ -406,7 +408,8 @@ export function AnalysisTab() {
         cascadeNonReg: true,
         rateType: retRateType,
         equityAllocationPct: retEqAllocation,
-        historicalStartYear: retStartYear
+        historicalStartYear: retStartYear,
+        allowableShortfall: retAllowableShortfall,
       })
       setRetResult(res)
       setRetRunning(false)
@@ -2184,7 +2187,7 @@ export function AnalysisTab() {
                 The simulation sweeps retirement age combinations starting from each spouse's current age up to their planned retirement age plus 10 years. All age calculations are based on each spouse's exact birthdate (birthday-relative) rather than calendar year.
               </p>
               <p>
-                For each age combination, the tool runs a full lifetime projection using the rates configured in your plan. If the plan succeeds with no cash shortfalls in any year, it's flagged as a success.
+                For each age combination, the tool runs a full lifetime projection using the rates configured in your plan. A combination is flagged as a <strong>success</strong> (white cell) when its average shortfall per shortage year is within the <strong>Allowable Annual Shortage</strong> threshold. At the default of $0 this requires a perfectly balanced plan — no spending gap in any year. Raising the threshold lets minor shortfalls pass as acceptable, which is useful when you are comfortable covering a small annual gap from discretionary spending cuts or other flexibility. The heatmap colours always reflect the actual shortfall regardless of the threshold — only the success boundary shifts.
               </p>
               <p>
                 <strong>Cascades and Spending Adjustments:</strong>
@@ -2225,6 +2228,16 @@ export function AnalysisTab() {
                   <button className="btn-primary" onClick={runRetirementSweep} disabled={retRunning}>
                     {retRunning ? 'Running…' : retResult ? 'Re-Run' : 'Run'}
                   </button>
+
+                  <NumberInput
+                    label="Allowable Annual Shortage"
+                    value={retAllowableShortfall}
+                    onChange={setRetAllowableShortfall}
+                    prefix="$"
+                    decimals={0}
+                    min={0}
+                    tooltip="Average shortfall per shortage year (today's dollars) that still counts as a successful retirement. Default 0 requires a perfect plan. Raising this allows minor shortfalls — the heatmap colours still reflect actual shortfall, only the success boundary shifts."
+                  />
 
                   <SelectInput
                     label="Rate Simulation"
