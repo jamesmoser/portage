@@ -102,7 +102,7 @@ export function TFSATab() {
   const state = useStore()
   const { tfsaA, tfsaB, personA, personB, update } = state
   const aName = personA.name || 'Person A'
-  const bName = personB.name || 'Person B'
+  const bName = personB.name || ''
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
 
   const currentYear = new Date().getFullYear()
@@ -159,7 +159,7 @@ export function TFSATab() {
         retirementDate={personB.retirementDate}
         onChange={v => update('tfsaB', v)}
         onReset={() => update('tfsaB', { ...DEFAULT_STATE.tfsaB, contributionEndDate: dateAtAge(personB.birthDate, personB.planningEndAge) })}
-        personColor={personB.color} />
+        personColor={personB.name ? personB.color : '#000000'} />
 
       <SectionCard title="TFSA Balances" width="full"
         info={

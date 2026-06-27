@@ -33,7 +33,7 @@ export function CPPOASTab() {
   const { cppA, cppB, oasA, oasB, personA, personB, update } = state
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
   const aName = personA.name || 'A'
-  const bName = personB.name || 'B'
+  const bName = personB.name || ''
 
   const cppFactA = cppAdjFactor(cppA.startDate, personA.birthDate)
   const cppFactB = cppAdjFactor(cppB.startDate, personB.birthDate)
@@ -234,7 +234,7 @@ export function CPPOASTab() {
       </SectionCard>
 
       {/* CPP Person B */}
-      <SectionCard title={`CPP — ${personB.name || 'Person B'}`} width="half" personColor={personB.color}
+      <SectionCard title={`CPP — ${personB.name}`} width="half" personColor={personB.name ? personB.color : '#000000'}
         onReset={() => update('cppB', { ...cppB, estimatedMonthlyAt65: 0, startDate: dateAtAge(personB.birthDate, 65) })}
         info={cppInfoModal}>
         <div className="space-y-3">
@@ -398,7 +398,7 @@ export function CPPOASTab() {
       </SectionCard>
 
       {/* OAS Person B */}
-      <SectionCard title={`OAS — ${personB.name || 'Person B'}`} width="half" personColor={personB.color}
+      <SectionCard title={`OAS — ${personB.name}`} width="half" personColor={personB.name ? personB.color : '#000000'}
         onReset={() => update('oasB', { ...DEFAULT_STATE.oasB, startDate: dateAtAge(personB.birthDate, 65) })}
         info={oasInfoModal}>
         <div className="space-y-3">

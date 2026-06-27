@@ -178,7 +178,7 @@ function PersonPensionCard({ label, pension, onChange, onReset, personColor, ret
 export function DBPensionTab() {
   const { dbPensionA, dbPensionB, employmentA, employmentB, personA, personB, personalInflationRatePct, cpiRatePct, update } = useStore()
   const aName = personA.name || 'Person A'
-  const bName = personB.name || 'Person B'
+  const bName = personB.name || ''
   const pi  = personalInflationRatePct / 100
   const cpi = cpiRatePct / 100
   const currentYear = new Date().getFullYear()
@@ -296,7 +296,7 @@ export function DBPensionTab() {
           startDate: personB.retirementDate,
           bridgeBenefitEndDate: dateAtAge(personB.birthDate, 65),
         })}
-        personColor={personB.color}
+        personColor={personB.name ? personB.color : '#000000'}
         retirementDate={personB.retirementDate}
         cpiRatePct={cpiRatePct}
         personalInflationRatePct={personalInflationRatePct}

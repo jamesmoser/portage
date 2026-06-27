@@ -18,13 +18,17 @@ function PersonCard({
   onReset: () => void
 }) {
   const today = todayStr()
-  const displayName = person.name || defaultLabel
+  const isPersonB = defaultLabel === 'Person B'
+  const isBEmpty = isPersonB && !person.name
+  const displayName = isBEmpty ? '' : (person.name || defaultLabel)
+  const cardColor = isBEmpty ? '#000000' : person.color
+
   const ageNow   = exactAgeAt(person.birthDate, today)
   const retAge   = exactAgeAt(person.birthDate, person.retirementDate)
   const yearsToRetire = retAge - ageNow
 
   return (
-    <SectionCard title={`Personal Data - ${displayName}`} width="half" personColor={person.color} onReset={onReset}
+    <SectionCard title={`Personal Data - ${displayName}`} width="half" personColor={cardColor} onReset={onReset}
       info={
         <div className="space-y-2 text-sm">
           <p>This card defines the fundamental parameters the engine uses to frame this person's working life and retirement. Get these right first — everything else in the plan is anchored to these dates.</p>
@@ -47,7 +51,7 @@ function PersonCard({
             <label className="label-text">Colour</label>
             <input
               type="color"
-              value={person.color}
+              value={cardColor}
               onChange={e => onChange({ ...person, color: e.target.value })}
               className="h-9 w-10 rounded border border-slate-200 cursor-pointer bg-white p-0.5 block"
               title="Choose card colour for this person"
@@ -99,12 +103,14 @@ export function HouseholdTab() {
   const { personA, personB, ageReferencePerson, update } = useStore()
 
   const nameA = personA.name || 'Person A'
-  const nameB = personB.name || 'Person B'
-
+  const nameB = personB.name
   const options = [
     { value: 'personA', label: nameA, color: personA.color },
-    { value: 'personB', label: nameB, color: personB.color },
   ]
+
+  if (personB.name) {
+    options.push({ value: 'personB', label: nameB, color: personB.color })
+  }
 
   return (
     <CardGrid>
@@ -119,7 +125,7 @@ export function HouseholdTab() {
         onReset={() => update('ageReferencePerson', DEFAULT_STATE.ageReferencePerson)}
         info={
           <div className="space-y-2 text-sm">
-            <p>The age reference person provides the "clock" for age-based thresholds throughout the plan: portfolio return rate tier transitions (e.g. shifting to conservative returns at 65), spending phase start ages, and ages for one-time additional spending items all measure against this person's birthday.</p>
+            <p>The age reference person provides the "clock" for age-based thresholds throughout the plan: portfolio return rate glide path transitions (e.g. shifting to conservative returns at 65), spending phase start ages, and ages for one-time additional spending items all measure against this person's birthday.</p>
             <p>Typically set to the <strong>older spouse</strong>, so the return rate glide path reflects the couple's overall portfolio risk profile advancing with the older person's age. This is the most conservative assumption.</p>
             <p>Ages that are person-specific — Age at Death, CPP start age, OAS start age — always use that individual's own birth date regardless of this setting.</p>
             <p>All age inputs throughout the tool use a decimal convention: 55.0 = exact 55th birthday, 55.5 = six months after the 55th birthday. This applies to spending phase starts, one-time item ages, and any other age-based input.</p>

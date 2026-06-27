@@ -175,6 +175,14 @@ export const useStore = create<Store>()(
           if (newOasStart !== s.oasB.startDate) {
             patch.oasB = { ...s.oasB, startDate: newOasStart }
           }
+          if (!p.name) {
+            if (s.ageReferencePerson === 'personB') {
+              patch.ageReferencePerson = 'personA'
+            }
+            patch.spendingPhases = s.spendingPhases.map(phase =>
+              phase.linkedToFirstDeath ? { ...phase, linkedToFirstDeath: false } : phase
+            )
+          }
         }
 
         if (key === 'cppA') {
@@ -268,6 +276,14 @@ export const useStore = create<Store>()(
       // Clear old-format scenarios
       if (merged.scenarios.length > 0 && !('whatIfs' in merged.scenarios[0])) {
         merged.scenarios = []
+      }
+      if (!merged.personB.name) {
+        if (merged.ageReferencePerson === 'personB') {
+          merged.ageReferencePerson = 'personA'
+        }
+        merged.spendingPhases = merged.spendingPhases.map(phase =>
+          phase.linkedToFirstDeath ? { ...phase, linkedToFirstDeath: false } : phase
+        )
       }
       set(() => ({ ...merged }))
       saveToStorage(merged)

@@ -1,0 +1,384 @@
+{
+  "_metadata": {
+    "title": "Dan - Solo Estate Lawyer Plan",
+    "narrative": "This is a story about Dan, a divorced 54-year-old estate lawyer with no friends and no dependents. Born on September 12, 1971, Dan currently makes $190,000 per year and has accumulated a solid nest egg: $1.2M in RRSPs, $100K in TFSAs, $250K in a Non-Registered account, and $50K in a High Interest Savings Account (HISA). Dan plans to retire on his 60th birthday (September 12, 2031). He aims for a quiet retirement with flat spending of $60,000 per year (inflation-adjusted) until he dies at age 82. Since he has no dependents, his goal is simply to ensure his own security without worrying about leaving an estate. He will save $20,000/year in RRSPs and $7,000/year in TFSAs until retirement, and then stop all contributions. We assume a flat 8.0% nominal return on investments and a 2.0% return on his HISA. He will take his maximum CPP and full OAS benefits at age 65."
+  },
+  "personA": {
+    "name": "Dan",
+    "color": "#3b82f6",
+    "birthDate": "1971-09-12",
+    "gender": "male",
+    "retirementDate": "2031-09-12",
+    "planningEndAge": 82
+  },
+  "personB": {
+    "name": "",
+    "color": "#a855f7",
+    "birthDate": "1971-01-01",
+    "gender": "female",
+    "retirementDate": "1971-01-01",
+    "planningEndAge": 0
+  },
+  "ageReferencePerson": "personA",
+  "personalInflationRatePct": 3,
+  "cpiRatePct": 2,
+  "returnRates": {
+    "upTo55": 8,
+    "from55to65": 8,
+    "from65to70": 8,
+    "from70plus": 8
+  },
+  "employmentA": {
+    "annualAmount": 190000,
+    "growthRatePct": 3
+  },
+  "employmentB": {
+    "annualAmount": 0,
+    "growthRatePct": 0
+  },
+  "dbPensionA": {
+    "enabled": false,
+    "planName": "",
+    "startDate": "2031-09-12",
+    "annualAmount": 0,
+    "cpiIndexed": false,
+    "indexingRatePct": 0,
+    "cpiIndexingCapEnabled": false,
+    "cpiIndexingCap": 0,
+    "bridgeBenefitAmount": 0,
+    "bridgeBenefitEndDate": "2036-09-12",
+    "survivorBenefitPct": 0.6,
+    "cppIntegration": false,
+    "cppIntegrationAmount": 0
+  },
+  "dbPensionB": {
+    "enabled": false,
+    "planName": "",
+    "startDate": "2031-09-12",
+    "annualAmount": 0,
+    "cpiIndexed": false,
+    "indexingRatePct": 0,
+    "cpiIndexingCapEnabled": false,
+    "cpiIndexingCap": 0,
+    "bridgeBenefitAmount": 0,
+    "bridgeBenefitEndDate": "2036-09-12",
+    "survivorBenefitPct": 0.6,
+    "cppIntegration": false,
+    "cppIntegrationAmount": 0
+  },
+  "cppA": {
+    "estimatedMonthlyAt65": 1563,
+    "startDate": "2036-09-12",
+    "inputMode": "direct",
+    "maxMonthlyBenefit": 1563,
+    "pctOfMax": 0,
+    "yearsAtMax": 0
+  },
+  "cppB": {
+    "estimatedMonthlyAt65": 0,
+    "startDate": "2036-09-12",
+    "inputMode": "direct",
+    "maxMonthlyBenefit": 1563,
+    "pctOfMax": 0,
+    "yearsAtMax": 0
+  },
+  "oasA": {
+    "estimatedMonthlyAt65": 742,
+    "startDate": "2036-09-12",
+    "inputMode": "direct",
+    "maxMonthlyBenefit": 742,
+    "yearsOfResidency": 40,
+    "gisEligible": false,
+    "gisMonthlyAmount": 667
+  },
+  "oasB": {
+    "estimatedMonthlyAt65": 0,
+    "startDate": "2036-09-12",
+    "inputMode": "direct",
+    "maxMonthlyBenefit": 742,
+    "yearsOfResidency": 0,
+    "gisEligible": false,
+    "gisMonthlyAmount": 667
+  },
+  "rrspA": {
+    "balance": 1200000,
+    "annualContribution": 20000,
+    "contributionEndDate": "2031-09-12",
+    "contributionTiming": "spread",
+    "spousalBalance": 0,
+    "spousalAnnualContribution": 0,
+    "spousalContributionTiming": "spread",
+    "spousalLastContributionDate": "2031-09-12",
+    "rrifConversionDate": "2042-12-31",
+    "useSpouseAgeForMinimums": false,
+    "additionalWithdrawalAboveMinimum": 0,
+    "returnRateOverrideEnabled": false,
+    "returnRateOverridePct": 0
+  },
+  "rrspB": {
+    "balance": 0,
+    "annualContribution": 0,
+    "contributionEndDate": "2031-09-12",
+    "contributionTiming": "spread",
+    "spousalBalance": 0,
+    "spousalAnnualContribution": 0,
+    "spousalContributionTiming": "spread",
+    "spousalLastContributionDate": "2031-09-12",
+    "rrifConversionDate": "2042-12-31",
+    "useSpouseAgeForMinimums": false,
+    "additionalWithdrawalAboveMinimum": 0,
+    "returnRateOverrideEnabled": false,
+    "returnRateOverridePct": 0
+  },
+  "tfsaA": {
+    "balance": 100000,
+    "annualContribution": 7000,
+    "contributionEndDate": "2031-09-12",
+    "contributionTiming": "spread",
+    "returnRateOverrideEnabled": false,
+    "returnRateOverridePct": 0
+  },
+  "tfsaB": {
+    "balance": 0,
+    "annualContribution": 0,
+    "contributionEndDate": "2031-09-12",
+    "contributionTiming": "spread",
+    "returnRateOverrideEnabled": false,
+    "returnRateOverridePct": 0
+  },
+  "nonRegA": {
+    "balance": 250000,
+    "acb": 160000,
+    "annualContribution": 0,
+    "contributionEndDate": "2031-09-12",
+    "contributionTiming": "spread",
+    "returnRateOverrideEnabled": false,
+    "returnRateOverridePct": 0,
+    "eligibleDivYieldPct": 0,
+    "foreignIncomeYieldPct": 0,
+    "interestYieldPct": 0
+  },
+  "nonRegB": {
+    "balance": 0,
+    "acb": 0,
+    "annualContribution": 0,
+    "contributionEndDate": "2031-09-12",
+    "contributionTiming": "spread",
+    "returnRateOverrideEnabled": false,
+    "returnRateOverridePct": 0,
+    "eligibleDivYieldPct": 0,
+    "foreignIncomeYieldPct": 0,
+    "interestYieldPct": 0
+  },
+  "cash": {
+    "hisaBalance": 50000,
+    "hisaRatePct": 2,
+    "hisaMinBalance": 0
+  },
+  "otherIncome": {
+    "otherItems": []
+  },
+  "spendingPhases": [
+    {
+      "id": "phase-0",
+      "label": "Pre-Retirement",
+      "startAge": 54,
+      "annualAmount": 120000,
+      "growthRatePct": 0,
+      "linkedToFirstDeath": false
+    },
+    {
+      "id": "phase-1",
+      "label": "Go-Go Years (both retired)",
+      "startAge": 60,
+      "annualAmount": 60000,
+      "growthRatePct": 0,
+      "linkedToFirstDeath": false
+    },
+    {
+      "id": "phase-2",
+      "label": "Slow-Go Years",
+      "startAge": 70,
+      "annualAmount": 60000,
+      "growthRatePct": 0,
+      "linkedToFirstDeath": false
+    },
+    {
+      "id": "phase-3",
+      "label": "No-Go Years",
+      "startAge": 80,
+      "annualAmount": 60000,
+      "growthRatePct": 0,
+      "linkedToFirstDeath": false
+    },
+    {
+      "id": "phase-4",
+      "label": "Survivor",
+      "startAge": 82,
+      "annualAmount": 60000,
+      "growthRatePct": 0,
+      "linkedToFirstDeath": true
+    }
+  ],
+  "additionalSpending": [],
+  "taxSettings": {
+    "taxYear": 2026,
+    "federalBrackets": [
+      { "upTo": 58523, "rate": 0.14 },
+      { "upTo": 117045, "rate": 0.205 },
+      { "upTo": 181440, "rate": 0.26 },
+      { "upTo": 258482, "rate": 0.29 },
+      { "upTo": "__Infinity__", "rate": 0.33 }
+    ],
+    "federalBPA": 16452,
+    "federalAgeAmount": 9209,
+    "federalAgeAmountThreshold": 46432,
+    "federalAgeAmountReductionRate": 0.15,
+    "federalPensionIncomeAmount": 2000,
+    "federalEligibleDivGrossUp": 0.38,
+    "federalEligibleDivCredit": 0.150198,
+    "federalNonEligibleDivGrossUp": 0.15,
+    "federalNonEligibleDivCredit": 0.090301,
+    "capitalGainsInclusionRate": 0.5,
+    "capitalGainsHighRate": 0.5,
+    "capitalGainsHighThreshold": 10000000,
+    "oasClawbackThreshold": 95323,
+    "oasClawbackRate": 0.15,
+    "ontarioBrackets": [
+      { "upTo": 53891, "rate": 0.0505 },
+      { "upTo": 107785, "rate": 0.0915 },
+      { "upTo": 150000, "rate": 0.1116 },
+      { "upTo": 220000, "rate": 0.1216 },
+      { "upTo": "__Infinity__", "rate": 0.1316 }
+    ],
+    "ontarioBPA": 12989,
+    "ontarioAgeAmount": 6342,
+    "ontarioAgeAmountThreshold": 47210,
+    "ontarioAgeAmountReductionRate": 0.15,
+    "ontarioPensionIncomeAmount": 1796,
+    "ontarioEligibleDivCredit": 0.1,
+    "ontarioNonEligibleDivCredit": 0.029863,
+    "ontarioSurtax1Threshold": 5818,
+    "ontarioSurtax1Rate": 0.2,
+    "ontarioSurtax2Threshold": 7446,
+    "ontarioSurtax2Rate": 0.36
+  },
+  "withdrawalStrategy": {
+    "pensionSplitMode": "auto",
+    "pensionSplitPct": 0,
+    "drawdownStrategy": "none",
+    "drawdownFixedPct": {
+      "rrspPct": 4,
+      "rrspMin": 0,
+      "tfsaPct": 4,
+      "tfsaMin": 0,
+      "nonRegPct": 4,
+      "nonRegMin": 0,
+      "hisaPct": 0,
+      "hisaMin": 0
+    },
+    "drawdownFixedWithdrawal": {
+      "rrspAmountA": 0,
+      "rrspAmountB": 0,
+      "tfsaAmountA": 0,
+      "tfsaAmountB": 0,
+      "nonRegAmountA": 0,
+      "nonRegAmountB": 0,
+      "hisaAmount": 0
+    },
+    "spendGapConfig": {
+      "stopContributionsWhenPartnerRetired": false,
+      "meltdownA": {
+        "grossIncomeCeiling": 0,
+        "deficitItems": [
+          { "account": "tfsa", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "hisa", "unlimited": true, "cap": 0 }
+        ]
+      },
+      "meltdownB": {
+        "grossIncomeCeiling": 0,
+        "deficitItems": [
+          { "account": "tfsa", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "hisa", "unlimited": true, "cap": 0 }
+        ]
+      },
+      "rrifA": {
+        "grossIncomeCeiling": 0,
+        "deficitItems": [
+          { "account": "tfsa", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "hisa", "unlimited": true, "cap": 0 }
+        ]
+      },
+      "rrifB": {
+        "grossIncomeCeiling": 0,
+        "deficitItems": [
+          { "account": "tfsa", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "hisa", "unlimited": true, "cap": 0 }
+        ]
+      },
+      "surplusMeltdownItems": [
+        { "account": "tfsa", "unlimited": false, "limit": 0 },
+        { "account": "nonReg", "unlimited": false, "limit": 0 },
+        { "account": "hisa", "unlimited": false, "limit": 0 }
+      ],
+      "surplusRrifItems": [
+        { "account": "tfsa", "unlimited": false, "limit": 0 },
+        { "account": "nonReg", "unlimited": false, "limit": 0 },
+        { "account": "hisa", "unlimited": false, "limit": 0 }
+      ]
+    },
+    "bengenConfig": {
+      "inflationIndex": "personal",
+      "surplusToHisa": true,
+      "deficitFromHisa": false,
+      "personA": {
+        "drawRatePct": 4,
+        "accountOrder": [
+          { "account": "rrsp", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "tfsa", "unlimited": true, "cap": 0 }
+        ]
+      },
+      "personB": {
+        "drawRatePct": 4,
+        "accountOrder": [
+          { "account": "rrsp", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "tfsa", "unlimited": true, "cap": 0 }
+        ]
+      }
+    },
+    "gkConfig": {
+      "inflationIndex": "personal",
+      "surplusToHisa": true,
+      "deficitFromHisa": false,
+      "lowerGuardrailPct": 20,
+      "upperGuardrailPct": 20,
+      "cutPct": 10,
+      "raisePct": 10,
+      "apply15YearRule": true,
+      "personA": {
+        "drawRatePct": 4,
+        "accountOrder": [
+          { "account": "rrsp", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "tfsa", "unlimited": true, "cap": 0 }
+        ]
+      },
+      "personB": {
+        "drawRatePct": 4,
+        "accountOrder": [
+          { "account": "rrsp", "unlimited": true, "cap": 0 },
+          { "account": "nonReg", "unlimited": true, "cap": 0 },
+          { "account": "tfsa", "unlimited": true, "cap": 0 }
+        ]
+      }
+    }
+  },
+  "scenarios": [],
+  "activeDatasetId": "us_shiller"
+}

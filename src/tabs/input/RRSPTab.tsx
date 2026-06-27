@@ -189,7 +189,7 @@ export function RRSPTab() {
   const state = useStore()
   const { rrspA, rrspB, personA, personB, update } = state
   const aName = personA.name || 'Person A'
-  const bName = personB.name || 'Person B'
+  const bName = personB.name || ''
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
 
   const currentYear = new Date().getFullYear()
@@ -255,6 +255,12 @@ export function RRSPTab() {
     { x: years, y: rrspBVals, name: `${bName} RRSP/RRIF`, type: 'bar', marker: { color: CHART_COLORS.rrifB } },
   ]
 
+  const hasSpouse = !!personB.name
+  const spousalLabel1 = hasSpouse ? `Spousal RRSP — ${aName} contributes for ${bName}` : 'Spousal RRSP -'
+  const spousalLabel2 = hasSpouse ? `Spousal RRSP — ${bName} contributes for ${aName}` : 'Spousal RRSP -'
+  const spousalColor1 = hasSpouse ? personB.color : '#000000'
+  const spousalColor2 = hasSpouse ? personA.color : '#000000'
+
   return (
     <CardGrid>
       <RRSPSection label={`RRSP / RRIF — ${aName}`}
@@ -268,20 +274,20 @@ export function RRSPTab() {
         spouseName={aName}
         onChange={v => update('rrspB', v)}
         onReset={() => update('rrspB', { ...DEFAULT_STATE.rrspB, contributionEndDate: personB.retirementDate, rrifConversionDate: dateAtAge(personB.birthDate, 71) })}
-        personColor={personB.color} />
+        personColor={personB.name ? personB.color : '#000000'} />
 
-      <SpousalRRSPSection label={`Spousal RRSP — ${aName} contributes for ${bName}`}
+      <SpousalRRSPSection label={spousalLabel1}
         account={rrspA} retirementDate={personA.retirementDate}
         spouseName={aName} annuitantName={bName}
         onChange={v => update('rrspA', v)}
         onReset={() => update('rrspA', { ...rrspA, spousalBalance: 0, spousalAnnualContribution: 0, spousalLastContributionDate: personA.retirementDate })}
-        personColor={personB.color} />
-      <SpousalRRSPSection label={`Spousal RRSP — ${bName} contributes for ${aName}`}
+        personColor={spousalColor1} />
+      <SpousalRRSPSection label={spousalLabel2}
         account={rrspB} retirementDate={personB.retirementDate}
         spouseName={bName} annuitantName={aName}
         onChange={v => update('rrspB', v)}
         onReset={() => update('rrspB', { ...rrspB, spousalBalance: 0, spousalAnnualContribution: 0, spousalLastContributionDate: personB.retirementDate })}
-        personColor={personA.color} />
+        personColor={spousalColor2} />
 
       <SectionCard title="RRSP / RRIF Balances" width="full"
         info={

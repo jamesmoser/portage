@@ -144,37 +144,40 @@ export function applyRetirementAges(
   }
 
   // 2. Person B retirement modifications
-  const birthB = s.personB.birthDate
-  const newDateB = snapToMonthStart(dateAtDecimalAge(birthB, ageB))
-  const deltaMsB = parseDate(newDateB).getTime() - parseDate(s.personB.retirementDate).getTime()
-  const deadlineB = getDeathDate(birthB, s.personB.planningEndAge)
+  const hasSpouseB = !!s.personB.name || s.personB.planningEndAge > 0
+  if (hasSpouseB) {
+    const birthB = s.personB.birthDate
+    const newDateB = snapToMonthStart(dateAtDecimalAge(birthB, ageB))
+    const deltaMsB = parseDate(newDateB).getTime() - parseDate(s.personB.retirementDate).getTime()
+    const deadlineB = getDeathDate(birthB, s.personB.planningEndAge)
 
-  s.personB = { ...s.personB, retirementDate: newDateB }
+    s.personB = { ...s.personB, retirementDate: newDateB }
 
-  if (options.cascadePension && s.dbPensionB.enabled) {
-    s.dbPensionB = { ...s.dbPensionB, startDate: newDateB }
-  }
-  if (options.cascadeRrsp) {
-    s.rrspB = {
-      ...s.rrspB,
-      contributionEndDate: minDate(shiftDateMs(s.rrspB.contributionEndDate, deltaMsB), deadlineB),
-      spousalLastContributionDate: minDate(shiftDateMs(s.rrspB.spousalLastContributionDate, deltaMsB), deadlineB),
+    if (options.cascadePension && s.dbPensionB.enabled) {
+      s.dbPensionB = { ...s.dbPensionB, startDate: newDateB }
     }
-  }
-  if (options.cascadeTfsa) {
-    s.tfsaB = { ...s.tfsaB, contributionEndDate: minDate(shiftDateMs(s.tfsaB.contributionEndDate, deltaMsB), deadlineB) }
-  }
-  if (options.cascadeNonReg) {
-    s.nonRegB = { ...s.nonRegB, contributionEndDate: minDate(shiftDateMs(s.nonRegB.contributionEndDate, deltaMsB), deadlineB) }
+    if (options.cascadeRrsp) {
+      s.rrspB = {
+        ...s.rrspB,
+        contributionEndDate: minDate(shiftDateMs(s.rrspB.contributionEndDate, deltaMsB), deadlineB),
+        spousalLastContributionDate: minDate(shiftDateMs(s.rrspB.spousalLastContributionDate, deltaMsB), deadlineB),
+      }
+    }
+    if (options.cascadeTfsa) {
+      s.tfsaB = { ...s.tfsaB, contributionEndDate: minDate(shiftDateMs(s.tfsaB.contributionEndDate, deltaMsB), deadlineB) }
+    }
+    if (options.cascadeNonReg) {
+      s.nonRegB = { ...s.nonRegB, contributionEndDate: minDate(shiftDateMs(s.nonRegB.contributionEndDate, deltaMsB), deadlineB) }
+    }
   }
 
   // 3. Shifting Go-Go Years (first retirement phase only)
   // Transition to slow-go is based on health, not retirement date, so we only shift phase-1.
   if (s.spendingPhases.length > 1) {
     const refBirth = s.ageReferencePerson === 'personB' ? s.personB.birthDate : s.personA.birthDate
-    const dateGoGo = s.personA.retirementDate > s.personB.retirementDate
-      ? s.personA.retirementDate
-      : s.personB.retirementDate
+    const dateGoGo = (hasSpouseB && s.personB.retirementDate > s.personA.retirementDate)
+      ? s.personB.retirementDate
+      : s.personA.retirementDate
 
     const newGoGoAge = decimalAgeAt(refBirth, dateGoGo)
 
@@ -204,11 +207,16 @@ export function runRetirementAgeSweep(
 ): RetirementAgeSweepResult {
   const points: RetirementAgeSweepPoint[] = []
 
+  const hasSpouse = !!state.personB.name || state.personB.planningEndAge > 0
+
   const currentAgeA = Math.max(35, getNextBirthdayAge(state.personA.birthDate, todayStr()))
-  const currentAgeB = Math.max(35, getNextBirthdayAge(state.personB.birthDate, todayStr()))
+  const currentAgeB = hasSpouse ? Math.max(35, getNextBirthdayAge(state.personB.birthDate, todayStr())) : 0
 
   const baseA = Math.max(currentAgeA, Math.round(decimalAgeAt(state.personA.birthDate, state.personA.retirementDate)))
-  const baseB = Math.max(currentAgeB, Math.round(decimalAgeAt(state.personB.birthDate, state.personB.retirementDate)))
+  const baseB = hasSpouse ? Math.max(currentAgeB, Math.round(decimalAgeAt(state.personB.birthDate, state.personB.retirementDate))) : 0
+
+  const startB = hasSpouse ? options.startAgeB : 0
+  const endB = hasSpouse ? options.endAgeB : 0
 
   // Generate historical rate schedules once if historical simulation is requested
   const schedules: number[][] = []
@@ -277,7 +285,7 @@ export function runRetirementAgeSweep(
 
   // Loop through ages for A and B
   for (let ageA = options.startAgeA; ageA <= options.endAgeA; ageA += options.step) {
-    for (let ageB = options.startAgeB; ageB <= options.endAgeB; ageB += options.step) {
+    for (let ageB = startB; ageB <= endB; ageB += options.step) {
       const testState = applyRetirementAges(state, ageA, ageB, options)
 
       let successRate = 0
@@ -393,27 +401,28 @@ export function runRetirementAgeSweep(
 
   // 2. Earliest B can retire given A is at configured plan age (baseA)
   let earliestB: number | null = null
-  const pointsABase = points.filter(p => p.ageA === baseA && p.success)
-  if (pointsABase.length > 0) {
-    earliestB = Math.min(...pointsABase.map(p => p.ageB))
+  if (hasSpouse) {
+    const pointsABase = points.filter(p => p.ageA === baseA && p.success)
+    if (pointsABase.length > 0) {
+      earliestB = Math.min(...pointsABase.map(p => p.ageB))
+    }
   }
 
   // 3. Earliest they can retire together (same calendar year)
   let earliestTogetherA: number | null = null
   let earliestTogetherB: number | null = null
-  let minTogetherYear = Infinity
-
-  const currentYear = new Date().getFullYear()
-
-  for (const p of points) {
-    if (p.success) {
-      const yearA = getYear(state.personA.birthDate) + p.ageA
-      const yearB = getYear(state.personB.birthDate) + p.ageB
-      if (yearA === yearB) {
-        if (yearA < minTogetherYear) {
-          minTogetherYear = yearA
-          earliestTogetherA = p.ageA
-          earliestTogetherB = p.ageB
+  if (hasSpouse) {
+    let minTogetherYear = Infinity
+    for (const p of points) {
+      if (p.success) {
+        const yearA = getYear(state.personA.birthDate) + p.ageA
+        const yearB = getYear(state.personB.birthDate) + p.ageB
+        if (yearA === yearB) {
+          if (yearA < minTogetherYear) {
+            minTogetherYear = yearA
+            earliestTogetherA = p.ageA
+            earliestTogetherB = p.ageB
+          }
         }
       }
     }
@@ -422,31 +431,34 @@ export function runRetirementAgeSweep(
   // 4. Best Outcome: lowest combined age (sum), tie breaker is the lowest age of the youngest person to retire
   let bestOutcomeA: number | null = null
   let bestOutcomeB: number | null = null
-  let minSum = Infinity
-  let minYoungest = Infinity
-
-  for (const p of points) {
-    if (p.success) {
-      const sum = p.ageA + p.ageB
-      const youngest = Math.min(p.ageA, p.ageB)
-      if (sum < minSum) {
-        minSum = sum
-        minYoungest = youngest
-        bestOutcomeA = p.ageA
-        bestOutcomeB = p.ageB
-      } else if (sum === minSum) {
-        if (youngest < minYoungest) {
+  if (hasSpouse) {
+    let minSum = Infinity
+    let minYoungest = Infinity
+    for (const p of points) {
+      if (p.success) {
+        const sum = p.ageA + p.ageB
+        const youngest = Math.min(p.ageA, p.ageB)
+        if (sum < minSum) {
+          minSum = sum
           minYoungest = youngest
           bestOutcomeA = p.ageA
           bestOutcomeB = p.ageB
+        } else if (sum === minSum) {
+          if (youngest < minYoungest) {
+            minYoungest = youngest
+            bestOutcomeA = p.ageA
+            bestOutcomeB = p.ageB
+          }
         }
       }
     }
+  } else {
+    bestOutcomeA = earliestA
   }
 
   return {
     points,
-    hasSpouse: true,
+    hasSpouse,
     baseA,
     baseB,
     earliestA,

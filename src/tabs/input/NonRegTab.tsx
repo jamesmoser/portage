@@ -131,7 +131,7 @@ export function NonRegTab() {
   const state = useStore()
   const { nonRegA, nonRegB, personA, personB, update } = state
   const aName = personA.name || 'Person A'
-  const bName = personB.name || 'Person B'
+  const bName = personB.name || ''
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>('year')
 
   const currentYear = new Date().getFullYear()
@@ -188,7 +188,7 @@ export function NonRegTab() {
         retirementDate={personB.retirementDate}
         onChange={v => update('nonRegB', v)}
         onReset={() => update('nonRegB', { ...DEFAULT_STATE.nonRegB, contributionEndDate: personB.retirementDate })}
-        personColor={personB.color} />
+        personColor={personB.name ? personB.color : '#000000'} />
 
       <SectionCard title="Non-Registered Balances" width="full"
         info={

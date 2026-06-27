@@ -5,6 +5,26 @@ Format: [Semantic Versioning](https://semver.org) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.13.0] — 2026-06-27
+
+### Added
+- **Solo User Support** — The entire UI now adapts when Person B is not specified. All Person B input fields, charts, analysis tools, and What-If Override controls are hidden throughout the application, giving solo users a clean, uncluttered experience.
+  - Input tabs: Person B sections hidden in Household, Employment, DB Pension, RRSP, TFSA, Non-Reg, CPP/OAS, and Spending tabs.
+  - Annual Summary table: Person B columns hidden.
+  - Drawdown scenarios: Person B fixed withdrawal and strategy inputs hidden.
+  - CPP/OAS Timing Analyser: Person B charts hidden.
+  - RRSP Meltdown: Person B meltdown chart hidden.
+  - Life Insurance Needs Analyser: replaced with an info panel explaining the tool requires a spouse.
+  - Retirement Age Analyser: switches from a 2D heatmap to a 1D success-rate line chart for solo plans.
+  - What-If Overrides: Person B retirement age, longevity, CPP start, OAS start, and layoff controls hidden.
+  - Analysis tab modifiers: Person B retirement age, death, CPP start, OAS start, and layoff overrides hidden.
+- **Dan Solo Example Plan** — Added `dan_solo.json` and `dan_solo.md` — a canned solo demonstration plan for a 54-year-old estate lawyer retiring at 60 with $1.55M in assets.
+- **Dan Solo E2E Tests** — 23 new integration tests covering the full solo projection lifecycle: timeline length, accumulation phase, retirement transition, CPP/OAS onset, Person B isolation invariants, portfolio growth, and the 1D retirement age sweep.
+
+### Fixed
+- **Retirement Age Sweep — Solo** — Fixed a bug where the sweep would not run at all for solo plans (previously required Person B). The sweep engine now detects solo plans and performs a 1D sweep over Person A's retirement age only, with `ageB = 0` and `hasSpouse: false` in the result.
+- **Retirement Age Sweep — Spouse** — Fixed a regression where the 2D sweep was not executing correctly when Person B was specified; the outer loop age variables were wired to the wrong option keys.
+
 ## [0.12.1] — 2026-06-23
 
 ### Added

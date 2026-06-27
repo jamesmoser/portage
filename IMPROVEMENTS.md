@@ -26,3 +26,5 @@ A place to quickly capture ideas, UI enhancements, tax engine updates, and gener
 ## Completed
 
 - [2026-06-21] Canned JSON file for Jack and Dianne (Ottawa demo plan) to use for demonstration and video storytelling.
+- [2026-06-27] Canned JSON file for Dan (solo estate lawyer demo plan) to use for demonstration and video storytelling.
+- [2026-06-27] Solo user support — hide all Person B controls, charts, and analysis tools when Person B is not specified.

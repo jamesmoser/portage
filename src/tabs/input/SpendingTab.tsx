@@ -107,7 +107,7 @@ export function SpendingTab() {
           const linked = phase.linkedToFirstDeath ?? false
           return (
             <div key={phase.id} className="mb-3 p-3 border border-slate-200 rounded bg-slate-50">
-              {isLastPhase && (
+              {isLastPhase && personB.name && (
                 <div className="mb-2">
                   <ToggleInput
                     label={`Survivor Phase — starts at ${firstToDisName}'s death`}

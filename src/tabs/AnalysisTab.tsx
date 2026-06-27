@@ -309,6 +309,7 @@ export function AnalysisTab() {
   const [retEndAgeB,   setRetEndAgeB]   = useState(0)
 
   const [retResult, setRetResult] = useState<RetirementAgeSweepResult | null>(null)
+  const hasSpouse = !!effectiveState.personB.name
   const [retRunning, setRetRunning] = useState(false)
   const [retApplyTarget, setRetApplyTarget] = useState<'personA' | 'personB' | 'joint' | 'balanced'>('personA')
   const [retRateType, setRetRateType] = useState<'plan' | 'historical'>('plan')
@@ -360,7 +361,7 @@ export function AnalysisTab() {
       setRetStartAgeA(Math.round(defaultStartA))
       setRetEndAgeA(Math.round(defaultEndA))
 
-      if (effectiveState.personB.birthDate) {
+      if (effectiveState.personB.name) {
         const defaultStartB = currentAgeB
         const defaultEndB = Math.max(defaultStartB, Math.min(effectiveState.personB.planningEndAge, baseB + 10))
         setRetStartAgeB(Math.round(defaultStartB))
@@ -385,11 +386,14 @@ export function AnalysisTab() {
     setRetStartAgeA(Math.round(defaultStartA))
     setRetEndAgeA(Math.round(defaultEndA))
 
-    if (effectiveState.personB.birthDate) {
+    if (effectiveState.personB.name) {
       const defaultStartB = currentAgeB
       const defaultEndB = Math.max(defaultStartB, Math.min(effectiveState.personB.planningEndAge, baseB + 10))
       setRetStartAgeB(Math.round(defaultStartB))
       setRetEndAgeB(Math.round(defaultEndB))
+    } else {
+      setRetStartAgeB(0)
+      setRetEndAgeB(0)
     }
   };
 
@@ -419,7 +423,9 @@ export function AnalysisTab() {
   function applyRetirementToDashboard() {
     if (!retResult) return
 
-    if (retApplyTarget === 'personA') {
+    const target = hasSpouse ? retApplyTarget : 'personA'
+
+    if (target === 'personA') {
       if (retResult.earliestA === null) return
       updateWhatIf('retirementA', {
         enabled: true,
@@ -502,6 +508,88 @@ export function AnalysisTab() {
   const retHeatmapChart = useMemo(() => {
     if (!retResult || retResult.points.length === 0) return null
 
+    const formatShortfallYears = (val: number) => {
+      if (val === 0) return '0'
+      if (val % 1 === 0) return val.toString()
+      if (val < 0.1) return val.toFixed(2)
+      return val.toFixed(1)
+    }
+
+    if (!retResult.hasSpouse) {
+      const ages = Array.from(new Set(retResult.points.map(p => p.ageA))).sort((a, b) => a - b)
+      const successRates = ages.map(age => {
+        const p = retResult.points.find(pt => pt.ageA === age)
+        return p ? p.successRate : 0
+      })
+      const hoverText = ages.map(age => {
+        const p = retResult.points.find(pt => pt.ageA === age)
+        if (!p) return ''
+        const dateA = snapToMonthStart(dateAtDecimalAge(effectiveState.personA.birthDate, age))
+        const yearA = getYear(dateA)
+        const sfYrsStr = formatShortfallYears(p.shortfallYears)
+        const outcome = p.success
+          ? (p.successRate === 100 ? 'Success' : `Success (${p.successRate.toFixed(0)}%)`)
+          : (p.successRate === 0
+              ? `Failure (${sfYrsStr} yrs, Total Shortfall: ${fmt(p.shortfallTotal)})`
+              : `Failure (${p.successRate.toFixed(0)}% success, Avg Shortfall: ${sfYrsStr} yrs, Total Shortfall: ${fmt(p.shortfallTotal)})`
+            )
+        const firstYr = p.firstShortfallYear ? `<br>First Shortfall: Year ${p.firstShortfallYear}` : ''
+        return `${aName} retires: Age ${age} (${yearA})<br>Success Rate: ${p.successRate.toFixed(1)}%<br>Outcome: <b>${outcome}</b>${firstYr}<br>Final Balance: ${fmt(p.finalBalance)}`
+      })
+
+      const traces: Data[] = [
+        {
+          x: ages,
+          y: successRates,
+          text: hoverText,
+          hoverinfo: 'text',
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: { color: '#7B1515', width: 2 },
+          marker: { color: '#7B1515', size: 6 }
+        }
+      ]
+
+      const shapes: object[] = [
+        {
+          type: 'line',
+          xref: 'x',
+          yref: 'paper',
+          x0: baseA,
+          y0: 0,
+          x1: baseA,
+          y1: 1,
+          line: { color: '#475569', dash: 'dash', width: 2 }
+        }
+      ]
+
+      const annotations: object[] = [
+        {
+          x: baseA,
+          y: 50,
+          xref: 'x',
+          yref: 'y',
+          text: `Plan Configured Retirement Age (${baseA})`,
+          showarrow: true,
+          arrowhead: 2,
+          arrowcolor: '#1e293b',
+          arrowsize: 1,
+          arrowwidth: 1.5,
+          ax: 80,
+          bgcolor: 'rgba(255, 255, 255, 0.95)',
+          bordercolor: '#475569',
+          borderwidth: 1,
+          borderpad: 4,
+          font: {
+            size: 10,
+            color: '#1e293b'
+          }
+        }
+      ]
+
+      return { traces, shapes, annotations, is1D: true, ys: ages, xs: [] }
+    }
+
     const xs = Array.from(new Set(retResult.points.map(p => p.ageB))).sort((a, b) => a - b)
     const ys = Array.from(new Set(retResult.points.map(p => p.ageA))).sort((a, b) => a - b)
 
@@ -513,12 +601,7 @@ export function AnalysisTab() {
       })
     })
 
-    const formatShortfallYears = (val: number) => {
-      if (val === 0) return '0'
-      if (val % 1 === 0) return val.toString()
-      if (val < 0.1) return val.toFixed(2)
-      return val.toFixed(1)
-    }
+
 
     const hoverText = ys.map((yVal) => {
       return xs.map((xVal) => {
@@ -915,9 +998,11 @@ export function AnalysisTab() {
   function applyOptimalGovAges() {
     if (!govResult) return
     updateWhatIf('cppStartAgeA', { enabled: true, value: govResult.optimalCppAgeA })
-    updateWhatIf('cppStartAgeB', { enabled: true, value: govResult.optimalCppAgeB })
     updateWhatIf('oasStartAgeA', { enabled: true, value: govResult.optimalOasAgeA })
-    updateWhatIf('oasStartAgeB', { enabled: true, value: govResult.optimalOasAgeB })
+    if (hasSpouse) {
+      updateWhatIf('cppStartAgeB', { enabled: true, value: govResult.optimalCppAgeB })
+      updateWhatIf('oasStartAgeB', { enabled: true, value: govResult.optimalOasAgeB })
+    }
   }
 
   // ── CPP / OAS chart builder ───────────────────────────────────────────────
@@ -1004,10 +1089,12 @@ export function AnalysisTab() {
             ...withdrawalStrategy.spendGapConfig.meltdownA,
             grossIncomeCeiling: meltResult.optimalCeilingA ?? withdrawalStrategy.spendGapConfig.meltdownA.grossIncomeCeiling,
           },
-          meltdownB: {
-            ...withdrawalStrategy.spendGapConfig.meltdownB,
-            grossIncomeCeiling: meltResult.optimalCeilingB ?? withdrawalStrategy.spendGapConfig.meltdownB.grossIncomeCeiling,
-          },
+          meltdownB: hasSpouse
+            ? {
+                ...withdrawalStrategy.spendGapConfig.meltdownB,
+                grossIncomeCeiling: meltResult.optimalCeilingB ?? withdrawalStrategy.spendGapConfig.meltdownB.grossIncomeCeiling,
+              }
+            : withdrawalStrategy.spendGapConfig.meltdownB,
         },
       },
     })
@@ -2201,26 +2288,6 @@ export function AnalysisTab() {
           }
         >
           {(() => {
-            const hasSpouse = !!effectiveState.personB.name
-            if (!hasSpouse) {
-              return (
-                <InfoPanel>
-                  <div className="flex items-start gap-3 py-2">
-                    <span className="text-xl">⚠️</span>
-                    <div>
-                      <h4 className="font-semibold text-slate-800">Spouse (Person B) Config Required</h4>
-                      <p className="mt-1 text-sm text-slate-600 leading-relaxed">
-                        The Retirement Age Analysis sweeps retirement age combinations for both spouses on a 2D mesh to find the optimal joint retirement boundary. 
-                      </p>
-                      <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                        To unlock this tool, configure your spouse (Person B) in the <strong>Household</strong> input tab.
-                      </p>
-                    </div>
-                  </div>
-                </InfoPanel>
-              )
-            }
-
             return (
               <>
                 {/* Controls */}
@@ -2308,71 +2375,88 @@ export function AnalysisTab() {
                           {retResult.earliestA !== null ? retResult.earliestA : 'None'}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">
-                          Assuming {bName} retires at {baseB}
+                          {hasSpouse ? `Assuming ${bName} retires at ${baseB}` : 'Safe projection boundary'}
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                        <div className="text-xs text-slate-400">
-                          Earliest Retirement for {bName}
-                        </div>
-                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                          {retResult.earliestB !== null ? retResult.earliestB : 'None'}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Assuming {aName} retires at {baseA}
-                        </div>
-                      </div>
+                      {hasSpouse && (
+                        <>
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                            <div className="text-xs text-slate-400">
+                              Earliest Retirement for {bName}
+                            </div>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                              {retResult.earliestB !== null ? retResult.earliestB : 'None'}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">
+                              Assuming {aName} retires at {baseA}
+                            </div>
+                          </div>
 
-                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                        <div className="text-xs text-slate-400">
-                          Earliest Joint Retirement
-                        </div>
-                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                          {retResult.earliestTogetherA !== null
-                            ? `${aName} ${retResult.earliestTogetherA} · ${bName} ${retResult.earliestTogetherB}`
-                            : 'None'}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Retiring in same calendar year
-                        </div>
-                      </div>
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                            <div className="text-xs text-slate-400">
+                              Earliest Joint Retirement
+                            </div>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                              {retResult.earliestTogetherA !== null
+                                ? `${aName} ${retResult.earliestTogetherA} · ${bName} ${retResult.earliestTogetherB}`
+                                : 'None'}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">
+                              Retiring in same calendar year
+                            </div>
+                          </div>
 
-                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                        <div className="text-xs text-slate-400">
-                          Best Balanced Outcome
-                        </div>
-                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
-                          {retResult.bestOutcomeA !== null
-                            ? `${aName} ${retResult.bestOutcomeA} · ${bName} ${retResult.bestOutcomeB}`
-                            : 'None'}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Retire as soon as possible
-                        </div>
-                      </div>
+                          <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                            <div className="text-xs text-slate-400">
+                              Best Balanced Outcome
+                            </div>
+                            <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>
+                              {retResult.bestOutcomeA !== null
+                                ? `${aName} ${retResult.bestOutcomeA} · ${bName} ${retResult.bestOutcomeB}`
+                                : 'None'}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">
+                              Retire as soon as possible
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Heatmap plot */}
                     <div>
                       <div className="text-sm font-semibold mb-2 text-slate-700">
-                        Safe Retirement Heatmap
+                        {retHeatmapChart.is1D ? `${aName}'s Retirement Age viability` : 'Safe Retirement Heatmap'}
                       </div>
                       <PlotlyChart
                         data={retHeatmapChart.traces}
                         layout={{
-                          xaxis: {
-                            title: { text: `${bName}'s Retirement Age`, font: { size: 12 } },
-                            gridcolor: '#e2e8f0',
-                            dtick: 1,
-                            range: [retStartAgeB - 0.5, retEndAgeB + 0.5]
-                          },
-                          yaxis: {
-                            title: { text: `${aName}'s Retirement Age`, font: { size: 12 } },
-                            gridcolor: '#e2e8f0',
-                            dtick: 1,
-                            range: [retStartAgeA - 0.5, retEndAgeA + 0.5]
-                          },
+                          xaxis: retHeatmapChart.is1D
+                            ? {
+                                title: { text: `${aName}'s Retirement Age`, font: { size: 12 } },
+                                gridcolor: '#e2e8f0',
+                                dtick: 1,
+                                range: [retStartAgeA - 0.5, retEndAgeA + 0.5]
+                              }
+                            : {
+                                title: { text: `${bName}'s Retirement Age`, font: { size: 12 } },
+                                gridcolor: '#e2e8f0',
+                                dtick: 1,
+                                range: [retStartAgeB - 0.5, retEndAgeB + 0.5]
+                              },
+                          yaxis: retHeatmapChart.is1D
+                            ? {
+                                title: { text: 'Success Rate (%)', font: { size: 12 } },
+                                gridcolor: '#e2e8f0',
+                                range: [0, 105]
+                              }
+                            : {
+                                title: { text: `${aName}'s Retirement Age`, font: { size: 12 } },
+                                gridcolor: '#e2e8f0',
+                                dtick: 1,
+                                range: [retStartAgeA - 0.5, retEndAgeA + 0.5]
+                              },
                           shapes: retHeatmapChart.shapes,
                           annotations: retHeatmapChart.annotations,
                           margin: { t: 30, r: 30, b: 50, l: 50 },
@@ -2390,29 +2474,43 @@ export function AnalysisTab() {
                         className="btn-primary"
                         onClick={applyRetirementToDashboard}
                         disabled={
-                          (retApplyTarget === 'personA' && retResult.earliestA === null) ||
-                          (retApplyTarget === 'personB' && retResult.earliestB === null) ||
-                          (retApplyTarget === 'joint' && retResult.earliestTogetherA === null) ||
-                          (retApplyTarget === 'balanced' && retResult.bestOutcomeA === null)
+                          hasSpouse
+                            ? (
+                                (retApplyTarget === 'personA' && retResult.earliestA === null) ||
+                                (retApplyTarget === 'personB' && retResult.earliestB === null) ||
+                                (retApplyTarget === 'joint' && retResult.earliestTogetherA === null) ||
+                                (retApplyTarget === 'balanced' && retResult.bestOutcomeA === null)
+                              )
+                            : (retResult.earliestA === null)
                         }
                       >
                         Apply to Dashboard
                       </button>
-                      <SelectInput
-                        label=""
-                        value={retApplyTarget}
-                        onChange={v => setRetApplyTarget(v as 'personA' | 'personB' | 'joint' | 'balanced')}
-                        options={[
-                          { value: 'personA', label: `Earliest Retirement for ${aName} (${retResult.earliestA !== null ? `Age ${retResult.earliestA}` : 'None'})`, disabled: retResult.earliestA === null },
-                          { value: 'personB', label: `Earliest Retirement for ${bName} (${retResult.earliestB !== null ? `Age ${retResult.earliestB}` : 'None'})`, disabled: retResult.earliestB === null },
-                          { value: 'joint', label: `Joint Retirement (${retResult.earliestTogetherA !== null ? `${retResult.earliestTogetherA} & ${retResult.earliestTogetherB}` : 'None'})`, disabled: retResult.earliestTogetherA === null },
-                          { value: 'balanced', label: `Balanced Retirement (${retResult.bestOutcomeA !== null ? `${retResult.bestOutcomeA} & ${retResult.bestOutcomeB}` : 'None'})`, disabled: retResult.bestOutcomeA === null }
-                        ]}
-                        tooltip="Select which retirement age scenario to override on the main Dashboard planner."
-                      />
-                      <span className="text-xs text-slate-400 self-center">
-                        Set calculated retirement ages in the Dashboard
-                      </span>
+                      {hasSpouse ? (
+                        <SelectInput
+                          label=""
+                          value={retApplyTarget}
+                          onChange={v => setRetApplyTarget(v as 'personA' | 'personB' | 'joint' | 'balanced')}
+                          options={[
+                            { value: 'personA', label: `Earliest Retirement for ${aName} (${retResult.earliestA !== null ? `Age ${retResult.earliestA}` : 'None'})`, disabled: retResult.earliestA === null },
+                            { value: 'personB', label: `Earliest Retirement for ${bName} (${retResult.earliestB !== null ? `Age ${retResult.earliestB}` : 'None'})`, disabled: retResult.earliestB === null },
+                            { value: 'joint', label: `Joint Retirement (${retResult.earliestTogetherA !== null ? `${retResult.earliestTogetherA} & ${retResult.earliestTogetherB}` : 'None'})`, disabled: retResult.earliestTogetherA === null },
+                            { value: 'balanced', label: `Balanced Retirement (${retResult.bestOutcomeA !== null ? `${retResult.bestOutcomeA} & ${retResult.bestOutcomeB}` : 'None'})`, disabled: retResult.bestOutcomeA === null }
+                          ]}
+                          tooltip="Select which retirement age scenario to override on the main Dashboard planner."
+                        />
+                      ) : (
+                        <span className="text-sm text-slate-600 self-center">
+                          {retResult.earliestA !== null
+                            ? `Applies earliest retirement age (Age ${retResult.earliestA}) to ${aName} on the main Dashboard planner.`
+                            : 'No safe retirement ages found.'}
+                        </span>
+                      )}
+                      {hasSpouse && (
+                        <span className="text-xs text-slate-400 self-center">
+                          Set calculated retirement ages in the Dashboard
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
@@ -3092,9 +3190,26 @@ export function AnalysisTab() {
             </div>
           }
         >
-          {/* Controls */}
-          <div className="flex items-end gap-4 mb-4 flex-wrap">
-            <button className="btn-primary" onClick={runInsAnalyser} disabled={insRunning}>
+          {!hasSpouse ? (
+            <InfoPanel>
+              <div className="flex items-start gap-3 py-2">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <h4 className="font-semibold text-slate-800">Spouse (Person B) Config Required</h4>
+                  <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+                    The Life Insurance Needs Analyser sweeps death age combinations for both spouses to calculate the lump sum coverage needed at the time of the first death to fund all future spending goals without shortfalls.
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                    To unlock this tool, configure your spouse (Person B) in the <strong>Household</strong> input tab.
+                  </p>
+                </div>
+              </div>
+            </InfoPanel>
+          ) : (
+            <>
+              {/* Controls */}
+              <div className="flex items-end gap-4 mb-4 flex-wrap">
+                <button className="btn-primary" onClick={runInsAnalyser} disabled={insRunning}>
               {insRunning ? 'Running…' : insResult ? 'Re-Run' : 'Run'}
             </button>
 
@@ -3370,6 +3485,8 @@ export function AnalysisTab() {
               </>
             )
           })()}
+            </>
+          )}
         </SectionCard>
 
         {/* ── Plan Viability Analysis ────────────────────────────────────────────── */}
@@ -3643,17 +3760,19 @@ export function AnalysisTab() {
   
                   {/* ── CPP column ── */}
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className={`grid ${hasSpouse ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                       <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                         <div className="text-xs text-slate-400">{aName} — CPP Start</div>
                         <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeA}</div>
                         <div className="text-xs text-slate-400">{deltaLabel(cppDeltaA)}</div>
                       </div>
-                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                        <div className="text-xs text-slate-400">{bName} — CPP Start</div>
-                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeB}</div>
-                        <div className="text-xs text-slate-400">{deltaLabel(cppDeltaB)}</div>
-                      </div>
+                      {hasSpouse && (
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                          <div className="text-xs text-slate-400">{bName} — CPP Start</div>
+                          <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalCppAgeB}</div>
+                          <div className="text-xs text-slate-400">{deltaLabel(cppDeltaB)}</div>
+                        </div>
+                      )}
                     </div>
                     {(() => {
                       const { trace, annotations } = buildGovChart(
@@ -3678,7 +3797,7 @@ export function AnalysisTab() {
                         </div>
                       )
                     })()}
-                    {(() => {
+                    {hasSpouse && (() => {
                       const { trace, annotations } = buildGovChart(
                         govResult.cppSweepB, 'cpp', govResult.optimalCppAgeB, govResult.baseCppAgeB,
                       )
@@ -3705,17 +3824,19 @@ export function AnalysisTab() {
   
                   {/* ── OAS column ── */}
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className={`grid ${hasSpouse ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                       <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
                         <div className="text-xs text-slate-400">{aName} — OAS Start</div>
                         <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeA}</div>
                         <div className="text-xs text-slate-400">{deltaLabel(oasDeltaA)}</div>
                       </div>
-                      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
-                        <div className="text-xs text-slate-400">{bName} — OAS Start</div>
-                        <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeB}</div>
-                        <div className="text-xs text-slate-400">{deltaLabel(oasDeltaB)}</div>
-                      </div>
+                      {hasSpouse && (
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-3 text-center">
+                          <div className="text-xs text-slate-400">{bName} — OAS Start</div>
+                          <div className="text-2xl font-bold mt-0.5" style={{ color: '#7B1515' }}>Age {govResult.optimalOasAgeB}</div>
+                          <div className="text-xs text-slate-400">{deltaLabel(oasDeltaB)}</div>
+                        </div>
+                      )}
                     </div>
                     {(() => {
                       const { trace, annotations } = buildGovChart(
@@ -3740,7 +3861,7 @@ export function AnalysisTab() {
                         </div>
                       )
                     })()}
-                    {(() => {
+                    {hasSpouse && (() => {
                       const { trace, annotations } = buildGovChart(
                         govResult.oasSweepB, 'oas', govResult.optimalOasAgeB, govResult.baseOasAgeB,
                       )
@@ -3892,7 +4013,7 @@ export function AnalysisTab() {
                   })()}
   
                   {/* ── Person B sweep ── */}
-                  {hasMeltdownB && (() => {
+                  {hasSpouse && hasMeltdownB && (() => {
                     const { traces, shapes, annotations } = buildMeltdownChart(
                       meltResult.sweepB,
                       meltResult.optimalCeilingB,
@@ -3939,12 +4060,12 @@ export function AnalysisTab() {
                 </div>
   
                 {/* Boundary warnings */}
-                {(meltResult.optimalAtBoundaryA || meltResult.optimalAtBoundaryB) && (
+                {(meltResult.optimalAtBoundaryA || (hasSpouse && meltResult.optimalAtBoundaryB)) && (
                   <div className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 space-y-1">
                     {meltResult.optimalAtBoundaryA && meltResult.hasMeltdownA && (
                       <p><strong>{aName}:</strong> The curve is still decreasing at the sweep boundary (3× OAS full-clawback). No tax minimum was found — the optimal ceiling may be higher still. This typically means the RRSP is large enough that higher meltdown draws always improve the lifetime tax outcome within any realistic income range.</p>
                     )}
-                    {meltResult.optimalAtBoundaryB && meltResult.hasMeltdownB && (
+                    {hasSpouse && meltResult.optimalAtBoundaryB && meltResult.hasMeltdownB && (
                       <p><strong>{bName}:</strong> The curve is still decreasing at the sweep boundary. Same interpretation as above.</p>
                     )}
                   </div>

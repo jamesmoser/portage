@@ -724,6 +724,7 @@ export function DashboardTab() {
 
   const aName = personA.name || 'Person A'
   const bName = personB.name || 'Person B'
+  const hasSpouse = !!personB.name
 
   // ── Base plan "instead of" labels ─────────────────────────────────────────
 
@@ -904,6 +905,14 @@ export function DashboardTab() {
   const toggleTableGroup = (key: TableGroupKey) =>
     setExpandedTableGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
   const [showPersonTint, setShowPersonTint] = useState(true)
+
+  useEffect(() => {
+    if (!personB.name) {
+      if (incomePerson === 'B') setIncomePerson('both')
+      if (taxPerson === 'B') setTaxPerson('both')
+      if (portfolioPerson === 'B') setPortfolioPerson('both')
+    }
+  }, [personB.name, incomePerson, taxPerson, portfolioPerson])
 
   // ── Modal state ─────────────────────────────────────────────────────────────
   const [modalDef, setModalDef] = useState<ModalDef | null>(null)
@@ -1122,15 +1131,19 @@ export function DashboardTab() {
 
   const a = aName, b = bName   // short aliases for compact column label strings
 
-  const yearTableCols: TableCol[] = yearOpen ? [
+  const filterB = (cols: TableCol[]) => personB.name
+    ? cols
+    : cols.filter(c => c.person !== 'B' && !c.label.includes('Split'))
+
+  const yearTableCols: TableCol[] = filterB(yearOpen ? [
     { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                className: 'font-medium text-slate-700 text-left' },
     { label: `Age — ${a}`, value: d => d.personAAge, format: (v, d) => d.year > endYearA ? `(${v.toFixed(1)})` : v.toFixed(1), className: 'text-slate-600', person: 'A' },
     { label: `Age — ${b}`, value: d => d.personBAge, format: (v, d) => d.year > endYearB ? `(${v.toFixed(1)})` : v.toFixed(1), className: 'text-slate-600', person: 'B' },
   ] : [
     { label: 'Year',        value: d => d.year,      format: (v)    => String(v),                                                className: 'font-medium text-slate-700 text-left' },
-  ]
+  ])
 
-  const incomeTableCols: TableCol[] = incomeOpen ? [
+  const incomeTableCols: TableCol[] = filterB(incomeOpen ? [
     { label: `Emp — ${a}`,    value: d => d.employmentA,       person: 'A' },
     { label: `Emp — ${b}`,    value: d => d.employmentB,       person: 'B' },
     { label: `DB — ${a}`,     value: d => d.dbPensionBase,     person: 'A' },
@@ -1159,7 +1172,7 @@ export function DashboardTab() {
   ] : [
     { label: `Taxable — ${a}`, value: d => d.grossIncomeA, person: 'A' },
     { label: `Taxable — ${b}`, value: d => d.grossIncomeB, person: 'B' },
-  ]
+  ])
 
   const splitCol: TableCol = {
     label: 'Split',
@@ -1171,7 +1184,7 @@ export function DashboardTab() {
     },
   }
 
-  const taxTableCols: TableCol[] = taxOpen ? [
+  const taxTableCols: TableCol[] = filterB(taxOpen ? [
     { label: `Tax — ${a}`,      value: d => d.taxA,          person: 'A' },
     { label: `Tax — ${b}`,      value: d => d.taxB,          person: 'B' },
     { label: `Clawback — ${a}`, value: d => d.oasClawbackA,  person: 'A' },
@@ -1180,9 +1193,9 @@ export function DashboardTab() {
   ] : [
     { label: `Tax — ${a}`, value: d => d.taxA, person: 'A' },
     { label: `Tax — ${b}`, value: d => d.taxB, person: 'B' },
-  ]
+  ])
 
-  const spendingTableCols: TableCol[] = spendingOpen ? [
+  const spendingTableCols: TableCol[] = filterB(spendingOpen ? [
     { label: 'Lifestyle',       value: d => d.spendingLifestyle },
     { label: `RRSP — ${a}`,    value: d => d.contribRrspA,   person: 'A' },
     { label: `RRSP — ${b}`,    value: d => d.contribRrspB,   person: 'B' },
@@ -1194,9 +1207,9 @@ export function DashboardTab() {
     { label: 'Unexpected',     value: d => d.spendingUnexpected },
   ] : [
     { label: 'Spending',       value: d => d.householdSpending },
-  ]
+  ])
 
-  const portfolioTableCols: TableCol[] = portfolioOpen ? [
+  const portfolioTableCols: TableCol[] = filterB(portfolioOpen ? [
     { label: `RRSP — ${a}`, value: d => d.rrspA,   person: 'A' },
     { label: `RRSP — ${b}`, value: d => d.rrspB,   person: 'B' },
     { label: `TFSA — ${a}`, value: d => d.tfsaA,   person: 'A' },
@@ -1206,7 +1219,7 @@ export function DashboardTab() {
     { label: 'HISA',         value: d => d.hisa },
   ] : [
     { label: 'Total', value: d => d.totalPortfolio },
-  ]
+  ])
 
   const colTint = (col: TableCol, rowIdx: number) => {
     if (!showPersonTint || !col.person) return {}
@@ -1361,13 +1374,15 @@ export function DashboardTab() {
             return (
               <div className="space-y-3 pt-1">
                 {/* Global toggle */}
-                <div className="flex items-center gap-3 px-3 py-2 border border-slate-200 rounded bg-slate-50">
-                  <ToggleInput
-                    label="Stop contributions when partner retires"
-                    value={sg.stopContributionsWhenPartnerRetired}
-                    onChange={v => updateSg({ stopContributionsWhenPartnerRetired: v })}
-                  />
-                </div>
+                {personB.name && (
+                  <div className="flex items-center gap-3 px-3 py-2 border border-slate-200 rounded bg-slate-50">
+                    <ToggleInput
+                      label="Stop contributions when partner retires"
+                      value={sg.stopContributionsWhenPartnerRetired}
+                      onChange={v => updateSg({ stopContributionsWhenPartnerRetired: v })}
+                    />
+                  </div>
+                )}
 
                 {/* Phase 2 — Meltdown */}
                 <p className="text-sm font-semibold text-slate-600 pt-1">Phase 2 — RRSP Meltdown</p>
@@ -1376,13 +1391,15 @@ export function DashboardTab() {
                     <span className="text-sm text-slate-600 w-36 shrink-0 pb-[3px]">Gross Income Ceiling</span>
                     <div className="flex gap-6">
                       <NumberInput label={aName}
-                        value={sg.meltdownA.grossIncomeCeiling}
-                        onChange={v => updatePhase('meltdownA', { grossIncomeCeiling: v })}
-                        prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
-                      <NumberInput label={bName}
-                        value={sg.meltdownB.grossIncomeCeiling}
-                        onChange={v => updatePhase('meltdownB', { grossIncomeCeiling: v })}
-                        prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                         value={sg.meltdownA.grossIncomeCeiling}
+                         onChange={v => updatePhase('meltdownA', { grossIncomeCeiling: v })}
+                         prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                      {personB.name && (
+                        <NumberInput label={bName}
+                          value={sg.meltdownB.grossIncomeCeiling}
+                          onChange={v => updatePhase('meltdownB', { grossIncomeCeiling: v })}
+                          prefix="$" min={0} max={500_000} step={5_000} decimals={0} size="sm" />
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1393,7 +1410,9 @@ export function DashboardTab() {
                       <div className="bg-white px-3 py-3">
                         <div className="flex gap-20">
                           <DeficitOrderInput phase={sg.meltdownA} allowRrif={false} onChange={items => updatePhase('meltdownA', { deficitItems: items })} personName={aName} />
-                          <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} personName={bName} />
+                          {personB.name && (
+                            <DeficitOrderInput phase={sg.meltdownB} allowRrif={false} onChange={items => updatePhase('meltdownB', { deficitItems: items })} personName={bName} />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1422,7 +1441,9 @@ export function DashboardTab() {
                       <div className="bg-white px-3 py-3">
                         <div className="flex gap-20">
                           <DeficitOrderInput phase={sg.rrifA} allowRrif={true} onChange={items => updatePhase('rrifA', { deficitItems: items })} personName={aName} />
-                          <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} personName={bName} />
+                          {personB.name && (
+                            <DeficitOrderInput phase={sg.rrifB} allowRrif={true} onChange={items => updatePhase('rrifB', { deficitItems: items })} personName={bName} />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1513,12 +1534,14 @@ export function DashboardTab() {
                               onChange={v => updatePerson('personA', { drawRatePct: v })}
                               min={0} max={20} step={0.25} decimals={2} size="sm"
                             />
-                            <NumberInput
-                              label={`${bName} (%)`}
-                              value={bg.personB.drawRatePct}
-                              onChange={v => updatePerson('personB', { drawRatePct: v })}
-                              min={0} max={20} step={0.25} decimals={2} size="sm"
-                            />
+                            {personB.name && (
+                              <NumberInput
+                                label={`${bName} (%)`}
+                                value={bg.personB.drawRatePct}
+                                onChange={v => updatePerson('personB', { drawRatePct: v })}
+                                min={0} max={20} step={0.25} decimals={2} size="sm"
+                              />
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1538,11 +1561,13 @@ export function DashboardTab() {
                         onChange={items => updatePerson('personA', { accountOrder: items })}
                         personName={aName}
                       />
-                      <BengenAccountOrderInput
-                        items={bg.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
-                        onChange={items => updatePerson('personB', { accountOrder: items })}
-                        personName={bName}
-                      />
+                      {personB.name && (
+                        <BengenAccountOrderInput
+                          items={bg.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
+                          onChange={items => updatePerson('personB', { accountOrder: items })}
+                          personName={bName}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1622,12 +1647,14 @@ export function DashboardTab() {
                               onChange={v => updatePerson('personA', { drawRatePct: v })}
                               min={0} max={20} step={0.25} decimals={2} size="sm"
                             />
-                            <NumberInput
-                              label={`${bName} (%)`}
-                              value={gk.personB.drawRatePct}
-                              onChange={v => updatePerson('personB', { drawRatePct: v })}
-                              min={0} max={20} step={0.25} decimals={2} size="sm"
-                            />
+                            {personB.name && (
+                              <NumberInput
+                                label={`${bName} (%)`}
+                                value={gk.personB.drawRatePct}
+                                onChange={v => updatePerson('personB', { drawRatePct: v })}
+                                min={0} max={20} step={0.25} decimals={2} size="sm"
+                              />
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1704,11 +1731,13 @@ export function DashboardTab() {
                         onChange={items => updatePerson('personA', { accountOrder: items })}
                         personName={aName}
                       />
-                      <BengenAccountOrderInput
-                        items={gk.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
-                        onChange={items => updatePerson('personB', { accountOrder: items })}
-                        personName={bName}
-                      />
+                      {personB.name && (
+                        <BengenAccountOrderInput
+                          items={gk.personB.accountOrder ?? DEFAULT_BENGEN_ACCOUNT_ORDER}
+                          onChange={items => updatePerson('personB', { accountOrder: items })}
+                          personName={bName}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1735,12 +1764,14 @@ export function DashboardTab() {
                           value: { ...whatIfs.drawdownStrategy.value, fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [keyA]: v } },
                         })}
                         prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
-                      <NumberInput label={bName}
-                        value={whatIfs.drawdownStrategy.value.fixedWithdrawal[keyB]}
-                        onChange={v => updateWhatIf('drawdownStrategy', {
-                          value: { ...whatIfs.drawdownStrategy.value, fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [keyB]: v } },
-                        })}
-                        prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                      {personB.name && (
+                        <NumberInput label={bName}
+                          value={whatIfs.drawdownStrategy.value.fixedWithdrawal[keyB]}
+                          onChange={v => updateWhatIf('drawdownStrategy', {
+                            value: { ...whatIfs.drawdownStrategy.value, fixedWithdrawal: { ...whatIfs.drawdownStrategy.value.fixedWithdrawal, [keyB]: v } },
+                          })}
+                          prefix="$" min={0} max={500_000} step={1000} decimals={0} size="sm" />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2299,7 +2330,7 @@ export function DashboardTab() {
               {([
                 { key: 'retirementA' as const, person: personA, currentAge: currentAgeA, dbEnabled: state.dbPensionA.enabled, name: aName, rrsp: state.rrspA, tfsa: state.tfsaA, nonReg: state.nonRegA },
                 { key: 'retirementB' as const, person: personB, currentAge: currentAgeB, dbEnabled: state.dbPensionB.enabled, name: bName, rrsp: state.rrspB, tfsa: state.tfsaB, nonReg: state.nonRegB },
-              ]).map(({ key, person, currentAge, dbEnabled, name, rrsp, tfsa, nonReg }) => {
+              ].filter(x => x.key === 'retirementA' || hasSpouse)).map(({ key, person, currentAge, dbEnabled, name, rrsp, tfsa, nonReg }) => {
                 const wi    = whatIfs[key]
                 const cfg   = wi?.value ?? { retirementAge: exactAgeAt(person.birthDate, person.retirementDate), cascadePension: true, cascadeRrsp: true, cascadeTfsa: true, cascadeNonReg: true } as RetirementWhatIfConfig
                 const baseAge        = exactAgeAt(person.birthDate, person.retirementDate)
@@ -2371,14 +2402,16 @@ export function DashboardTab() {
                 enabled={whatIfs.longevityA.enabled}
                 onChange={(age, active) => updateWhatIf('longevityA', { enabled: active, value: age })}
               />
-              <WhatIfSlider
-                label={`${bName}'s Age at Death`}
-                min={Math.floor(currentAgeB)} max={100}
-                baseValue={personB.planningEndAge}
-                value={whatIfs.longevityB.enabled ? whatIfs.longevityB.value : personB.planningEndAge}
-                enabled={whatIfs.longevityB.enabled}
-                onChange={(age, active) => updateWhatIf('longevityB', { enabled: active, value: age })}
-              />
+              {hasSpouse && (
+                <WhatIfSlider
+                  label={`${bName}'s Age at Death`}
+                  min={Math.floor(currentAgeB)} max={100}
+                  baseValue={personB.planningEndAge}
+                  value={whatIfs.longevityB.enabled ? whatIfs.longevityB.value : personB.planningEndAge}
+                  enabled={whatIfs.longevityB.enabled}
+                  onChange={(age, active) => updateWhatIf('longevityB', { enabled: active, value: age })}
+                />
+              )}
             </WhatIfSection>
 
             <WhatIfSection title="Government Benefits">
@@ -2390,14 +2423,16 @@ export function DashboardTab() {
                 enabled={whatIfs.cppStartAgeA.enabled}
                 onChange={(age, active) => updateWhatIf('cppStartAgeA', { enabled: active, value: age })}
               />
-              <WhatIfSlider
-                label={`CPP Start — ${bName}`}
-                min={60} max={70}
-                baseValue={cppBaseAgeB}
-                value={whatIfs.cppStartAgeB.enabled ? whatIfs.cppStartAgeB.value : cppBaseAgeB}
-                enabled={whatIfs.cppStartAgeB.enabled}
-                onChange={(age, active) => updateWhatIf('cppStartAgeB', { enabled: active, value: age })}
-              />
+              {hasSpouse && (
+                <WhatIfSlider
+                  label={`CPP Start — ${bName}`}
+                  min={60} max={70}
+                  baseValue={cppBaseAgeB}
+                  value={whatIfs.cppStartAgeB.enabled ? whatIfs.cppStartAgeB.value : cppBaseAgeB}
+                  enabled={whatIfs.cppStartAgeB.enabled}
+                  onChange={(age, active) => updateWhatIf('cppStartAgeB', { enabled: active, value: age })}
+                />
+              )}
               <WhatIfSlider
                 label={`OAS Start — ${aName}`}
                 min={65} max={70}
@@ -2406,21 +2441,23 @@ export function DashboardTab() {
                 enabled={whatIfs.oasStartAgeA.enabled}
                 onChange={(age, active) => updateWhatIf('oasStartAgeA', { enabled: active, value: age })}
               />
-              <WhatIfSlider
-                label={`OAS Start — ${bName}`}
-                min={65} max={70}
-                baseValue={oasBaseAgeB}
-                value={whatIfs.oasStartAgeB.enabled ? whatIfs.oasStartAgeB.value : oasBaseAgeB}
-                enabled={whatIfs.oasStartAgeB.enabled}
-                onChange={(age, active) => updateWhatIf('oasStartAgeB', { enabled: active, value: age })}
-              />
+              {hasSpouse && (
+                <WhatIfSlider
+                  label={`OAS Start — ${bName}`}
+                  min={65} max={70}
+                  baseValue={oasBaseAgeB}
+                  value={whatIfs.oasStartAgeB.enabled ? whatIfs.oasStartAgeB.value : oasBaseAgeB}
+                  enabled={whatIfs.oasStartAgeB.enabled}
+                  onChange={(age, active) => updateWhatIf('oasStartAgeB', { enabled: active, value: age })}
+                />
+              )}
             </WhatIfSection>
 
             <WhatIfSection title="One Shot Events">
               {([
                 { key: 'layoffA' as const, name: aName, baseRetireDate: state.personA.retirementDate },
                 { key: 'layoffB' as const, name: bName, baseRetireDate: state.personB.retirementDate },
-              ]).map(({ key, name, baseRetireDate }) => {
+              ].filter(x => x.key === 'layoffA' || hasSpouse)).map(({ key, name, baseRetireDate }) => {
                 const wi       = whatIfs[key]
                 const enabled  = wi?.enabled ?? false
                 const date     = wi?.value?.date      ?? todayStr()

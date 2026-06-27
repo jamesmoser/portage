@@ -67,9 +67,9 @@ export const DEFAULT_TAX_SETTINGS: TaxSettings = {
 
 // Helper: a person born ~52 years ago with a retirement date ~3 years from now
 const birthA = `${new Date().getFullYear() - 52}-06-15`
-const birthB = `${new Date().getFullYear() - 50}-03-22`
+const birthB = '1971-01-01'
 const retireA = dateAtAge(birthA, 55)
-const retireB = dateAtAge(birthB, 53)
+const retireB = '1971-01-01'
 
 export const DEFAULT_DEFICIT_ITEMS: SpendGapDeficitItem[] = [
   { account: 'tfsa',   unlimited: true, cap: 0 },
@@ -180,7 +180,7 @@ export const DEFAULT_STATE: AppState = {
     birthDate: birthB,
     gender: 'female',
     retirementDate: retireB,
-    planningEndAge: 95,
+    planningEndAge: 0,
   },
 
   ageReferencePerson: 'personA',

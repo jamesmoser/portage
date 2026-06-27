@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { exactAgeAt } from '../engine/dates'
+import { useStore } from '../store/useStore'
 
 export type XAxisMode = 'year' | 'ageA' | 'ageB'
 
@@ -34,11 +36,24 @@ interface Props {
 }
 
 export function XAxisSelector({ value, onChange, aName, bName }: Props) {
+  const personBName = useStore(s => s.personB.name)
+  const hasPersonB = !!personBName
+
+  useEffect(() => {
+    if (value === 'ageB' && !hasPersonB) {
+      onChange('year')
+    }
+  }, [value, hasPersonB, onChange])
+
   const options: { value: XAxisMode; label: string }[] = [
     { value: 'year', label: 'Year' },
     { value: 'ageA', label: `${aName}'s Age` },
-    { value: 'ageB', label: `${bName}'s Age` },
   ]
+
+  if (hasPersonB) {
+    options.push({ value: 'ageB', label: `${bName}'s Age` })
+  }
+
   return (
     <div className="flex items-center justify-center gap-1.5 pt-2">
       {options.map(o => (
@@ -58,3 +73,4 @@ export function XAxisSelector({ value, onChange, aName, bName }: Props) {
     </div>
   )
 }
+

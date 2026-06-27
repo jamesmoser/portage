@@ -8,7 +8,7 @@ import { DEFAULT_STATE } from '../../engine/defaults'
 export function EmploymentTab() {
   const { employmentA, employmentB, personA, personB, update } = useStore()
   const aName = personA.name || 'Person A'
-  const bName = personB.name || 'Person B'
+  const bName = personB.name || ''
 
   function retirementNominal(amount: number, growthPct: number, retDate: string) {
     const years = Math.max(0, new Date(retDate).getFullYear() - new Date().getFullYear())
@@ -42,7 +42,7 @@ export function EmploymentTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title={`Employment — ${bName}`} width="half" personColor={personB.color}
+      <SectionCard title={`Employment — ${bName}`} width="half" personColor={personB.name ? personB.color : '#000000'}
         onReset={() => update('employmentB', DEFAULT_STATE.employmentB)}
         info={
           <div className="space-y-2 text-sm">
